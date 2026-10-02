@@ -12,7 +12,7 @@ services:
       - key: PORT
         value: 10000
       - key: BASE_URL
-        sync: false # Set to https://<your-render-subdomain>.onrender.com in dashboard
+        value: https://medfinder-ethiopia.onrender.com
       - key: TELEGRAM_PHARMACY_BOT_TOKEN
         sync: false # Set to your @MedFinder_Verifier_bot token in Render dashboard
       - key: TELEGRAM_PATIENT_BOT_TOKEN

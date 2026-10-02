@@ -497,7 +497,7 @@ export class TelegramVerificationBotService {
    * Get Telegram Mini App URL
    */
   public getMiniAppUrl(): string {
-    const host = process.env.BASE_URL || process.env.APP_BASE_URL || 'http://localhost:4000';
+    const host = process.env.BASE_URL || process.env.APP_BASE_URL || 'https://medfinder-ethiopia.onrender.com';
     return `${host.replace(/\/$/, '')}/miniapp`;
   }
 
@@ -505,7 +505,7 @@ export class TelegramVerificationBotService {
    * Get Web Pharmacy Studio URL for direct browser access
    */
   public getWebStudioUrl(pharmacyId?: string): string {
-    const host = process.env.BASE_URL || process.env.APP_BASE_URL || 'http://localhost:4000';
+    const host = process.env.BASE_URL || process.env.APP_BASE_URL || 'https://medfinder-ethiopia.onrender.com';
     const cleanHost = host.replace(/\/$/, '');
     return pharmacyId ? `${cleanHost}/?tab=pharmacy&pharmId=${pharmacyId}` : `${cleanHost}/?tab=pharmacy`;
   }
