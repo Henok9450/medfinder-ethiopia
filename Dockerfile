@@ -5,7 +5,7 @@ WORKDIR /app
 
 # Install dependencies
 COPY package*.json tsconfig.json ./
-RUN npm ci
+RUN npm install
 
 # Copy application source code
 COPY src/ ./src/
@@ -24,7 +24,7 @@ ENV PORT=4000
 
 # Install production dependencies only
 COPY package*.json ./
-RUN npm ci --omit=dev
+RUN npm install --omit=dev
 
 # Copy compiled JavaScript from builder stage
 COPY --from=builder /app/dist ./dist
