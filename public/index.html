@@ -114,7 +114,7 @@
           <div>
             <div class="flex items-center gap-2">
               <span class="text-[10px] font-bold bg-white/20 text-white px-2 py-0.5 rounded-full uppercase tracking-wider">Top Recommended for Patients</span>
-              <h3 class="font-bold text-sm md:text-base">Official Telegram Search Bot &amp; Mini App (@MedFinderEthioBot)</h3>
+              <h3 class="font-bold text-sm md:text-base">Official Telegram Search Bot &amp; Mini App (@MedFinder_ET_bot)</h3>
             </div>
             <p class="text-xs text-sky-100 mt-1">
               Ethiopia's easiest way for patients to find medicines: live Addis Ababa sub-city radar, verified pharmacy prices, and 60-minute anti-gouging hold vouchers.
@@ -215,11 +215,7 @@
             <div>
               <span class="text-xs text-slate-500 font-medium">Currently Managing Pharmacy:</span>
               <select id="actingPharmacySelect" onchange="loadPharmacyInventory()" class="text-base font-bold bg-transparent text-slate-900 block border-b-2 border-emerald-500 outline-none pb-0.5">
-                <option value="pharm-bole-01">Kenema Pharmacy No. 12 (Bole, Addis Ababa)</option>
-                <option value="pharm-mexico-05">Aster Pharmacy (Mexico Square, Kirkos)</option>
-                <option value="pharm-megenagna-02">Lion Pharmacy (Megenagna Branch, Yeka)</option>
-                <option value="pharm-piazza-03">Buraq Modern Pharmacy (Piazza, Arada)</option>
-                <option value="pharm-saris-04">Saris Community Care Pharmacy (Nifas Silk)</option>
+                <option value="" disabled selected>No pharmacies registered yet (Register via @MedFinder_Verifier_bot)</option>
               </select>
             </div>
           </div>
@@ -239,7 +235,7 @@
             <div>
               <div class="flex items-center gap-2">
                 <span class="text-[10px] font-bold bg-white/20 text-white px-2 py-0.5 rounded-full uppercase tracking-wider">Channel B Active</span>
-                <h3 class="font-bold text-sm md:text-base">Official Telegram Verification Bot (@MedFinderVerifyBot)</h3>
+                <h3 class="font-bold text-sm md:text-base">Official Telegram Verification Bot (@MedFinder_Verifier_bot)</h3>
               </div>
               <p class="text-xs text-sky-100 mt-1">
                 Fastest way for Ethiopian pharmacies to verify: send your EFDA CoC wall certificate, Pharmacist ID, and TIN directly through Telegram.
@@ -251,7 +247,7 @@
               <i class="fa-solid fa-mobile-screen text-sky-600"></i>
               <span>Launch Bot Simulator</span>
             </button>
-            <button onclick="window.open('https://t.me/MedFinderVerifyBot?start=verify', '_blank')" class="bg-sky-500/30 hover:bg-sky-500/40 text-white text-xs font-semibold px-3.5 py-2.5 rounded-xl border border-white/20 transition flex items-center space-x-1.5">
+            <button onclick="window.open('https://t.me/MedFinder_Verifier_bot?start=verify', '_blank')" class="bg-sky-500/30 hover:bg-sky-500/40 text-white text-xs font-semibold px-3.5 py-2.5 rounded-xl border border-white/20 transition flex items-center space-x-1.5">
               <i class="fa-brands fa-telegram"></i>
               <span>Open in Telegram</span>
             </button>
@@ -553,7 +549,7 @@
             <div class="flex items-center justify-between">
               <div class="flex items-center space-x-2">
                 <i class="fa-brands fa-telegram text-sky-600 text-lg"></i>
-                <h4 class="font-bold text-sm text-slate-900">Incoming Telegram Verification Review Queue (@MedFinderVerifyBot)</h4>
+                <h4 class="font-bold text-sm text-slate-900">Incoming Telegram Verification Review Queue (@MedFinder_Verifier_bot)</h4>
                 <span id="telegramQueueBadge" class="text-[10px] bg-sky-100 text-sky-800 font-bold px-2 py-0.5 rounded-full">0 Applications</span>
               </div>
               <button onclick="loadTelegramApplications()" class="text-xs text-sky-700 hover:text-sky-900 font-semibold flex items-center space-x-1">
@@ -926,19 +922,19 @@
       <div class="p-6 space-y-3 text-xs">
         <div class="flex justify-between py-1 border-b border-slate-100">
           <span class="text-slate-500">Medicine:</span>
-          <strong id="resMedName" class="text-slate-900">Augmentin 625mg</strong>
+          <strong id="resMedName" class="text-slate-900">—</strong>
         </div>
         <div class="flex justify-between py-1 border-b border-slate-100">
           <span class="text-slate-500">Guaranteed Price:</span>
-          <strong id="resPrice" class="text-emerald-700 text-sm">390 ETB</strong>
+          <strong id="resPrice" class="text-emerald-700 text-sm">—</strong>
         </div>
         <div class="flex justify-between py-1 border-b border-slate-100">
           <span class="text-slate-500">Pharmacy:</span>
-          <strong id="resPharmName" class="text-slate-900">Kenema Pharmacy Bole</strong>
+          <strong id="resPharmName" class="text-slate-900">—</strong>
         </div>
         <div class="flex justify-between py-1">
           <span class="text-slate-500">Phone:</span>
-          <strong id="resPharmPhone" class="text-slate-900">+251911223344</strong>
+          <strong id="resPharmPhone" class="text-slate-900">—</strong>
         </div>
 
         <div class="p-3 bg-amber-50 border border-amber-200 rounded-xl text-amber-900 text-[11px] flex items-center space-x-2">
@@ -1031,7 +1027,7 @@
               <h3 class="font-bold text-sm">MedFinder Verification Bot</h3>
               <i class="fa-solid fa-circle-check text-sky-400 text-xs"></i>
             </div>
-            <p class="text-[11px] text-sky-300">@MedFinderVerifyBot • bot • 🟢 online</p>
+            <p class="text-[11px] text-sky-300">@MedFinder_Verifier_bot • bot • 🟢 online</p>
           </div>
         </div>
         <div class="flex items-center space-x-2">
@@ -1566,8 +1562,25 @@
 
     // --- PHARMACY INVENTORY LOGIC ---
     async function loadPharmacyInventory() {
-      const pharmacyId = document.getElementById('actingPharmacySelect').value;
+      const select = document.getElementById('actingPharmacySelect');
+      const pharmacyId = select ? select.value : '';
       const tbody = document.getElementById('pharmacyInventoryTbody');
+      
+      if (!pharmacyId) {
+        if (tbody) {
+          tbody.innerHTML = `<tr><td colspan="5" class="p-8 text-center text-slate-400 text-xs">No registered pharmacy selected. Onboard your pharmacy via @MedFinder_Verifier_bot to manage stock.</td></tr>`;
+        }
+        const badge = document.getElementById('inventoryCountBadge');
+        if (badge) badge.innerText = '0 Items';
+        const licenseTxt = document.getElementById('pharmLicenseTxt');
+        if (licenseTxt) licenseTxt.innerText = '—';
+        const strikesTxt = document.getElementById('pharmStrikesTxt');
+        if (strikesTxt) strikesTxt.innerText = '0/3';
+        const trustBadge = document.getElementById('pharmTrustBadge');
+        if (trustBadge) trustBadge.innerText = '—';
+        return;
+      }
+
       tbody.innerHTML = `<tr><td colspan="5" class="p-4 text-center text-slate-400">Loading shelf inventory...</td></tr>`;
 
       try {
@@ -1696,6 +1709,10 @@
 
     async function submitChecklistImport() {
       const pharmacyId = document.getElementById('actingPharmacySelect').value;
+      if (!pharmacyId) {
+        alert('Please register or select a pharmacy first before adding inventory. Pharmacies can register via @MedFinder_Verifier_bot.');
+        return;
+      }
       const selectedItems = [];
 
       masterCatalog.forEach((item, idx) => {
@@ -1736,6 +1753,10 @@
 
     async function submitSingleMedicineAdd() {
       const pharmacyId = document.getElementById('actingPharmacySelect').value;
+      if (!pharmacyId) {
+        alert('Please register or select a pharmacy first before adding inventory. Pharmacies can register via @MedFinder_Verifier_bot.');
+        return;
+      }
       const name = document.getElementById('singleMedName').value.trim();
       const genericName = document.getElementById('singleGenericName').value.trim();
       const category = document.getElementById('singleCategory').value;
@@ -1921,6 +1942,10 @@
 
     async function submitDirectFileImport() {
       const pharmacyId = document.getElementById('actingPharmacySelect').value;
+      if (!pharmacyId) {
+        alert('Please register or select a pharmacy first before importing inventory. Pharmacies can register via @MedFinder_Verifier_bot.');
+        return;
+      }
 
       if (!parsedFileItems || parsedFileItems.length === 0) {
         alert('No medicines found to import. Please select a valid spreadsheet file.');
@@ -2068,7 +2093,7 @@
       const typingNode = document.createElement('div');
       typingNode.id = typingId;
       typingNode.className = 'flex items-center space-x-2 text-slate-400 text-[11px] pl-2 py-1';
-      typingNode.innerHTML = `<i class="fa-solid fa-circle-notch fa-spin text-sky-400"></i><span>@MedFinderVerifyBot is typing...</span>`;
+      typingNode.innerHTML = `<i class="fa-solid fa-circle-notch fa-spin text-sky-400"></i><span>@MedFinder_Verifier_bot is typing...</span>`;
       logs.appendChild(typingNode);
       logs.scrollTop = logs.scrollHeight;
 
@@ -2203,7 +2228,7 @@
           if (badge) badge.innerText = `${apps.length} Applications`;
 
           if (apps.length === 0) {
-            tbody.innerHTML = `<tr><td colspan="6" class="p-6 text-center text-slate-400 text-xs">No verification applications submitted yet. Test via Channel B Bot Simulator!</td></tr>`;
+            tbody.innerHTML = `<tr><td colspan="6" class="p-6 text-center text-slate-400 text-xs">No verification applications in queue. Pharmacies can submit registration via @MedFinder_Verifier_bot.</td></tr>`;
             return;
           }
 
@@ -2567,36 +2592,40 @@
         const res = await fetch('/api/admin/pharmacies');
         const data = await res.json();
         if (data.success && data.pharmacies) {
-          tbody.innerHTML = data.pharmacies.map(p => `
-            <tr class="hover:bg-slate-50 transition">
-              <td class="p-3">
-                <strong class="text-slate-900 block">${p.name}</strong>
-                <span class="text-[11px] text-slate-500">📍 ${p.subCity} • ${p.phone}</span>
-              </td>
-              <td class="p-3">
-                <span class="font-mono text-xs text-slate-700 bg-slate-100 px-2 py-0.5 rounded">${p.efdaLicenseNumber}</span>
-              </td>
-              <td class="p-3">
-                <span class="font-mono text-xs text-slate-700">${p.tinNumber}</span>
-              </td>
-              <td class="p-3">
-                <span class="font-bold ${p.trustScore >= 90 ? 'text-emerald-700' : p.trustScore >= 70 ? 'text-amber-700' : 'text-rose-700'}">★ ${p.trustScore}%</span>
-                <span class="text-[11px] text-slate-400 block">${p.strikeCount}/3 Strikes</span>
-              </td>
-              <td class="p-3">
-                ${p.isPermanentlyBanned 
-                  ? '<span class="bg-rose-100 text-rose-800 font-bold px-2 py-0.5 rounded text-[10px]">🚫 Permanently Banned</span>'
-                  : p.isVerified 
-                    ? '<span class="bg-emerald-100 text-emerald-800 font-bold px-2 py-0.5 rounded text-[10px]">✅ EFDA Verified</span>'
-                    : '<span class="bg-amber-100 text-amber-800 font-bold px-2 py-0.5 rounded text-[10px]">⏳ Pending / Unverified</span>'}
-              </td>
-              <td class="p-3 text-right">
-                <button onclick="togglePharmacyVerification('${p.id}')" class="text-xs font-semibold px-2.5 py-1 rounded-lg transition ${p.isVerified ? 'bg-rose-50 text-rose-700 hover:bg-rose-100' : 'bg-emerald-50 text-emerald-700 hover:bg-emerald-100'}">
-                  ${p.isVerified ? 'Revoke Status' : 'Approve & Verify'}
-                </button>
-              </td>
-            </tr>
-          `).join('');
+          if (data.pharmacies.length === 0) {
+            tbody.innerHTML = `<tr><td colspan="6" class="p-8 text-center text-slate-400 text-xs">No registered pharmacies yet in database. Once pharmacies register via @MedFinder_Verifier_bot, they will appear here for EFDA compliance review.</td></tr>`;
+          } else {
+            tbody.innerHTML = data.pharmacies.map(p => `
+              <tr class="hover:bg-slate-50 transition">
+                <td class="p-3">
+                  <strong class="text-slate-900 block">${p.name}</strong>
+                  <span class="text-[11px] text-slate-500">📍 ${p.subCity} • ${p.phone}</span>
+                </td>
+                <td class="p-3">
+                  <span class="font-mono text-xs text-slate-700 bg-slate-100 px-2 py-0.5 rounded">${p.efdaLicenseNumber}</span>
+                </td>
+                <td class="p-3">
+                  <span class="font-mono text-xs text-slate-700">${p.tinNumber}</span>
+                </td>
+                <td class="p-3">
+                  <span class="font-bold ${p.trustScore >= 90 ? 'text-emerald-700' : p.trustScore >= 70 ? 'text-amber-700' : 'text-rose-700'}">★ ${p.trustScore}%</span>
+                  <span class="text-[11px] text-slate-400 block">${p.strikeCount}/3 Strikes</span>
+                </td>
+                <td class="p-3">
+                  ${p.isPermanentlyBanned 
+                    ? '<span class="bg-rose-100 text-rose-800 font-bold px-2 py-0.5 rounded text-[10px]">🚫 Permanently Banned</span>'
+                    : p.isVerified 
+                      ? '<span class="bg-emerald-100 text-emerald-800 font-bold px-2 py-0.5 rounded text-[10px]">✅ EFDA Verified</span>'
+                      : '<span class="bg-amber-100 text-amber-800 font-bold px-2 py-0.5 rounded text-[10px]">⏳ Pending / Unverified</span>'}
+                </td>
+                <td class="p-3 text-right">
+                  <button onclick="togglePharmacyVerification('${p.id}')" class="text-xs font-semibold px-2.5 py-1 rounded-lg transition ${p.isVerified ? 'bg-rose-50 text-rose-700 hover:bg-rose-100' : 'bg-emerald-50 text-emerald-700 hover:bg-emerald-100'}">
+                    ${p.isVerified ? 'Revoke Status' : 'Approve & Verify'}
+                  </button>
+                </td>
+              </tr>
+            `).join('');
+          }
 
           // Dynamically synchronize the pharmacy dropdown selector in Tab 2!
           updatePharmacySelectDropdown(data.pharmacies);
@@ -2608,7 +2637,12 @@
 
     function updatePharmacySelectDropdown(pharmacies) {
       const select = document.getElementById('actingPharmacySelect');
-      if (!select || !pharmacies || pharmacies.length === 0) return;
+      if (!select) return;
+      if (!pharmacies || pharmacies.length === 0) {
+        select.innerHTML = '<option value="" disabled selected>No pharmacies registered yet (Register via @MedFinder_Verifier_bot)</option>';
+        loadPharmacyInventory();
+        return;
+      }
       const currentVal = select.value;
       select.innerHTML = pharmacies.map(p => `
         <option value="${p.id}" ${p.id === currentVal ? 'selected' : ''}>
@@ -2618,6 +2652,7 @@
       if (currentVal && Array.from(select.options).some(o => o.value === currentVal)) {
         select.value = currentVal;
       }
+      loadPharmacyInventory();
     }
 
     async function togglePharmacyVerification(pharmacyId) {
