@@ -1,0 +1,19 @@
+services:
+  - type: web
+    name: medfinder-ethiopia
+    env: node
+    plan: free
+    region: frankfurt # Closest low-latency region to East Africa / Ethiopia
+    buildCommand: npm install && npm run build
+    startCommand: node dist/server.js
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: PORT
+        value: 10000
+      - key: BASE_URL
+        sync: false # Set to https://<your-render-subdomain>.onrender.com in dashboard
+      - key: TELEGRAM_PHARMACY_BOT_TOKEN
+        sync: false # Set to your @MedFinder_Verifier_bot token in Render dashboard
+      - key: TELEGRAM_PATIENT_BOT_TOKEN
+        sync: false # Set to your @MedFinder_ET_bot token in Render dashboard

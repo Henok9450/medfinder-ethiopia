@@ -1,0 +1,2969 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>MedFinder Ethiopia (የመድኃኒት አግኚ) - Interactive Platform</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://cdn.sheetjs.com/xlsx-0.20.2/package/dist/xlsx.full.min.js"></script>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          colors: {
+            brand: {
+              50: '#ecfdf5',
+              500: '#10b981',
+              600: '#059669',
+              700: '#047857',
+            },
+            telebirr: '#005baa',
+          }
+        }
+      }
+    }
+  </script>
+  <style>
+    body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif; }
+    .tab-active { border-bottom: 3px solid #059669; color: #059669; font-weight: 600; }
+  </style>
+</head>
+<body class="bg-slate-50 text-slate-800 min-h-screen">
+
+  <!-- TOP NAVIGATION HEADER -->
+  <header class="bg-white border-b border-slate-200 sticky top-0 z-50 shadow-sm">
+    <div class="max-w-7xl mx-auto px-4 py-3 flex flex-wrap items-center justify-between gap-4">
+      <div class="flex items-center space-x-3">
+        <div class="w-10 h-10 rounded-xl bg-gradient-to-tr from-emerald-600 to-teal-400 flex items-center justify-center text-white text-xl shadow-md">
+          <i class="fa-solid fa-prescription-bottle-medical"></i>
+        </div>
+        <div>
+          <div class="flex items-center space-x-2">
+            <h1 class="text-xl font-bold text-slate-900 tracking-tight">MedFinder Ethiopia</h1>
+            <span class="text-xs bg-emerald-100 text-emerald-800 font-semibold px-2 py-0.5 rounded-full">የመድኃኒት አግኚ</span>
+          </div>
+          <p class="text-xs text-slate-500">Real-Time Medicine Stock Radar & Dynamic Telebirr Micro-Subscription</p>
+        </div>
+      </div>
+
+      <!-- ACTIONS & BADGES -->
+      <div class="flex items-center space-x-2.5">
+        <a href="/miniapp" target="_blank" class="bg-gradient-to-r from-sky-500 to-blue-600 hover:from-sky-600 hover:to-blue-700 text-white font-bold text-xs px-3.5 py-2 rounded-xl shadow-sm transition flex items-center space-x-1.5">
+          <i class="fa-brands fa-telegram text-sm"></i>
+          <span>📱 Open Telegram Mini App</span>
+        </a>
+        <button onclick="openTelegramBotModal()" class="bg-slate-900 hover:bg-black text-white font-bold text-xs px-3 py-2 rounded-xl shadow-sm transition flex items-center space-x-1.5">
+          <i class="fa-solid fa-robot text-sky-400"></i>
+          <span>Bot Simulator</span>
+        </button>
+        <div id="statusBadge" class="bg-amber-50 border border-amber-200 text-amber-900 px-3 py-1.5 rounded-lg text-xs flex items-center space-x-2 shadow-sm">
+          <span class="w-2 h-2 rounded-full bg-amber-500 animate-pulse"></span>
+          <span id="policyStatusText">Loading dynamic system policy...</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- TAB NAVIGATION -->
+    <div class="max-w-7xl mx-auto px-4 flex space-x-8 text-sm border-t border-slate-100 overflow-x-auto">
+      <button onclick="switchTab('search')" id="tab-search" class="tab-btn py-3 tab-active flex items-center space-x-2">
+        <i class="fa-solid fa-magnifying-glass"></i>
+        <span>Patient Search Simulator</span>
+      </button>
+      <button onclick="switchTab('pharmacy')" id="tab-pharmacy" class="tab-btn py-3 text-slate-500 hover:text-slate-800 flex items-center space-x-2">
+        <i class="fa-solid fa-clinic-medical text-emerald-600"></i>
+        <span class="font-bold text-emerald-700">Tab 2: Pharmacy Studio (Inventory & Check-In)</span>
+      </button>
+      <button onclick="switchTab('admin')" id="tab-admin" class="tab-btn py-3 text-slate-500 hover:text-slate-800 flex items-center space-x-2">
+        <i class="fa-solid fa-sliders"></i>
+        <span>Dynamic Admin Policy & Pricing</span>
+      </button>
+      <button onclick="switchTab('telebirr')" id="tab-telebirr" class="tab-btn py-3 text-slate-500 hover:text-slate-800 flex items-center space-x-2">
+        <i class="fa-solid fa-credit-card"></i>
+        <span>Telebirr Webhook Simulator</span>
+      </button>
+    </div>
+  </header>
+
+  <!-- MAIN CONTAINER -->
+  <main class="max-w-7xl mx-auto px-4 py-6">
+
+    <!-- ============================================================== -->
+    <!-- TAB 1: PATIENT SEARCH SIMULATOR                                -->
+    <!-- ============================================================== -->
+    <section id="panel-search" class="space-y-6">
+      
+      <!-- FREE PROMO NOTICE BANNER -->
+      <div id="freePromoBanner" class="p-4 rounded-xl bg-gradient-to-r from-emerald-500 to-teal-600 text-white shadow-md flex items-center justify-between">
+        <div class="flex items-center space-x-3">
+          <div class="text-2xl"><i class="fa-solid fa-gift"></i></div>
+          <div>
+            <h3 class="font-bold text-sm md:text-base">🎉 Special Free Launch Promotion Active</h3>
+            <p id="promoBannerDate" class="text-xs text-emerald-100">All searches are 100% free of charge during the early penetration period.</p>
+          </div>
+        </div>
+        <span class="text-xs font-bold uppercase tracking-wider bg-white/20 backdrop-blur-md px-3 py-1 rounded-full">0 ETB Fee</span>
+      </div>
+
+      <!-- TELEGRAM SEARCH BOT & MINI APP BANNER (OPTION 1) -->
+      <div class="p-5 rounded-2xl bg-gradient-to-r from-sky-600 via-sky-700 to-indigo-800 text-white shadow-md flex flex-wrap items-center justify-between gap-4">
+        <div class="flex items-center space-x-4">
+          <div class="w-12 h-12 rounded-2xl bg-white/10 backdrop-blur-md border border-white/20 flex items-center justify-center text-3xl text-sky-200 shadow-inner">
+            <i class="fa-brands fa-telegram"></i>
+          </div>
+          <div>
+            <div class="flex items-center gap-2">
+              <span class="text-[10px] font-bold bg-white/20 text-white px-2 py-0.5 rounded-full uppercase tracking-wider">Top Recommended for Patients</span>
+              <h3 class="font-bold text-sm md:text-base">Official Telegram Search Bot &amp; Mini App (@MedFinderEthioBot)</h3>
+            </div>
+            <p class="text-xs text-sky-100 mt-1">
+              Ethiopia's easiest way for patients to find medicines: live Addis Ababa sub-city radar, verified pharmacy prices, and 60-minute anti-gouging hold vouchers.
+            </p>
+          </div>
+        </div>
+        <div class="flex items-center gap-2.5">
+          <a href="/miniapp" target="_blank" class="bg-white text-sky-800 hover:bg-sky-50 text-xs font-bold px-4 py-2.5 rounded-xl shadow transition flex items-center space-x-2">
+            <i class="fa-solid fa-mobile-screen text-sky-600"></i>
+            <span>Launch Telegram Mini App</span>
+          </a>
+          <button onclick="openTelegramBotModal()" class="bg-sky-500/30 hover:bg-sky-500/40 text-white text-xs font-semibold px-3.5 py-2.5 rounded-xl border border-white/20 transition flex items-center space-x-1.5">
+            <i class="fa-solid fa-comments"></i>
+            <span>Chat in Bot Simulator</span>
+          </button>
+        </div>
+      </div>
+
+      <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        <!-- SEARCH CONTROLS -->
+        <div class="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm space-y-5">
+          <h2 class="font-bold text-slate-900 text-base flex items-center space-x-2">
+            <i class="fa-solid fa-capsules text-emerald-600"></i>
+            <span>Search Patient Medicine</span>
+          </h2>
+
+          <div>
+            <label class="block text-xs font-medium text-slate-600 mb-1">User Identifier</label>
+            <input type="text" id="patientUserId" value="patient_addis_001" class="w-full text-sm px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-emerald-500 outline-none">
+          </div>
+
+          <div>
+            <label class="block text-xs font-medium text-slate-600 mb-1">Patient Location (Addis Ababa Sub-City)</label>
+            <select id="patientLocation" class="w-full text-sm px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-emerald-500 outline-none">
+              <option value="Bole" data-lat="9.0015" data-lng="38.7845">Bole (Near Airport / Edna Mall)</option>
+              <option value="Yeka" data-lat="9.0201" data-lng="38.8021">Yeka (Megenagna / Shola)</option>
+              <option value="Arada" data-lat="9.0345" data-lng="38.7512">Arada (Piazza / Churchill)</option>
+              <option value="Kirkos" data-lat="9.0105" data-lng="38.7455">Kirkos (Mexico / Kazanchis)</option>
+              <option value="Nifas Silk" data-lat="8.9567" data-lng="38.7612">Nifas Silk-Lafto (Saris / Gotera)</option>
+            </select>
+          </div>
+
+          <div>
+            <label class="block text-xs font-medium text-slate-600 mb-1">Medicine Name (Brand or Generic)</label>
+            <input type="text" id="medicineInput" placeholder="e.g. Insulin, Augmentin, Ventolin" value="Insulin" class="w-full text-sm px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-emerald-500 outline-none">
+            <div class="flex flex-wrap gap-1.5 mt-2">
+              <span class="text-xs text-slate-400">Quick tests:</span>
+              <button onclick="setDrug('Insulin')" class="text-xs bg-slate-100 hover:bg-emerald-50 text-slate-700 px-2 py-0.5 rounded">Insulin</button>
+              <button onclick="setDrug('Augmentin')" class="text-xs bg-slate-100 hover:bg-emerald-50 text-slate-700 px-2 py-0.5 rounded">Augmentin</button>
+              <button onclick="setDrug('Ventolin')" class="text-xs bg-slate-100 hover:bg-emerald-50 text-slate-700 px-2 py-0.5 rounded">Ventolin</button>
+              <button onclick="setDrug('Humulin N (Specialty Insulin)')" class="text-xs bg-amber-50 hover:bg-amber-100 text-amber-800 px-2 py-0.5 rounded font-medium">Rare: Humulin N</button>
+            </div>
+          </div>
+
+          <div>
+            <label class="block text-xs font-medium text-slate-600 mb-1">Language</label>
+            <select id="langSelect" class="w-full text-sm px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-emerald-500 outline-none">
+              <option value="am">አማርኛ (Amharic)</option>
+              <option value="or">Afaan Oromoo</option>
+              <option value="en">English</option>
+            </select>
+          </div>
+
+          <button onclick="performSearch()" class="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-medium py-2.5 px-4 rounded-xl shadow-md transition duration-200 flex items-center justify-center space-x-2">
+            <i class="fa-solid fa-magnifying-glass"></i>
+            <span>Search Nearby Stock</span>
+          </button>
+        </div>
+
+        <!-- SEARCH RESULTS & PAYWALL DISPLAY -->
+        <div class="lg:col-span-2 space-y-4">
+          <div id="searchOutcomeBox" class="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm min-h-[300px]">
+            <div id="emptySearchPrompt" class="text-center py-12 text-slate-400">
+              <i class="fa-solid fa-pills text-4xl mb-3 text-slate-300"></i>
+              <p class="text-sm font-medium">Click "Search Nearby Stock" to execute a query.</p>
+              <p class="text-xs mt-1">The system will dynamically evaluate access rights, launch promotions, and nearby inventory.</p>
+            </div>
+
+            <!-- DYNAMIC RESULTS CONTAINER -->
+            <div id="resultsContainer" class="hidden space-y-4"></div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ============================================================== -->
+    <!-- TAB 2: PHARMACY INVENTORY & REGISTRATION STUDIO                -->
+    <!-- ============================================================== -->
+    <section id="panel-pharmacy" class="hidden space-y-6">
+      <div class="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm space-y-6">
+        
+        <!-- PHARMACY SELECTION HEADER -->
+        <div class="flex flex-wrap items-center justify-between pb-4 border-b border-slate-100 gap-4">
+          <div class="flex items-center space-x-3">
+            <div class="w-12 h-12 rounded-xl bg-emerald-100 text-emerald-700 flex items-center justify-center text-2xl">
+              <i class="fa-solid fa-clinic-medical"></i>
+            </div>
+            <div>
+              <span class="text-xs text-slate-500 font-medium">Currently Managing Pharmacy:</span>
+              <select id="actingPharmacySelect" onchange="loadPharmacyInventory()" class="text-base font-bold bg-transparent text-slate-900 block border-b-2 border-emerald-500 outline-none pb-0.5">
+                <option value="pharm-bole-01">Kenema Pharmacy No. 12 (Bole, Addis Ababa)</option>
+                <option value="pharm-mexico-05">Aster Pharmacy (Mexico Square, Kirkos)</option>
+                <option value="pharm-megenagna-02">Lion Pharmacy (Megenagna Branch, Yeka)</option>
+                <option value="pharm-piazza-03">Buraq Modern Pharmacy (Piazza, Arada)</option>
+                <option value="pharm-saris-04">Saris Community Care Pharmacy (Nifas Silk)</option>
+              </select>
+            </div>
+          </div>
+          <div class="flex items-center space-x-2">
+            <button onclick="loadPharmacyInventory()" class="text-xs bg-slate-100 hover:bg-slate-200 text-slate-700 font-semibold px-3 py-2 rounded-lg transition">
+              <i class="fa-solid fa-arrows-rotate mr-1"></i> Refresh Shelf
+            </button>
+          </div>
+        </div>
+
+        <!-- CHANNEL B: TELEGRAM VERIFICATION BOT BANNER -->
+        <div class="p-5 rounded-2xl bg-gradient-to-r from-sky-600 via-sky-700 to-indigo-800 text-white shadow-md flex flex-wrap items-center justify-between gap-4">
+          <div class="flex items-center space-x-4">
+            <div class="w-12 h-12 rounded-2xl bg-white/10 backdrop-blur-md border border-white/20 flex items-center justify-center text-3xl text-sky-200 shadow-inner">
+              <i class="fa-brands fa-telegram"></i>
+            </div>
+            <div>
+              <div class="flex items-center gap-2">
+                <span class="text-[10px] font-bold bg-white/20 text-white px-2 py-0.5 rounded-full uppercase tracking-wider">Channel B Active</span>
+                <h3 class="font-bold text-sm md:text-base">Official Telegram Verification Bot (@MedFinderVerifyBot)</h3>
+              </div>
+              <p class="text-xs text-sky-100 mt-1">
+                Fastest way for Ethiopian pharmacies to verify: send your EFDA CoC wall certificate, Pharmacist ID, and TIN directly through Telegram.
+              </p>
+            </div>
+          </div>
+          <div class="flex items-center gap-2.5">
+            <button onclick="openTelegramBotModal()" class="bg-white text-sky-800 hover:bg-sky-50 text-xs font-bold px-4 py-2.5 rounded-xl shadow transition flex items-center space-x-2">
+              <i class="fa-solid fa-mobile-screen text-sky-600"></i>
+              <span>Launch Bot Simulator</span>
+            </button>
+            <button onclick="window.open('https://t.me/MedFinderVerifyBot?start=verify', '_blank')" class="bg-sky-500/30 hover:bg-sky-500/40 text-white text-xs font-semibold px-3.5 py-2.5 rounded-xl border border-white/20 transition flex items-center space-x-1.5">
+              <i class="fa-brands fa-telegram"></i>
+              <span>Open in Telegram</span>
+            </button>
+          </div>
+        </div>
+
+        <!-- 3 PRACTICAL REGISTRATION METHODS ACCORDION / TABS -->
+        <div>
+          <h3 class="text-sm font-bold text-slate-900 mb-3 flex items-center space-x-2">
+            <i class="fa-solid fa-plus-circle text-emerald-600"></i>
+            <span>How Pharmacies Register Medicines (Choose a Method):</span>
+          </h3>
+
+          <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+            
+            <!-- METHOD 1: 1-CLICK MASTER CHECKLIST -->
+            <div class="p-5 rounded-2xl border-2 border-emerald-500/40 bg-emerald-50/30 space-y-3 flex flex-col justify-between">
+              <div>
+                <div class="flex items-center justify-between mb-1">
+                  <span class="text-xs font-bold uppercase text-emerald-700 tracking-wider">Method 1 (Fastest)</span>
+                  <span class="text-[10px] bg-emerald-200 text-emerald-900 font-bold px-2 py-0.5 rounded-full">2 Minutes</span>
+                </div>
+                <h4 class="font-bold text-slate-900 text-sm">1-Click Essential Drug Checklist</h4>
+                <p class="text-xs text-slate-500 mt-1">Select from Ethiopia's Top 15 Chronic & Vital medications (Insulin, Ventolin, Augmentin). Check the boxes and click import.</p>
+              </div>
+              <button onclick="openMasterChecklistModal()" class="w-full bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold py-2.5 rounded-xl shadow-sm transition flex items-center justify-center space-x-2">
+                <i class="fa-solid fa-list-check"></i>
+                <span>Open 1-Click Checklist</span>
+              </button>
+            </div>
+
+            <!-- METHOD 2: QUICK SINGLE ITEM FORM -->
+            <div class="p-5 rounded-2xl border border-slate-200 bg-white space-y-3 flex flex-col justify-between">
+              <div>
+                <div class="flex items-center justify-between mb-1">
+                  <span class="text-xs font-bold uppercase text-slate-500 tracking-wider">Method 2 (Custom)</span>
+                  <span class="text-[10px] bg-slate-100 text-slate-700 font-bold px-2 py-0.5 rounded-full">Single Item</span>
+                </div>
+                <h4 class="font-bold text-slate-900 text-sm">Quick Add to Shelf</h4>
+                <p class="text-xs text-slate-500 mt-1">Type in a specific medicine name, strength, category, and your retail price in ETB.</p>
+              </div>
+              <button onclick="openSingleAddModal()" class="w-full bg-slate-900 hover:bg-black text-white text-xs font-bold py-2.5 rounded-xl shadow-sm transition flex items-center justify-center space-x-2">
+                <i class="fa-solid fa-plus"></i>
+                <span>Add Single Medicine</span>
+              </button>
+            </div>
+
+            <!-- METHOD 3: EXCEL / CSV DIRECT FILE IMPORT -->
+            <div class="p-5 rounded-2xl border-2 border-sky-500/40 bg-sky-50/30 space-y-3 flex flex-col justify-between">
+              <div>
+                <div class="flex items-center justify-between mb-1">
+                  <span class="text-xs font-bold uppercase text-sky-700 tracking-wider">Method 3 (Direct File)</span>
+                  <span class="text-[10px] bg-sky-200 text-sky-900 font-bold px-2 py-0.5 rounded-full">.xlsx / .csv</span>
+                </div>
+                <h4 class="font-bold text-slate-900 text-sm">Upload & Browse Excel / CSV</h4>
+                <p class="text-xs text-slate-500 mt-1">Browse your `.xlsx`, `.xls`, or `.csv` spreadsheet directly from your computer or POS. Preview and import in 1 click.</p>
+              </div>
+              <button onclick="openCsvModal()" class="w-full bg-sky-600 hover:bg-sky-700 text-white text-xs font-bold py-2.5 rounded-xl shadow-sm transition flex items-center justify-center space-x-2">
+                <i class="fa-solid fa-file-excel"></i>
+                <span>Browse & Upload File</span>
+              </button>
+            </div>
+
+          </div>
+        </div>
+
+        <!-- REGULATORY INTEGRITY & COUNTER CHECK-IN -->
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <!-- REGULATORY CREDENTIALS -->
+          <div class="p-4 rounded-xl border border-slate-200 bg-slate-50 flex items-center justify-between">
+            <div class="space-y-1">
+              <span class="text-xs font-semibold text-slate-500 uppercase tracking-wider">Regulatory Integrity & Compliance</span>
+              <div class="flex items-center space-x-2 pt-0.5">
+                <span id="pharmEfdaBadge" class="text-xs bg-emerald-100 text-emerald-800 font-bold px-2.5 py-0.5 rounded-full flex items-center gap-1">
+                  <i class="fa-solid fa-shield-halved text-[10px]"></i> EFDA Verified
+                </span>
+                <span id="pharmTrustBadge" class="text-xs bg-amber-50 border border-amber-200 text-amber-900 font-bold px-2 py-0.5 rounded">
+                  ★ 98% Trust Score
+                </span>
+              </div>
+              <p class="text-[11px] text-slate-500 mt-1">Regulatory ID: <span id="pharmLicenseTxt" class="font-mono text-slate-700 font-semibold">EFDA/PH/AA/2024</span> • Strikes: <span id="pharmStrikesTxt" class="font-bold text-slate-700">0/3</span></p>
+            </div>
+          </div>
+
+          <!-- COUNTER RESERVATION CHECK-IN -->
+          <div class="p-4 rounded-xl border-2 border-emerald-500/40 bg-emerald-50/40 flex flex-col justify-between space-y-2">
+            <div>
+              <span class="text-xs font-bold text-emerald-900 flex items-center gap-1">
+                <i class="fa-solid fa-cash-register"></i> Counter Price-Lock Check-In
+              </span>
+              <p class="text-[11px] text-slate-500 mt-0.5">When patient presents their 4-digit code at the counter, enter it here to fulfill.</p>
+            </div>
+            <div class="flex gap-2">
+              <input type="text" id="counterCodeInput" placeholder="Code e.g. 8492" class="text-xs font-bold px-3 py-1.5 border border-slate-300 rounded-lg outline-none w-36 bg-white">
+              <button onclick="verifyCounterReservation()" class="text-xs font-bold bg-emerald-600 hover:bg-emerald-700 text-white px-3 py-1.5 rounded-lg shadow-sm transition">
+                Verify & Fulfill
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <!-- CURRENT INVENTORY TABLE -->
+        <div class="pt-4 border-t border-slate-100 space-y-4">
+          <div class="flex flex-wrap items-center justify-between gap-2">
+            <div>
+              <h3 class="text-sm font-bold text-slate-900 flex items-center space-x-2">
+                <i class="fa-solid fa-boxes-stacked text-emerald-600"></i>
+                <span>Current Shelf Inventory</span>
+                <span id="inventoryCountBadge" class="text-xs bg-slate-100 text-slate-700 px-2 py-0.5 rounded-full font-semibold">0 Items</span>
+              </h3>
+              <p class="text-xs text-slate-500">Patients searching for these items will see this pharmacy instantly in Tab 1.</p>
+            </div>
+            <input type="text" id="filterInventoryInput" onkeyup="filterInventoryTable()" placeholder="Filter registered shelf..." class="text-xs px-3 py-1.5 border border-slate-200 rounded-lg w-48 outline-none">
+          </div>
+
+          <div class="overflow-x-auto rounded-xl border border-slate-200 shadow-sm">
+            <table class="w-full text-left text-xs">
+              <thead class="bg-slate-100 text-slate-600 uppercase font-semibold">
+                <tr>
+                  <th class="p-3">Medicine Name</th>
+                  <th class="p-3">Generic / Category</th>
+                  <th class="p-3">Retail Price (ETB)</th>
+                  <th class="p-3">Status</th>
+                  <th class="p-3 text-right">Actions</th>
+                </tr>
+              </thead>
+              <tbody id="pharmacyInventoryTbody" class="divide-y divide-slate-100 bg-white">
+                <tr><td colspan="5" class="p-4 text-center text-slate-400">Loading shelf inventory...</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <!-- REAL-TIME INCOMING BROADCAST INQUIRIES -->
+        <div class="pt-4 border-t border-slate-100 space-y-3">
+          <div class="flex items-center justify-between">
+            <h3 class="text-sm font-bold text-slate-900 flex items-center space-x-2">
+              <i class="fa-solid fa-tower-broadcast text-amber-500"></i>
+              <span>Live Patient Broadcast Pings (Rare / Elusive Inquiries)</span>
+            </h3>
+            <button onclick="loadActiveBroadcasts()" class="text-xs text-emerald-700 font-semibold hover:underline">Check Inquiries</button>
+          </div>
+          <div id="broadcastsListContainer" class="space-y-3">
+            <div class="text-center py-6 text-slate-400 text-xs">
+              No active broadcast queries pending right now.
+            </div>
+          </div>
+        </div>
+
+      </div>
+    </section>
+
+    <!-- ============================================================== -->
+    <!-- TAB 3: DYNAMIC ADMIN POLICY & PRICING                          -->
+    <!-- ============================================================== -->
+    <section id="panel-admin" class="hidden space-y-6">
+      <div class="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm space-y-6">
+        <div class="flex items-center justify-between pb-4 border-b border-slate-100">
+          <div>
+            <h2 class="text-lg font-bold text-slate-900">Dynamic Policy & Monetization Controller</h2>
+            <p class="text-xs text-slate-500">Edit rules, pricing tariffs, and launch dates live without restarting or redeploying the server.</p>
+          </div>
+          <button onclick="reloadAdminPolicy()" class="text-xs bg-slate-100 hover:bg-slate-200 px-3 py-1.5 rounded-lg font-medium text-slate-700">
+            <i class="fa-solid fa-arrows-rotate mr-1"></i> Refresh
+          </button>
+        </div>
+
+        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          
+          <!-- MONETIZATION CUTOFF & MODE -->
+          <div class="p-5 rounded-xl border border-slate-200 bg-slate-50 space-y-4">
+            <h3 class="font-bold text-sm text-slate-800 flex items-center space-x-2">
+              <i class="fa-regular fa-calendar-check text-emerald-600"></i>
+              <span>Free Promotion Cut-Off Date</span>
+            </h3>
+            <p class="text-xs text-slate-500">Before this date, all users get 100% free access. After this date, the paywall takes effect.</p>
+            <div>
+              <label class="block text-xs font-medium text-slate-700 mb-1">Cut-Off Date (ISO)</label>
+              <input type="datetime-local" id="adminCutoffInput" class="w-full text-xs px-3 py-2 border border-slate-300 rounded-lg">
+            </div>
+            <div class="flex gap-2">
+              <button onclick="setCutoffDays(90)" class="text-xs bg-emerald-100 hover:bg-emerald-200 text-emerald-800 px-2.5 py-1 rounded font-medium">+3 Months (Free)</button>
+              <button onclick="setCutoffDays(-1)" class="text-xs bg-rose-100 hover:bg-rose-200 text-rose-800 px-2.5 py-1 rounded font-medium">Expire Now (Paywall)</button>
+            </div>
+            <button onclick="saveCutoffDate()" class="w-full bg-slate-900 hover:bg-black text-white text-xs font-semibold py-2 rounded-lg transition">Save Cutoff Date</button>
+          </div>
+
+          <!-- PRICING TARIFFS -->
+          <div class="p-5 rounded-xl border border-slate-200 bg-slate-50 space-y-4">
+            <h3 class="font-bold text-sm text-slate-800 flex items-center space-x-2">
+              <i class="fa-solid fa-coins text-amber-500"></i>
+              <span>Dynamic Pricing (ETB)</span>
+            </h3>
+            <div>
+              <label class="block text-xs font-medium text-slate-700 mb-1">Pay-Per-Search Fee (ETB)</label>
+              <input type="number" id="adminSearchFee" class="w-full text-xs px-3 py-2 border border-slate-300 rounded-lg">
+            </div>
+            <div>
+              <label class="block text-xs font-medium text-slate-700 mb-1">Monthly Pass (ETB)</label>
+              <input type="number" id="adminMonthlyFee" class="w-full text-xs px-3 py-2 border border-slate-300 rounded-lg">
+            </div>
+            <div>
+              <label class="block text-xs font-medium text-slate-700 mb-1">3-Month Pass (ETB)</label>
+              <input type="number" id="adminQuarterlyFee" class="w-full text-xs px-3 py-2 border border-slate-300 rounded-lg">
+            </div>
+            <button onclick="savePricing()" class="w-full bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold py-2 rounded-lg transition">Update Pricing</button>
+          </div>
+
+          <!-- GEO-MATCHING & RADAR -->
+          <div class="p-5 rounded-xl border border-slate-200 bg-slate-50 space-y-4">
+            <h3 class="font-bold text-sm text-slate-800 flex items-center space-x-2">
+              <i class="fa-solid fa-tower-broadcast text-sky-600"></i>
+              <span>Geo-Broadcast Settings</span>
+            </h3>
+            <div>
+              <label class="block text-xs font-medium text-slate-700 mb-1">Initial Search Radius (km)</label>
+              <input type="number" step="0.5" id="adminInitialRadius" class="w-full text-xs px-3 py-2 border border-slate-300 rounded-lg">
+            </div>
+            <div>
+              <label class="block text-xs font-medium text-slate-700 mb-1">Expanded Fallback Radius (km)</label>
+              <input type="number" step="0.5" id="adminExpandedRadius" class="w-full text-xs px-3 py-2 border border-slate-300 rounded-lg">
+            </div>
+            <div>
+              <label class="block text-xs font-medium text-slate-700 mb-1">Max Pharmacies Pinged</label>
+              <input type="number" id="adminMaxPing" class="w-full text-xs px-3 py-2 border border-slate-300 rounded-lg">
+            </div>
+            <button onclick="saveGeoSettings()" class="w-full bg-sky-600 hover:bg-sky-700 text-white text-xs font-semibold py-2 rounded-lg transition">Update Geo Rules</button>
+          </div>
+
+        </div>
+
+        <!-- REGULATORY COMPLIANCE & EFDA VERIFICATION DESK -->
+        <div class="mt-6 p-6 rounded-2xl border border-slate-200 bg-white space-y-4 shadow-sm">
+          <div class="flex flex-wrap items-center justify-between gap-3 pb-3 border-b border-slate-100">
+            <div>
+              <div class="flex items-center space-x-2">
+                <i class="fa-solid fa-shield-halved text-emerald-600 text-lg"></i>
+                <h3 class="font-bold text-base text-slate-900">Regulatory Compliance & EFDA Verification Desk</h3>
+              </div>
+              <p class="text-xs text-slate-500 mt-0.5">
+                Vetting authority for Ethiopian Food & Drug Authority (EFDA) CoC licenses, Ministry of Trade TINs, and professional compliance.
+              </p>
+            </div>
+            <button onclick="loadAdminPharmacies()" class="text-xs bg-slate-100 hover:bg-slate-200 text-slate-700 font-semibold px-3 py-1.5 rounded-lg flex items-center space-x-1.5 transition">
+              <i class="fa-solid fa-rotate-right text-[10px]"></i>
+              <span>Refresh Pharmacy Registry</span>
+            </button>
+          </div>
+
+          <!-- REGULATORY FRAMEWORK EXPLANATION CARDS -->
+          <div class="grid grid-cols-1 md:grid-cols-3 gap-3 text-xs">
+            <div class="p-3 bg-emerald-50/60 border border-emerald-200 rounded-xl">
+              <strong class="text-emerald-900 block flex items-center gap-1.5">
+                <i class="fa-solid fa-building-columns"></i> 1. Statutory Authority: EFDA
+              </strong>
+              <p class="text-slate-600 text-[11px] mt-1">
+                EFDA Proclamation 1112/2019 governs medicine premise accreditation (Certificate of Competence) and Druggist/Pharmacist professional licensing.
+              </p>
+            </div>
+            <div class="p-3 bg-blue-50/60 border border-blue-200 rounded-xl">
+              <strong class="text-blue-900 block flex items-center gap-1.5">
+                <i class="fa-solid fa-user-check"></i> 2. MedFinder Vetting Desk
+              </strong>
+              <p class="text-slate-600 text-[11px] mt-1">
+                Our compliance officers cross-verify submitted CoC documents against EFDA's iRIS registry and MoTRI e-Trade TIN portal before approving broadcasts.
+              </p>
+            </div>
+            <div class="p-3 bg-amber-50/60 border border-amber-200 rounded-xl">
+              <strong class="text-amber-900 block flex items-center gap-1.5">
+                <i class="fa-solid fa-gavel"></i> 3. Continuous 3-Strike Audit
+              </strong>
+              <p class="text-slate-600 text-[11px] mt-1">
+                Patient price-lock disputes and mystery shopping feed an automated sanction engine (shadowban at 1 strike, permanent blacklist at 3 strikes).
+              </p>
+            </div>
+          </div>
+
+          <!-- PHARMACY REGISTRATION TABLE -->
+          <div class="overflow-x-auto rounded-xl border border-slate-200">
+            <table class="w-full text-left text-xs">
+              <thead class="bg-slate-50 text-slate-600 font-semibold border-b border-slate-200">
+                <tr>
+                  <th class="p-3">Pharmacy Name & Location</th>
+                  <th class="p-3">EFDA License (CoC)</th>
+                  <th class="p-3">TIN Number</th>
+                  <th class="p-3">Trust Score & Strikes</th>
+                  <th class="p-3">Status</th>
+                  <th class="p-3 text-right">Regulatory Action</th>
+                </tr>
+              </thead>
+              <tbody id="adminPharmaciesTbody" class="divide-y divide-slate-100">
+                <tr><td colspan="6" class="p-4 text-center text-slate-400">Loading pharmacy compliance data...</td></tr>
+              </tbody>
+            </table>
+          </div>
+
+          <!-- INCOMING TELEGRAM VERIFICATION APPLICATIONS QUEUE -->
+          <div class="mt-6 pt-5 border-t border-slate-200 space-y-3">
+            <div class="flex items-center justify-between">
+              <div class="flex items-center space-x-2">
+                <i class="fa-brands fa-telegram text-sky-600 text-lg"></i>
+                <h4 class="font-bold text-sm text-slate-900">Incoming Telegram Verification Review Queue (@MedFinderVerifyBot)</h4>
+                <span id="telegramQueueBadge" class="text-[10px] bg-sky-100 text-sky-800 font-bold px-2 py-0.5 rounded-full">0 Applications</span>
+              </div>
+              <button onclick="loadTelegramApplications()" class="text-xs text-sky-700 hover:text-sky-900 font-semibold flex items-center space-x-1">
+                <i class="fa-solid fa-rotate-right text-[10px]"></i>
+                <span>Refresh Telegram Queue</span>
+              </button>
+            </div>
+            <p class="text-xs text-slate-500">Live credential packets submitted by pharmacists via Telegram. Review EFDA CoC & TIN numbers to approve or request more info.</p>
+
+            <div class="overflow-x-auto rounded-xl border border-sky-200 bg-sky-50/20">
+              <table class="w-full text-left text-xs">
+                <thead class="bg-sky-50 text-slate-700 font-semibold border-b border-sky-100">
+                  <tr>
+                    <th class="p-3">App ID & Telegram</th>
+                    <th class="p-3">Pharmacy & Location</th>
+                    <th class="p-3">Lead Pharmacist</th>
+                    <th class="p-3">Wall Certificate & CoC Document</th>
+                    <th class="p-3">Status</th>
+                    <th class="p-3 text-right">Compliance Action</th>
+                  </tr>
+                </thead>
+                <tbody id="telegramAppsTbody" class="divide-y divide-slate-100 bg-white">
+                  <tr><td colspan="6" class="p-4 text-center text-slate-400">Loading Telegram applications...</td></tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          <!-- REAL TELEGRAM DUAL BOT CLOUD GATEWAY (ROADMAP 2: BEST PRACTICE) -->
+          <div class="mt-6 p-5 rounded-2xl border-2 border-sky-300 bg-gradient-to-r from-sky-50 via-white to-blue-50 space-y-4 shadow-sm">
+            <div class="flex flex-wrap items-center justify-between gap-3 pb-3 border-b border-sky-100">
+              <div class="flex items-center space-x-3">
+                <div class="w-10 h-10 rounded-xl bg-sky-500 text-white flex items-center justify-center text-xl shadow">
+                  <i class="fa-brands fa-telegram"></i>
+                </div>
+                <div>
+                  <div class="flex items-center gap-2">
+                    <h4 class="font-bold text-sm text-slate-900">Dual Dedicated Telegram Bot Cloud Gateway</h4>
+                    <span class="text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800 border border-emerald-300">⭐ Roadmap 2: Production Standard</span>
+                  </div>
+                  <p class="text-xs text-slate-500">Separates <strong>Patients/Finders</strong> from <strong>Pharmacies/Staff</strong> into dedicated bots, connected to the same live database.</p>
+                </div>
+              </div>
+            </div>
+
+            <!-- TWO DEDICATED BOT CARDS -->
+            <div class="grid grid-cols-1 lg:grid-cols-2 gap-4">
+              <!-- BOT 1: PHARMACY PARTNER & SHELF BOT -->
+              <div class="p-4 rounded-xl border border-emerald-200 bg-white shadow-sm space-y-3">
+                <div class="flex items-center justify-between">
+                  <div class="flex items-center space-x-2">
+                    <div class="w-8 h-8 rounded-lg bg-emerald-100 text-emerald-700 flex items-center justify-center font-bold">
+                      <i class="fa-solid fa-hospital"></i>
+                    </div>
+                    <div>
+                      <h5 class="font-bold text-xs text-slate-900">Bot A: Pharmacy Partner & Verifier</h5>
+                      <p class="text-[10px] text-slate-500">Shelf Inventory • EFDA Accreditation • Counter Hold Alerts</p>
+                    </div>
+                  </div>
+                  <div id="pharmacyBotStatusBadge" class="text-[11px] font-semibold px-2.5 py-0.5 rounded-full bg-slate-100 text-slate-600 flex items-center gap-1">
+                    <span class="w-1.5 h-1.5 rounded-full bg-slate-400"></span>
+                    <span>Checking...</span>
+                  </div>
+                </div>
+
+                <div class="space-y-2">
+                  <label class="block text-[11px] font-semibold text-slate-700">Pharmacy Bot Token (e.g. @MedFinder_Verifier_bot)</label>
+                  <div class="flex gap-1.5">
+                    <input type="text" id="pharmacyTokenInput" placeholder="e.g. 8629140316:AAE9x0YS..." class="flex-1 text-xs font-mono px-3 py-2 border border-slate-300 rounded-lg outline-none focus:ring-2 focus:ring-emerald-500 bg-slate-50">
+                    <button onclick="connectBotWithType('pharmacy')" class="bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold px-3 py-2 rounded-lg shadow-sm transition flex items-center space-x-1 whitespace-nowrap">
+                      <i class="fa-solid fa-plug"></i>
+                      <span>Connect</span>
+                    </button>
+                    <button onclick="disconnectBotWithType('pharmacy')" class="bg-slate-200 hover:bg-slate-300 text-slate-700 text-xs font-semibold px-2.5 py-2 rounded-lg transition whitespace-nowrap">
+                      Disconnect
+                    </button>
+                  </div>
+                </div>
+
+                <div id="pharmacyBotDetails" class="hidden p-2.5 rounded-lg bg-emerald-50 border border-emerald-200 text-xs text-emerald-900 flex items-center justify-between">
+                  <div class="flex items-center space-x-1.5">
+                    <i class="fa-solid fa-circle-check text-emerald-600"></i>
+                    <div>
+                      <span id="pharmacyBotName" class="font-bold">@username</span>
+                      <span class="text-[10px] text-slate-500 block">🟢 Real-time long polling active for pharmacy staff</span>
+                    </div>
+                  </div>
+                  <a id="pharmacyBotLink" href="#" target="_blank" class="bg-emerald-600 text-white text-[11px] font-bold px-2.5 py-1 rounded shadow-sm flex items-center space-x-1">
+                    <i class="fa-brands fa-telegram"></i>
+                    <span>Open Bot</span>
+                  </a>
+                </div>
+              </div>
+
+              <!-- BOT 2: PATIENT MEDICINE FINDER BOT -->
+              <div class="p-4 rounded-xl border border-sky-200 bg-white shadow-sm space-y-3">
+                <div class="flex items-center justify-between">
+                  <div class="flex items-center space-x-2">
+                    <div class="w-8 h-8 rounded-lg bg-sky-100 text-sky-700 flex items-center justify-center font-bold">
+                      <i class="fa-solid fa-pills"></i>
+                    </div>
+                    <div>
+                      <h5 class="font-bold text-xs text-slate-900">Bot B: Patient Medicine Finder</h5>
+                      <p class="text-[10px] text-slate-500">Live Medicine Radar • GPS Distance • 60-Min Price Locks</p>
+                    </div>
+                  </div>
+                  <div id="patientBotStatusBadge" class="text-[11px] font-semibold px-2.5 py-0.5 rounded-full bg-slate-100 text-slate-600 flex items-center gap-1">
+                    <span class="w-1.5 h-1.5 rounded-full bg-slate-400"></span>
+                    <span>Checking...</span>
+                  </div>
+                </div>
+
+                <div class="space-y-2">
+                  <label class="block text-[11px] font-semibold text-slate-700">Patient Bot Token (e.g. @MedFinder_bot)</label>
+                  <div class="flex gap-1.5">
+                    <input type="text" id="patientTokenInput" placeholder="Paste 2nd token from @BotFather" class="flex-1 text-xs font-mono px-3 py-2 border border-slate-300 rounded-lg outline-none focus:ring-2 focus:ring-sky-500 bg-slate-50">
+                    <button onclick="connectBotWithType('patient')" class="bg-sky-600 hover:bg-sky-700 text-white text-xs font-bold px-3 py-2 rounded-lg shadow-sm transition flex items-center space-x-1 whitespace-nowrap">
+                      <i class="fa-solid fa-plug"></i>
+                      <span>Connect</span>
+                    </button>
+                    <button onclick="disconnectBotWithType('patient')" class="bg-slate-200 hover:bg-slate-300 text-slate-700 text-xs font-semibold px-2.5 py-2 rounded-lg transition whitespace-nowrap">
+                      Disconnect
+                    </button>
+                  </div>
+                </div>
+
+                <div id="patientBotDetails" class="hidden p-2.5 rounded-lg bg-sky-50 border border-sky-200 text-xs text-sky-900 flex items-center justify-between">
+                  <div class="flex items-center space-x-1.5">
+                    <i class="fa-solid fa-circle-check text-sky-600"></i>
+                    <div>
+                      <span id="patientBotName" class="font-bold">@username</span>
+                      <span class="text-[10px] text-slate-500 block">🟢 Real-time long polling active for patients</span>
+                    </div>
+                  </div>
+                  <a id="patientBotLink" href="#" target="_blank" class="bg-sky-600 text-white text-[11px] font-bold px-2.5 py-1 rounded shadow-sm flex items-center space-x-1">
+                    <i class="fa-brands fa-telegram"></i>
+                    <span>Open Bot</span>
+                  </a>
+                </div>
+              </div>
+            </div>
+
+            <!-- BOTFATHER GUIDE BANNER -->
+            <div class="p-3 bg-white rounded-xl border border-sky-100 flex flex-wrap items-center justify-between gap-2 text-xs">
+              <div class="flex items-center space-x-2 text-slate-600 text-[11px]">
+                <i class="fa-solid fa-lightbulb text-amber-500 text-sm"></i>
+                <span><strong>Quick Setup:</strong> Open <strong>@BotFather</strong> on Telegram &gt; send <code>/newbot</code> &gt; name it <em>MedFinder Patient Search</em> &gt; paste token in Bot B above!</span>
+              </div>
+              <span class="text-[11px] text-emerald-700 font-semibold bg-emerald-50 px-2 py-0.5 rounded border border-emerald-200">
+                ⚡ Both bots communicate with the same live backend
+              </span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ============================================================== -->
+    <!-- TAB 4: TELEBIRR GATEWAY SIMULATOR                              -->
+    <!-- ============================================================== -->
+    <section id="panel-telebirr" class="hidden space-y-6">
+      <div class="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm space-y-4">
+        <div class="flex items-center justify-between pb-4 border-b border-slate-100">
+          <div class="flex items-center space-x-3">
+            <div class="w-8 h-8 rounded-lg bg-[#005baa] flex items-center justify-center text-white font-bold text-xs">tb</div>
+            <div>
+              <h2 class="text-lg font-bold text-slate-900">Telebirr Mini-App & Webhook Simulator</h2>
+              <p class="text-xs text-slate-500">Simulates user PIN entry and asynchronous Telebirr payment webhooks for micro-subscriptions.</p>
+            </div>
+          </div>
+          <button onclick="loadStats()" class="text-xs bg-slate-100 hover:bg-slate-200 px-3 py-1.5 rounded-lg font-medium text-slate-700">
+            Refresh Stats
+          </button>
+        </div>
+
+        <div id="telebirrInvoicesList" class="space-y-3">
+          <div class="text-center py-10 text-slate-400 text-sm">
+            No invoices generated yet. Trigger a paywall in Tab 1 or click below to generate a test 25 ETB Monthly Pass checkout.
+          </div>
+        </div>
+
+        <div class="pt-4 border-t border-slate-100">
+          <button onclick="generateManualCheckout('patient_addis_001')" class="bg-[#005baa] hover:bg-[#004a8c] text-white text-xs font-semibold py-2.5 px-4 rounded-xl shadow-md transition flex items-center space-x-2">
+            <i class="fa-solid fa-bolt"></i>
+            <span>Create Test 25 ETB Telebirr Invoice</span>
+          </button>
+        </div>
+      </div>
+    </section>
+
+  </main>
+
+  <!-- ============================================================== -->
+  <!-- MODAL 1: 1-CLICK MASTER ESSENTIAL DRUG CHECKLIST               -->
+  <!-- ============================================================== -->
+  <div id="masterChecklistModal" class="hidden fixed inset-0 z-50 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4">
+    <div class="bg-white rounded-2xl max-w-2xl w-full max-h-[90vh] flex flex-col shadow-2xl overflow-hidden">
+      <div class="p-5 border-b border-slate-100 flex items-center justify-between bg-emerald-50/50">
+        <div>
+          <h3 class="font-bold text-slate-900 text-base">Ethiopia Essential Medicines Checklist</h3>
+          <p class="text-xs text-slate-500">Select the medicines currently available on your shelves and adjust prices if needed.</p>
+        </div>
+        <button onclick="closeModal('masterChecklistModal')" class="text-slate-400 hover:text-slate-700 text-lg">
+          <i class="fa-solid fa-xmark"></i>
+        </button>
+      </div>
+
+      <div class="p-5 overflow-y-auto space-y-3 flex-1" id="masterChecklistItemsContainer">
+        <!-- Dynamically injected checklist items -->
+      </div>
+
+      <div class="p-4 border-t border-slate-100 bg-slate-50 flex items-center justify-between">
+        <button onclick="toggleSelectAllChecklist(true)" class="text-xs text-emerald-700 font-semibold hover:underline">Select All</button>
+        <div class="flex gap-2">
+          <button onclick="closeModal('masterChecklistModal')" class="px-4 py-2 text-xs font-semibold text-slate-600 hover:bg-slate-200 rounded-lg">Cancel</button>
+          <button onclick="submitChecklistImport()" class="px-5 py-2 text-xs font-bold bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg shadow-sm">
+            Import Selected to Pharmacy Shelf
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ============================================================== -->
+  <!-- MODAL 2: SINGLE MEDICINE QUICK ADD                             -->
+  <!-- ============================================================== -->
+  <div id="singleAddModal" class="hidden fixed inset-0 z-50 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4">
+    <div class="bg-white rounded-2xl max-w-md w-full shadow-2xl overflow-hidden">
+      <div class="p-5 border-b border-slate-100 flex items-center justify-between">
+        <h3 class="font-bold text-slate-900 text-base">Add Medicine to Shelf</h3>
+        <button onclick="closeModal('singleAddModal')" class="text-slate-400 hover:text-slate-700 text-lg"><i class="fa-solid fa-xmark"></i></button>
+      </div>
+
+      <div class="p-5 space-y-4 text-xs">
+        <div>
+          <label class="block font-medium text-slate-700 mb-1">Brand Name / Medicine Name *</label>
+          <input type="text" id="singleMedName" placeholder="e.g. Coartem 20/120mg or S-26 Baby Milk" class="w-full px-3 py-2 border border-slate-300 rounded-lg outline-none focus:ring-2 focus:ring-emerald-500">
+        </div>
+        <div>
+          <label class="block font-medium text-slate-700 mb-1">Generic Name (Optional)</label>
+          <input type="text" id="singleGenericName" placeholder="e.g. Artemether + Lumefantrine" class="w-full px-3 py-2 border border-slate-300 rounded-lg outline-none">
+        </div>
+        <div>
+          <label class="block font-medium text-slate-700 mb-1">Category</label>
+          <select id="singleCategory" class="w-full px-3 py-2 border border-slate-300 rounded-lg outline-none">
+            <option value="Antibiotics">Antibiotics</option>
+            <option value="Diabetes">Diabetes</option>
+            <option value="Hypertension">Hypertension & Heart</option>
+            <option value="Respiratory">Asthma & Respiratory</option>
+            <option value="Thyroid">Thyroid</option>
+            <option value="Pain & Fever">Pain & Fever</option>
+            <option value="Baby Care">Baby Formula & Infant</option>
+            <option value="Other">Other Specialty</option>
+          </select>
+        </div>
+        <div>
+          <label class="block font-medium text-slate-700 mb-1">Retail Price in ETB *</label>
+          <input type="number" id="singlePriceETB" placeholder="e.g. 240" class="w-full px-3 py-2 border border-slate-300 rounded-lg outline-none">
+        </div>
+      </div>
+
+      <div class="p-4 border-t border-slate-100 bg-slate-50 flex justify-end gap-2">
+        <button onclick="closeModal('singleAddModal')" class="px-4 py-2 text-xs font-semibold text-slate-600 hover:bg-slate-200 rounded-lg">Cancel</button>
+        <button onclick="submitSingleMedicineAdd()" class="px-5 py-2 text-xs font-bold bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg shadow-sm">Save to Shelf</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ============================================================== -->
+  <!-- MODAL 3: DIRECT FILE BROWSE & IMPORT (EXCEL / CSV)             -->
+  <!-- ============================================================== -->
+  <div id="csvModal" class="hidden fixed inset-0 z-50 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4">
+    <div class="bg-white rounded-2xl max-w-xl w-full shadow-2xl overflow-hidden flex flex-col max-h-[90vh]">
+      <div class="p-5 border-b border-slate-100 flex items-center justify-between bg-sky-50/50">
+        <div>
+          <h3 class="font-bold text-slate-900 text-base">Direct File Import (Excel / CSV)</h3>
+          <p class="text-xs text-slate-500">Browse and upload your inventory file (.xlsx, .xls, or .csv) from your computer or POS.</p>
+        </div>
+        <button onclick="closeModal('csvModal')" class="text-slate-400 hover:text-slate-700 text-lg"><i class="fa-solid fa-xmark"></i></button>
+      </div>
+
+      <div class="p-5 space-y-4 overflow-y-auto flex-1">
+        <!-- DRAG AND DROP / FILE PICKER ZONE -->
+        <div id="dropZone" onclick="document.getElementById('fileUploadInput').click()" class="border-2 border-dashed border-sky-300 hover:border-sky-500 bg-sky-50/40 hover:bg-sky-50 rounded-2xl p-6 text-center cursor-pointer transition">
+          <input type="file" id="fileUploadInput" accept=".xlsx, .xls, .csv" onchange="handleFileSelect(event)" class="hidden">
+          <div class="w-12 h-12 mx-auto rounded-full bg-sky-100 text-sky-600 flex items-center justify-center text-xl mb-3">
+            <i class="fa-solid fa-file-excel"></i>
+          </div>
+          <p class="text-xs font-bold text-slate-800">Click to Browse or Drag & Drop File</p>
+          <p class="text-[11px] text-slate-500 mt-1">Supports Microsoft Excel (.xlsx, .xls) and CSV (.csv)</p>
+          <span class="inline-block mt-3 text-xs bg-sky-600 hover:bg-sky-700 text-white font-semibold px-4 py-1.5 rounded-lg shadow-sm">
+            Choose Spreadsheet File
+          </span>
+        </div>
+
+        <div class="flex items-center justify-between text-xs text-slate-500">
+          <span>Need a starting format?</span>
+          <button onclick="downloadSampleTemplate()" class="text-sky-600 hover:text-sky-800 font-semibold flex items-center space-x-1">
+            <i class="fa-solid fa-download"></i>
+            <span>Download Sample Excel / CSV Template</span>
+          </button>
+        </div>
+
+        <!-- LIVE FILE PARSE PREVIEW CARD -->
+        <div id="filePreviewContainer" class="hidden p-4 rounded-xl border border-emerald-200 bg-emerald-50/40 space-y-3">
+          <div class="flex items-center justify-between">
+            <div class="flex items-center space-x-2">
+              <i class="fa-solid fa-circle-check text-emerald-600"></i>
+              <span id="previewFileName" class="font-bold text-xs text-slate-800">file.xlsx</span>
+              <span id="previewItemCount" class="text-[10px] bg-emerald-200 text-emerald-900 font-bold px-2 py-0.5 rounded-full">0 Items Detected</span>
+            </div>
+            <button onclick="clearSelectedFile()" class="text-xs text-rose-500 hover:text-rose-700 font-medium">Remove</button>
+          </div>
+
+          <div class="overflow-x-auto rounded-lg border border-emerald-200 bg-white">
+            <table class="w-full text-left text-[11px]">
+              <thead class="bg-slate-50 text-slate-600 font-semibold border-b border-slate-100">
+                <tr>
+                  <th class="p-2">Medicine Name</th>
+                  <th class="p-2">Category</th>
+                  <th class="p-2">Price (ETB)</th>
+                </tr>
+              </thead>
+              <tbody id="previewTableTbody" class="divide-y divide-slate-100"></tbody>
+            </table>
+          </div>
+          <p class="text-[10px] text-slate-400">Showing first 5 preview items.</p>
+        </div>
+
+        <!-- COLLAPSIBLE PASTE FALLBACK -->
+        <div class="pt-2 border-t border-slate-100">
+          <button onclick="togglePasteFallback()" class="text-xs text-slate-500 hover:text-slate-800 font-medium flex items-center space-x-1">
+            <i class="fa-solid fa-chevron-right text-[10px]" id="pasteChevron"></i>
+            <span>Or paste raw text / CSV data</span>
+          </button>
+          <div id="pasteFallbackArea" class="hidden mt-2 space-y-2">
+            <textarea id="csvInputText" rows="4" placeholder="Amoxicillin 500mg, 85, Antibiotics&#10;Ventolin Inhaler, 320, Respiratory&#10;Metformin 500mg, 120, Diabetes" onkeyup="handleManualPasteInput()" class="w-full text-xs font-mono p-3 border border-slate-300 rounded-lg outline-none"></textarea>
+          </div>
+        </div>
+      </div>
+
+      <div class="p-4 border-t border-slate-100 bg-slate-50 flex items-center justify-between">
+        <button onclick="closeModal('csvModal')" class="px-4 py-2 text-xs font-semibold text-slate-600 hover:bg-slate-200 rounded-lg">Cancel</button>
+        <button id="commitImportBtn" onclick="submitDirectFileImport()" class="px-5 py-2 text-xs font-bold bg-sky-600 hover:bg-sky-700 text-white rounded-lg shadow-sm disabled:opacity-50" disabled>
+          Import Medicines to Shelf
+        </button>
+      </div>
+    </div>
+  </div>
+  <!-- ============================================================== -->
+  <!-- MODAL 4: 1-HOUR PRICE-LOCK RESERVATION TICKET                  -->
+  <!-- ============================================================== -->
+  <div id="reservationModal" class="hidden fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4">
+    <div class="bg-white rounded-3xl max-w-md w-full shadow-2xl overflow-hidden border border-emerald-500/30">
+      <div class="p-6 text-center bg-gradient-to-b from-emerald-50 to-white border-b border-emerald-100">
+        <div class="w-14 h-14 mx-auto rounded-full bg-emerald-600 text-white flex items-center justify-center text-2xl shadow-lg mb-3">
+          <i class="fa-solid fa-lock"></i>
+        </div>
+        <h3 class="text-base font-bold text-slate-900">Price-Lock Reservation Confirmed</h3>
+        <p class="text-xs text-slate-500 mt-1">Present this code at the pharmacy counter. The stated price is legally locked for 60 minutes.</p>
+        
+        <!-- LARGE 4-DIGIT CODE -->
+        <div class="mt-4 p-4 rounded-2xl bg-slate-900 text-white shadow-inner">
+          <span class="text-xs text-emerald-400 font-bold uppercase tracking-wider block">Reservation Hold Code</span>
+          <div id="resCodeDisplay" class="text-4xl font-extrabold tracking-widest text-white mt-1">#8492</div>
+          <span class="text-[11px] text-slate-400 mt-1 block">⏱️ Valid for next 60 Minutes</span>
+        </div>
+      </div>
+
+      <div class="p-6 space-y-3 text-xs">
+        <div class="flex justify-between py-1 border-b border-slate-100">
+          <span class="text-slate-500">Medicine:</span>
+          <strong id="resMedName" class="text-slate-900">Augmentin 625mg</strong>
+        </div>
+        <div class="flex justify-between py-1 border-b border-slate-100">
+          <span class="text-slate-500">Guaranteed Price:</span>
+          <strong id="resPrice" class="text-emerald-700 text-sm">390 ETB</strong>
+        </div>
+        <div class="flex justify-between py-1 border-b border-slate-100">
+          <span class="text-slate-500">Pharmacy:</span>
+          <strong id="resPharmName" class="text-slate-900">Kenema Pharmacy Bole</strong>
+        </div>
+        <div class="flex justify-between py-1">
+          <span class="text-slate-500">Phone:</span>
+          <strong id="resPharmPhone" class="text-slate-900">+251911223344</strong>
+        </div>
+
+        <div class="p-3 bg-amber-50 border border-amber-200 rounded-xl text-amber-900 text-[11px] flex items-center space-x-2">
+          <i class="fa-solid fa-shield-halved text-base text-amber-600"></i>
+          <span>If the pharmacy attempts to increase this price, use the "Report Issue" button for immediate strike action.</span>
+        </div>
+      </div>
+
+      <div class="p-4 border-t border-slate-100 bg-slate-50 flex justify-end">
+        <button onclick="closeModal('reservationModal')" class="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-2.5 rounded-xl text-xs shadow-md transition">
+          I'm Heading to the Pharmacy Now
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ============================================================== -->
+  <!-- MODAL 5: REPORT VIOLATION & PRICE GOUGING (ANTI-SCAM)          -->
+  <!-- ============================================================== -->
+  <div id="reportModal" class="hidden fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4">
+    <div class="bg-white rounded-3xl max-w-md w-full shadow-2xl overflow-hidden">
+      <div class="p-5 border-b border-slate-100 flex items-center justify-between bg-rose-50/50">
+        <div class="flex items-center space-x-2 text-rose-700">
+          <i class="fa-solid fa-triangle-exclamation text-lg"></i>
+          <h3 class="font-bold text-slate-900 text-sm">Report Pharmacy Violation</h3>
+        </div>
+        <button onclick="closeModal('reportModal')" class="text-slate-400 hover:text-slate-700"><i class="fa-solid fa-xmark"></i></button>
+      </div>
+
+      <div class="p-5 space-y-4 text-xs">
+        <input type="hidden" id="reportPharmId">
+        <p class="text-slate-600">Reporting: <strong id="reportPharmName" class="text-slate-900">Pharmacy</strong> for medicine: <strong id="reportMedName">Medicine</strong></p>
+
+        <div class="space-y-2">
+          <label class="block font-semibold text-slate-700">What violation occurred? *</label>
+          <div class="space-y-1.5">
+            <label class="flex items-center space-x-2 p-2 border border-slate-200 rounded-lg hover:bg-slate-50 cursor-pointer">
+              <input type="radio" name="reportIssue" value="PRICE_GOUGING" checked class="text-rose-600">
+              <div>
+                <strong class="block text-slate-800">Price Gouging / Mismatch</strong>
+                <span class="text-[11px] text-slate-400">Pharmacy demanded a higher price than listed on app</span>
+              </div>
+            </label>
+            <label class="flex items-center space-x-2 p-2 border border-slate-200 rounded-lg hover:bg-slate-50 cursor-pointer">
+              <input type="radio" name="reportIssue" value="OUT_OF_STOCK_PHANTOM" class="text-rose-600">
+              <div>
+                <strong class="block text-slate-800">Phantom Stock (Bait & Switch)</strong>
+                <span class="text-[11px] text-slate-400">Claimed to have stock, but said sold out when I arrived</span>
+              </div>
+            </label>
+            <label class="flex items-center space-x-2 p-2 border border-slate-200 rounded-lg hover:bg-slate-50 cursor-pointer">
+              <input type="radio" name="reportIssue" value="EXPIRED_MEDICINE" class="text-rose-600">
+              <div>
+                <strong class="block text-slate-800">Expired or Damaged Package</strong>
+                <span class="text-[11px] text-slate-400">Offered medicine near expiration or broken seal</span>
+              </div>
+            </label>
+          </div>
+        </div>
+
+        <div>
+          <label class="block font-semibold text-slate-700 mb-1">Additional details (Optional)</label>
+          <textarea id="reportDescription" rows="2" placeholder="e.g. Quoted 380 ETB on app, asked for 800 ETB at counter" class="w-full p-2 border border-slate-300 rounded-lg outline-none"></textarea>
+        </div>
+      </div>
+
+      <div class="p-4 border-t border-slate-100 bg-slate-50 flex justify-end gap-2">
+        <button onclick="closeModal('reportModal')" class="px-4 py-2 text-xs font-semibold text-slate-600 hover:bg-slate-200 rounded-lg">Cancel</button>
+        <button onclick="submitViolationReport()" class="px-5 py-2 text-xs font-bold bg-rose-600 hover:bg-rose-700 text-white rounded-lg shadow-sm">
+          Submit Report (Apply Strike)
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ============================================================== -->
+  <!-- MODAL 6: TELEGRAM VERIFICATION BOT CONSOLE SIMULATOR (CHANNEL B) -->
+  <!-- ============================================================== -->
+  <div id="telegramBotModal" class="hidden fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4">
+    <div class="bg-slate-900 rounded-3xl max-w-lg w-full shadow-2xl overflow-hidden border border-slate-700 flex flex-col h-[650px]">
+      
+      <!-- TELEGRAM HEADER -->
+      <div class="p-4 bg-[#17212b] border-b border-slate-700/80 flex items-center justify-between text-white">
+        <div class="flex items-center space-x-3">
+          <div class="w-10 h-10 rounded-full bg-sky-500 flex items-center justify-center text-white text-xl shadow">
+            <i class="fa-brands fa-telegram"></i>
+          </div>
+          <div>
+            <div class="flex items-center space-x-1.5">
+              <h3 class="font-bold text-sm">MedFinder Verification Bot</h3>
+              <i class="fa-solid fa-circle-check text-sky-400 text-xs"></i>
+            </div>
+            <p class="text-[11px] text-sky-300">@MedFinderVerifyBot • bot • 🟢 online</p>
+          </div>
+        </div>
+        <div class="flex items-center space-x-2">
+          <button onclick="resetTelegramBotChat()" title="Reset Chat" class="text-slate-400 hover:text-white px-2.5 py-1 text-xs rounded-lg bg-slate-800 transition">
+            <i class="fa-solid fa-rotate-left mr-1"></i> Reset
+          </button>
+          <button onclick="closeModal('telegramBotModal')" class="text-slate-400 hover:text-white text-lg px-2">
+            <i class="fa-solid fa-xmark"></i>
+          </button>
+        </div>
+      </div>
+
+      <!-- CHAT MESSAGE LOG (TELEGRAM STYLE) -->
+      <div id="telegramChatLogs" class="flex-1 p-4 overflow-y-auto space-y-3 bg-[#0e1621] text-xs font-sans">
+        <!-- Messages rendered dynamically -->
+      </div>
+
+      <!-- QUICK REPLY CHIPS -->
+      <div id="telegramQuickReplies" class="p-2.5 bg-[#17212b] border-t border-slate-800 flex flex-wrap gap-1.5 max-h-24 overflow-y-auto">
+        <!-- Dynamic quick chips -->
+      </div>
+
+      <!-- CHAT INPUT BAR -->
+      <div class="p-3 bg-[#17212b] border-t border-slate-700/80 flex items-center space-x-2">
+        <input type="text" id="telegramUserInput" placeholder="Type message or click a quick reply..." onkeydown="if(event.key==='Enter') sendTelegramSimulatorMessage()" class="flex-1 bg-[#242f3d] text-white text-xs px-3.5 py-2.5 rounded-full outline-none focus:ring-1 focus:ring-sky-400 border border-slate-700">
+        <button onclick="sendTelegramSimulatorMessage()" class="w-10 h-10 rounded-full bg-sky-500 hover:bg-sky-400 text-white flex items-center justify-center transition shadow-md">
+          <i class="fa-solid fa-paper-plane text-xs"></i>
+        </button>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- MODAL: DOCUMENT & CERTIFICATE INSPECTION LIGHTBOX -->
+  <div id="docInspectModal" class="hidden fixed inset-0 z-50 bg-black/80 backdrop-blur-md flex items-center justify-center p-3 sm:p-6 transition-opacity">
+    <div class="bg-white rounded-2xl max-w-4xl w-full h-[90vh] max-h-[820px] shadow-2xl flex flex-col overflow-hidden border border-slate-200">
+      
+      <!-- MODAL HEADER -->
+      <div class="px-5 py-3.5 bg-slate-900 text-white flex items-center justify-between border-b border-slate-800">
+        <div class="flex items-center space-x-3">
+          <div class="w-8 h-8 rounded-lg bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 flex items-center justify-center text-sm">
+            <i class="fa-solid fa-file-shield"></i>
+          </div>
+          <div>
+            <h3 class="font-bold text-sm text-white flex items-center gap-2">
+              <span id="inspectModalPharmName">Azeb Mesfin Pharmacy</span>
+              <span id="inspectModalAppBadge" class="text-[10px] bg-sky-900 text-sky-200 border border-sky-700 px-2 py-0.5 rounded font-mono">MF-VERIFY-3297</span>
+            </h3>
+            <p class="text-[11px] text-slate-400">EFDA Certificate of Competence & Wall License Visual Inspector</p>
+          </div>
+        </div>
+        <div class="flex items-center space-x-2">
+          <a id="inspectModalNewTabLink" href="#" target="_blank" class="text-xs text-slate-300 hover:text-white bg-slate-800 hover:bg-slate-700 px-2.5 py-1.5 rounded-lg border border-slate-700 flex items-center gap-1 transition">
+            <i class="fa-solid fa-arrow-up-right-from-square text-[10px]"></i>
+            <span>Open High-Res</span>
+          </a>
+          <button onclick="closeDocInspectModal()" class="w-8 h-8 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white flex items-center justify-center transition">
+            <i class="fa-solid fa-xmark"></i>
+          </button>
+        </div>
+      </div>
+
+      <!-- MODAL BODY: SPLIT VIEW (IMAGE VIEWER + COMPLIANCE CHECK PANEL) -->
+      <div class="flex-1 grid grid-cols-1 md:grid-cols-12 min-h-0 overflow-hidden">
+        
+        <!-- LEFT: INTERACTIVE IMAGE LIGHTBOX WITH ZOOM CONTROLS (8 COLS) -->
+        <div class="md:col-span-8 bg-slate-950 flex flex-col relative overflow-hidden select-none">
+          <!-- Zoom & Pan Toolbar -->
+          <div class="absolute top-3 left-3 z-10 flex items-center gap-1 bg-slate-900/80 backdrop-blur-md px-2 py-1.5 rounded-lg border border-slate-700 shadow-md">
+            <button onclick="zoomDocInspect(0.25)" class="w-7 h-7 rounded text-slate-200 hover:text-white hover:bg-slate-800 flex items-center justify-center transition text-xs" title="Zoom In">
+              <i class="fa-solid fa-magnifying-glass-plus"></i>
+            </button>
+            <button onclick="zoomDocInspect(-0.25)" class="w-7 h-7 rounded text-slate-200 hover:text-white hover:bg-slate-800 flex items-center justify-center transition text-xs" title="Zoom Out">
+              <i class="fa-solid fa-magnifying-glass-minus"></i>
+            </button>
+            <button onclick="resetDocInspectZoom()" class="px-2 h-7 rounded text-slate-200 hover:text-white hover:bg-slate-800 flex items-center justify-center transition text-[11px] font-mono" title="Reset Scale">
+              <span id="inspectZoomLevel">100%</span>
+            </button>
+            <span class="text-slate-600 text-xs">|</span>
+            <span class="text-[10px] text-emerald-400 font-medium px-1 flex items-center gap-1">
+              <i class="fa-solid fa-shield-halved text-[9px]"></i> EFDA Document
+            </span>
+          </div>
+
+          <!-- The Scrollable / Zoomable Document Container -->
+          <div id="docInspectImgWrapper" class="flex-1 overflow-auto flex items-center justify-center p-4">
+            <img id="docInspectImg" src="" alt="Wall Certificate" class="max-w-full max-h-full object-contain rounded-lg shadow-2xl transition-transform duration-150 origin-center bg-slate-900">
+          </div>
+        </div>
+
+        <!-- RIGHT: COMPLIANCE AUDIT & VERIFICATION PANEL (4 COLS) -->
+        <div class="md:col-span-4 bg-slate-50 border-t md:border-t-0 md:border-l border-slate-200 p-5 flex flex-col justify-between overflow-y-auto space-y-4">
+          <div class="space-y-4">
+            <div>
+              <span class="text-[10px] font-bold uppercase tracking-wider text-slate-500">Applicant Telegram Identity</span>
+              <div class="bg-white p-3 rounded-xl border border-slate-200 shadow-sm mt-1 space-y-1">
+                <div class="flex items-center justify-between">
+                  <span class="text-xs font-bold text-slate-900" id="inspectModalPharmacist">Azeb Mesfin</span>
+                  <span class="text-[11px] font-mono text-sky-700 bg-sky-50 px-2 py-0.5 rounded border border-sky-200" id="inspectModalTgUser">@RoMn116</span>
+                </div>
+                <div class="text-[11px] text-slate-500 flex items-center gap-1">
+                  <i class="fa-solid fa-phone text-[9px] text-slate-400"></i>
+                  <span id="inspectModalPhone">+251911223344</span>
+                </div>
+                <div class="text-[11px] text-slate-500 flex items-center gap-1">
+                  <i class="fa-solid fa-location-dot text-[9px] text-emerald-600"></i>
+                  <span id="inspectModalLocation">Bole Sub-City, Addis Ababa</span>
+                </div>
+              </div>
+            </div>
+
+            <!-- EFDA License Confirmation & Editing -->
+            <div class="space-y-1.5">
+              <label class="block text-xs font-bold text-slate-800">
+                <span>EFDA CoC Serial Number (from Wall Certificate)</span>
+                <span class="text-[10px] text-emerald-600 font-normal block">Confirm or edit number matching the photo</span>
+              </label>
+              <input type="text" id="inspectModalLicenseInput" class="w-full text-xs font-mono font-bold bg-white border border-slate-300 rounded-lg px-3 py-2 text-slate-900 outline-none focus:ring-2 focus:ring-emerald-500 shadow-sm" placeholder="e.g. EFDA/PH/AA/2024/3297">
+            </div>
+
+            <!-- TIN Number Display -->
+            <div class="space-y-1">
+              <label class="block text-xs font-bold text-slate-800">Tax Identification Number (TIN)</label>
+              <input type="text" id="inspectModalTinInput" readonly class="w-full text-xs font-mono bg-slate-100 border border-slate-200 rounded-lg px-3 py-2 text-slate-600 outline-none cursor-not-allowed">
+            </div>
+
+            <!-- Compliance Officer Audit Notes with Preset Selector -->
+            <div class="space-y-1.5">
+              <div class="flex items-center justify-between">
+                <label class="block text-xs font-bold text-slate-800">Compliance Inspection Notes</label>
+                <span class="text-[10px] text-sky-700 font-semibold flex items-center gap-1">
+                  <i class="fa-solid fa-bolt text-amber-500"></i> Standard Presets
+                </span>
+              </div>
+
+              <!-- Quick Presets Dropdown -->
+              <select id="inspectModalPresetSelect" onchange="applyCompliancePreset(this.value)" class="w-full text-xs bg-white border border-slate-300 rounded-lg px-2.5 py-1.5 text-slate-700 outline-none focus:ring-2 focus:ring-sky-500 shadow-sm font-medium">
+                <option value="">-- Choose Standard Regulatory Preset --</option>
+                <option value="blurry_photo">📸 Blurry / Low-Resolution Certificate Photo</option>
+                <option value="glass_glare">💡 Glass Reflection / Flash Glare</option>
+                <option value="gps_mismatch">📍 Premise Address / GPS Mismatch</option>
+                <option value="pharmacist_license">👨‍⚕️ Lead Pharmacist EPA License Missing</option>
+                <option value="expired_coc">⏳ Expired CoC / Renewal Proof Needed</option>
+                <option value="tin_mismatch">🏛️ Business TIN / Trade Name Discrepancy</option>
+                <option value="counter_storefront">🏬 Storefront / Dispensing Counter Photo</option>
+              </select>
+
+              <!-- Quick Tag Chips -->
+              <div class="flex flex-wrap gap-1">
+                <button type="button" onclick="applyCompliancePreset('blurry_photo')" class="text-[10px] bg-slate-200/80 hover:bg-sky-100 hover:text-sky-800 text-slate-700 px-2 py-0.5 rounded-full transition border border-slate-300/60 font-medium">📸 Blurry</button>
+                <button type="button" onclick="applyCompliancePreset('glass_glare')" class="text-[10px] bg-slate-200/80 hover:bg-sky-100 hover:text-sky-800 text-slate-700 px-2 py-0.5 rounded-full transition border border-slate-300/60 font-medium">💡 Glare</button>
+                <button type="button" onclick="applyCompliancePreset('gps_mismatch')" class="text-[10px] bg-slate-200/80 hover:bg-sky-100 hover:text-sky-800 text-slate-700 px-2 py-0.5 rounded-full transition border border-slate-300/60 font-medium">📍 GPS</button>
+                <button type="button" onclick="applyCompliancePreset('pharmacist_license')" class="text-[10px] bg-slate-200/80 hover:bg-sky-100 hover:text-sky-800 text-slate-700 px-2 py-0.5 rounded-full transition border border-slate-300/60 font-medium">👨‍⚕️ EPA</button>
+                <button type="button" onclick="applyCompliancePreset('expired_coc')" class="text-[10px] bg-slate-200/80 hover:bg-sky-100 hover:text-sky-800 text-slate-700 px-2 py-0.5 rounded-full transition border border-slate-300/60 font-medium">⏳ Expired</button>
+              </div>
+
+              <textarea id="inspectModalNotes" rows="3" class="w-full text-xs bg-white border border-slate-300 rounded-lg p-2.5 text-slate-800 outline-none focus:ring-2 focus:ring-sky-500 shadow-sm leading-relaxed" placeholder="Select preset above or type custom inspection notes..."></textarea>
+            </div>
+          </div>
+
+          <!-- Bottom Action Buttons -->
+          <div class="pt-3 border-t border-slate-200 space-y-2">
+            <button onclick="approveFromDocInspect()" class="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs py-2.5 rounded-xl transition shadow-md flex items-center justify-center gap-2">
+              <i class="fa-solid fa-shield-check"></i>
+              <span>Approve & Issue Verified Shield</span>
+            </button>
+            <div class="grid grid-cols-2 gap-2">
+              <button onclick="requestInfoFromDocInspect()" class="bg-purple-50 hover:bg-purple-100 text-purple-700 border border-purple-200 font-semibold text-xs py-2 rounded-lg transition flex items-center justify-center gap-1 shadow-sm">
+                <i class="fa-solid fa-circle-question text-purple-600"></i>
+                <span>Request Info</span>
+              </button>
+              <button onclick="rejectFromDocInspect()" class="bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 font-semibold text-xs py-2 rounded-lg transition flex items-center justify-center gap-1">
+                <i class="fa-solid fa-xmark"></i>
+                <span>Reject</span>
+              </button>
+            </div>
+          </div>
+
+        </div>
+
+      </div>
+
+    </div>
+  </div>
+
+  <!-- MODAL: PRESET REGULATORY COMPLIANCE NOTES SELECTOR -->
+  <div id="requestInfoModal" class="hidden fixed inset-0 z-50 bg-black/75 backdrop-blur-sm flex items-center justify-center p-3 sm:p-6 transition-opacity">
+    <div class="bg-white rounded-2xl max-w-2xl w-full max-h-[90vh] shadow-2xl flex flex-col overflow-hidden border border-slate-200">
+      
+      <!-- MODAL HEADER -->
+      <div class="px-5 py-4 bg-slate-900 text-white flex items-center justify-between border-b border-slate-800">
+        <div class="flex items-center space-x-3">
+          <div class="w-9 h-9 rounded-xl bg-purple-500/20 text-purple-400 border border-purple-500/30 flex items-center justify-center text-base">
+            <i class="fa-solid fa-clipboard-question"></i>
+          </div>
+          <div>
+            <h3 class="font-bold text-sm text-white flex items-center gap-2">
+              <span>Request Information / ተጨማሪ ሰነድ መጠየቂያ</span>
+              <span id="reqInfoAppBadge" class="text-[10px] bg-purple-900 text-purple-200 border border-purple-700 px-2 py-0.5 rounded font-mono">MF-VERIFY</span>
+            </h3>
+            <p class="text-[11px] text-slate-400" id="reqInfoPharmTitle">Select a standard EFDA inspection note or customize</p>
+          </div>
+        </div>
+        <button onclick="closeRequestInfoModal()" class="w-8 h-8 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white flex items-center justify-center transition">
+          <i class="fa-solid fa-xmark"></i>
+        </button>
+      </div>
+
+      <!-- MODAL BODY -->
+      <div class="p-5 overflow-y-auto space-y-4 flex-1">
+        
+        <!-- Applicant Info Banner -->
+        <div class="p-3 bg-purple-50/70 border border-purple-200 rounded-xl flex items-center justify-between">
+          <div class="text-xs">
+            <span class="font-bold text-purple-950 block" id="reqInfoPharmName">Pharmacy Name</span>
+            <span class="text-[11px] text-purple-700" id="reqInfoPharmTg">@telegram_user • Location</span>
+          </div>
+          <span class="text-[10px] bg-white text-purple-800 font-bold px-2.5 py-1 rounded-full border border-purple-200 shadow-sm flex items-center gap-1">
+            <i class="fa-brands fa-telegram text-sky-500"></i> Dispatches to Telegram
+          </span>
+        </div>
+
+        <!-- Preset Selection Cards Grid -->
+        <div>
+          <label class="block text-xs font-bold text-slate-800 mb-2 flex items-center justify-between">
+            <span>⚡ Select Standard Regulatory Note Preset (ዝግጁ ማስታወሻዎች)</span>
+            <span class="text-[11px] text-slate-500 font-normal">Click any card to auto-fill</span>
+          </label>
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-2" id="presetCardsContainer">
+            <!-- Rendered by JS -->
+          </div>
+        </div>
+
+        <!-- Custom / Editable Note Textarea -->
+        <div class="space-y-1.5 pt-1">
+          <div class="flex items-center justify-between">
+            <label class="block text-xs font-bold text-slate-800">
+              <span>Inspection Note to Dispatch (የሚላከው ማስታወሻ)</span>
+            </label>
+            <span class="text-[10px] text-slate-400">Delivered directly to pharmacist on Telegram</span>
+          </div>
+          <textarea id="reqInfoCustomNote" rows="3" class="w-full text-xs bg-slate-50 focus:bg-white border border-slate-300 rounded-xl p-3 text-slate-900 outline-none focus:ring-2 focus:ring-purple-500 shadow-sm leading-relaxed" placeholder="Select a preset above or edit note..."></textarea>
+        </div>
+
+      </div>
+
+      <!-- MODAL FOOTER -->
+      <div class="p-4 bg-slate-50 border-t border-slate-200 flex items-center justify-between gap-3">
+        <button onclick="closeRequestInfoModal()" class="px-4 py-2 bg-white hover:bg-slate-100 text-slate-700 text-xs font-semibold rounded-xl border border-slate-300 transition">
+          Cancel
+        </button>
+        <button onclick="submitRequestInfoFromModal()" class="px-5 py-2.5 bg-purple-600 hover:bg-purple-700 text-white text-xs font-bold rounded-xl transition shadow-md flex items-center gap-2">
+          <i class="fa-solid fa-paper-plane text-[11px]"></i>
+          <span>Send Information Request to Pharmacy</span>
+        </button>
+      </div>
+
+    </div>
+  </div>
+
+  <script>
+    let currentPolicy = null;
+    let lastBroadcastId = null;
+    let masterCatalog = [];
+    let currentPharmacyInventory = [];
+    let currentSearchPharmacies = [];
+
+    // --- TAB SWITCHING ---
+    function switchTab(tabId) {
+      ['search', 'admin', 'pharmacy', 'telebirr'].forEach(t => {
+        document.getElementById(`panel-${t}`).classList.add('hidden');
+        document.getElementById(`tab-${t}`).classList.remove('tab-active');
+        document.getElementById(`tab-${t}`).classList.add('text-slate-500');
+      });
+      document.getElementById(`panel-${tabId}`).classList.remove('hidden');
+      document.getElementById(`tab-${tabId}`).classList.add('tab-active');
+      document.getElementById(`tab-${tabId}`).classList.remove('text-slate-500');
+
+      if (tabId === 'admin') reloadAdminPolicy();
+      if (tabId === 'pharmacy') loadPharmacyInventory();
+      if (tabId === 'telebirr') loadStats();
+    }
+
+    function setDrug(name) {
+      document.getElementById('medicineInput').value = name;
+    }
+
+    function closeModal(id) {
+      document.getElementById(id).classList.add('hidden');
+    }
+
+    // --- FETCH POLICY AT STARTUP ---
+    async function fetchPolicy() {
+      try {
+        const res = await fetch('/api/admin/config');
+        const data = await res.json();
+        if (data.success) {
+          currentPolicy = data.policy;
+          updateStatusBadge();
+        }
+      } catch (err) {
+        console.error('Failed to fetch policy:', err);
+      }
+    }
+
+    function updateStatusBadge() {
+      if (!currentPolicy) return;
+      const now = new Date();
+      const cutoff = new Date(currentPolicy.monetization.freePromotionUntil);
+      const isFree = now < cutoff;
+      const badge = document.getElementById('statusBadge');
+      const text = document.getElementById('policyStatusText');
+      const banner = document.getElementById('freePromoBanner');
+      const bannerDate = document.getElementById('promoBannerDate');
+
+      if (isFree) {
+        badge.className = 'bg-emerald-50 border border-emerald-200 text-emerald-900 px-3 py-1.5 rounded-lg text-xs flex items-center space-x-2 shadow-sm';
+        text.innerHTML = `<strong>Free Launch Active</strong> (Expires: ${cutoff.toLocaleDateString()})`;
+        banner.classList.remove('hidden');
+        bannerDate.innerText = `All searches are 100% free of charge until ${cutoff.toLocaleDateString()} ${cutoff.toLocaleTimeString()}.`;
+      } else {
+        badge.className = 'bg-amber-50 border border-amber-200 text-amber-900 px-3 py-1.5 rounded-lg text-xs flex items-center space-x-2 shadow-sm';
+        text.innerHTML = `<strong>Paywall Active</strong> (${currentPolicy.monetization.pricing.monthlyPassETB} ETB/mo)`;
+        banner.classList.add('hidden');
+      }
+    }
+
+    // --- PERFORM SEARCH ---
+    async function performSearch() {
+      const userId = document.getElementById('patientUserId').value;
+      const medicineName = document.getElementById('medicineInput').value;
+      const locSelect = document.getElementById('patientLocation');
+      const subCity = locSelect.value;
+      const selectedOption = locSelect.options[locSelect.selectedIndex];
+      const userLat = parseFloat(selectedOption.getAttribute('data-lat'));
+      const userLng = parseFloat(selectedOption.getAttribute('data-lng'));
+      const lang = document.getElementById('langSelect').value;
+
+      const container = document.getElementById('resultsContainer');
+      const emptyPrompt = document.getElementById('emptySearchPrompt');
+
+      emptyPrompt.classList.add('hidden');
+      container.classList.remove('hidden');
+      container.innerHTML = `
+        <div class="text-center py-8">
+          <div class="inline-block animate-spin text-emerald-600 text-2xl mb-2"><i class="fa-solid fa-circle-notch"></i></div>
+          <p class="text-xs text-slate-500">Checking dynamic access & searching pharmacies near ${subCity}...</p>
+        </div>
+      `;
+
+      try {
+        const res = await fetch('/api/search', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ userId, medicineName, userLat, userLng, subCity, lang })
+        });
+
+        const data = await res.json();
+
+        // 1. PAYWALL TRIGGERED
+        if (res.status === 402 || data.paywallTriggered) {
+          container.innerHTML = `
+            <div class="p-6 rounded-2xl border-2 border-amber-300 bg-amber-50/50 space-y-4">
+              <div class="flex items-center space-x-3 text-amber-800">
+                <i class="fa-solid fa-lock text-2xl"></i>
+                <div>
+                  <h3 class="font-bold text-base">Subscription Required / የክፍያ ጥያቄ</h3>
+                  <p class="text-xs text-amber-700">${data.message}</p>
+                </div>
+              </div>
+
+              <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-2">
+                <div class="bg-white p-4 rounded-xl border border-amber-200 shadow-sm flex flex-col justify-between">
+                  <div>
+                    <span class="text-xs font-semibold text-slate-500 uppercase">Single Search</span>
+                    <div class="text-xl font-bold text-slate-900 mt-1">${data.options.payPerSearchETB} ETB</div>
+                    <p class="text-xs text-slate-500 mt-0.5">Instant pharmacy radar for 1 drug</p>
+                  </div>
+                  <button onclick="payWithTelebirr('${data.telebirrCheckout.invoiceId}', 5)" class="mt-3 w-full bg-[#005baa] hover:bg-[#004a8c] text-white text-xs font-bold py-2 rounded-lg transition flex items-center justify-center space-x-2">
+                    <i class="fa-solid fa-mobile-screen-button"></i>
+                    <span>Pay 5 ETB via Telebirr</span>
+                  </button>
+                </div>
+
+                <div class="bg-white p-4 rounded-xl border-2 border-emerald-500 shadow-sm flex flex-col justify-between relative overflow-hidden">
+                  <span class="absolute top-2 right-2 text-[10px] bg-emerald-100 text-emerald-800 font-bold px-1.5 py-0.5 rounded">Best Value</span>
+                  <div>
+                    <span class="text-xs font-semibold text-slate-500 uppercase">Monthly Health Pass</span>
+                    <div class="text-xl font-bold text-slate-900 mt-1">${data.options.monthlyPassETB} ETB <span class="text-xs font-normal text-slate-500">/mo</span></div>
+                    <p class="text-xs text-slate-500 mt-0.5">Unlimited searches + chronic med alerts</p>
+                  </div>
+                  <button onclick="buyMonthlyPass('${userId}', ${data.options.monthlyPassETB})" class="mt-3 w-full bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold py-2 rounded-lg transition flex items-center justify-center space-x-2">
+                    <i class="fa-solid fa-shield-halved"></i>
+                    <span>Subscribe 25 ETB (Telebirr)</span>
+                  </button>
+                </div>
+              </div>
+            </div>
+          `;
+          return;
+        }
+
+        // 2. DIRECT INVENTORY MATCH
+        if (data.mode === 'INSTANT_CATALOG_MATCH') {
+          currentSearchPharmacies = data.pharmacies;
+          let pharmaciesHtml = data.pharmacies.map((p, idx) => `
+            <div class="p-4 rounded-xl border border-slate-200 bg-white hover:border-emerald-300 transition shadow-sm space-y-3">
+              <div class="flex items-center justify-between">
+                <div class="flex items-center space-x-3">
+                  <div class="w-10 h-10 rounded-full bg-emerald-100 text-emerald-700 flex items-center justify-center text-lg">
+                    <i class="fa-solid fa-check"></i>
+                  </div>
+                  <div>
+                    <div class="flex flex-wrap items-center gap-2">
+                      <h4 class="font-bold text-sm text-slate-900">${p.name}</h4>
+                      <span class="text-[10px] bg-emerald-100 text-emerald-800 font-bold px-2 py-0.5 rounded-full flex items-center gap-1">
+                        <i class="fa-solid fa-shield-halved text-[9px]"></i> EFDA Verified
+                      </span>
+                      <span class="text-[10px] bg-amber-50 text-amber-800 font-bold px-1.5 py-0.5 rounded border border-amber-200">
+                        ★ ${p.trustScore}% Trust
+                      </span>
+                    </div>
+                    <p class="text-xs text-slate-500 mt-0.5">
+                      📍 ${p.subCity} • <strong>${p.distanceKm} km</strong> away • License: <span class="font-mono text-[10px] text-slate-400">${p.efdaLicenseNumber || 'EFDA-AA-2024'}</span>
+                    </p>
+                  </div>
+                </div>
+                <div class="text-right">
+                  <div class="text-base font-bold text-slate-900">${p.priceETB} ETB</div>
+                  <span class="text-[10px] bg-emerald-50 text-emerald-700 font-semibold px-1.5 py-0.5 rounded">🟢 Verified Today</span>
+                </div>
+              </div>
+
+              <!-- ACTION BAR WITH PRICE-LOCK HOLD & DISPUTE REPORT -->
+              <div class="pt-2 border-t border-slate-100 flex flex-wrap items-center justify-between gap-2">
+                <div class="flex gap-2">
+                  <button onclick="handlePriceLockClick(${idx})" class="bg-slate-900 hover:bg-black text-white text-xs font-semibold px-3 py-1.5 rounded-lg transition flex items-center space-x-1 shadow-sm">
+                    <i class="fa-solid fa-lock text-[10px]"></i>
+                    <span>Lock Price & Hold (60 Mins)</span>
+                  </button>
+                  <a href="tel:${p.phone}" class="bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-semibold px-3 py-1.5 rounded-lg transition flex items-center space-x-1">
+                    <i class="fa-solid fa-phone text-[10px]"></i>
+                    <span>${p.phone}</span>
+                  </a>
+                </div>
+                <button onclick="handleReportClick(${idx})" class="text-slate-400 hover:text-rose-600 text-xs flex items-center space-x-1 transition">
+                  <i class="fa-solid fa-triangle-exclamation text-[10px]"></i>
+                  <span>Report Issue</span>
+                </button>
+              </div>
+            </div>
+          `).join('');
+
+          container.innerHTML = `
+            <div class="space-y-3">
+              <div class="flex items-center justify-between pb-2 border-b border-slate-100">
+                <span class="text-xs font-bold text-emerald-700 bg-emerald-50 px-2.5 py-1 rounded-md">
+                  ✅ Found ${data.resultsCount} Nearby Pharmacies with "${medicineName}"
+                </span>
+                <span class="text-xs text-slate-500">Access: <strong>${data.accessReason}</strong></span>
+              </div>
+              ${pharmaciesHtml}
+            </div>
+          `;
+          return;
+        }
+
+        // 3. BROADCAST PING INITIATED FOR RARE DRUG
+        if (data.mode === 'BROADCAST_PING_INITIATED') {
+          lastBroadcastId = data.requestId;
+          container.innerHTML = `
+            <div class="p-6 rounded-2xl border border-sky-200 bg-sky-50/50 space-y-4">
+              <div class="flex items-center space-x-3 text-sky-900">
+                <div class="w-10 h-10 rounded-full bg-sky-500 text-white flex items-center justify-center animate-pulse">
+                  <i class="fa-solid fa-tower-broadcast"></i>
+                </div>
+                <div>
+                  <h3 class="font-bold text-sm">Broadcast Ping Active / ጥያቄ ተልኳል</h3>
+                  <p class="text-xs text-sky-700">Pinging <strong>${data.pingedCount}</strong> pharmacies within <strong>${data.radiusKm} km</strong> for "${medicineName}".</p>
+                </div>
+              </div>
+
+              <div id="broadcastLiveResponses" class="bg-white p-4 rounded-xl border border-sky-100 text-xs text-slate-600 space-y-2">
+                <div class="flex items-center space-x-2 text-slate-500">
+                  <span class="w-2 h-2 rounded-full bg-sky-400 animate-ping"></span>
+                  <span>Waiting for pharmacies to check shelves...</span>
+                </div>
+              </div>
+
+              <div class="flex items-center justify-between pt-2 text-xs">
+                <span class="text-slate-400">Request ID: ${data.requestId}</span>
+                <button onclick="pollBroadcast('${data.requestId}')" class="bg-sky-600 hover:bg-sky-700 text-white font-medium px-3 py-1.5 rounded-lg transition">
+                  <i class="fa-solid fa-rotate-right mr-1"></i> Check Responses
+                </button>
+              </div>
+            </div>
+          `;
+          return;
+        }
+
+      } catch (err) {
+        container.innerHTML = `<div class="p-4 rounded-xl bg-rose-50 text-rose-800 text-xs">Error communicating with server: ${err.message}</div>`;
+      }
+    }
+
+    // --- TELEBIRR PAYMENT SIMULATION ---
+    async function payWithTelebirr(invoiceId, amount) {
+      alert(`[Telebirr Mini-App Simulation]\nUser enters PIN to authorize ${amount} ETB debit.\nConfirming webhook now...`);
+      const res = await fetch('/api/payment/webhook', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ outTradeNo: invoiceId, tradeStatus: 'Completed' })
+      });
+      const data = await res.json();
+      if (data.success) {
+        alert('🎉 Payment Confirmed! 1 search unlocked.');
+        performSearch();
+      }
+    }
+
+    async function buyMonthlyPass(userId, amount) {
+      const res = await fetch('/api/payment/checkout', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ userId, purpose: 'MONTHLY_PASS' })
+      });
+      const data = await res.json();
+      if (data.success) {
+        payWithTelebirr(data.invoice.invoiceId, amount);
+      }
+    }
+
+    // --- PHARMACY INVENTORY LOGIC ---
+    async function loadPharmacyInventory() {
+      const pharmacyId = document.getElementById('actingPharmacySelect').value;
+      const tbody = document.getElementById('pharmacyInventoryTbody');
+      tbody.innerHTML = `<tr><td colspan="5" class="p-4 text-center text-slate-400">Loading shelf inventory...</td></tr>`;
+
+      try {
+        const res = await fetch(`/api/pharmacy/${pharmacyId}/inventory`);
+        const data = await res.json();
+        if (data.success) {
+          currentPharmacyInventory = data.inventory;
+          document.getElementById('inventoryCountBadge').innerText = `${currentPharmacyInventory.length} Items`;
+          renderInventoryTable(currentPharmacyInventory);
+        }
+
+        // Fetch regulatory & trust metrics
+        const trustRes = await fetch(`/api/pharmacy/${pharmacyId}/trust`);
+        const trustData = await trustRes.json();
+        if (trustData.success) {
+          const ph = trustData.pharmacy;
+          document.getElementById('pharmLicenseTxt').innerText = ph.efdaLicenseNumber || 'EFDA-AA-2024';
+          document.getElementById('pharmStrikesTxt').innerText = `${ph.strikeCount}/3`;
+          document.getElementById('pharmTrustBadge').innerText = `★ ${ph.trustScore}% Trust Score`;
+          document.getElementById('pharmEfdaBadge').className = ph.isVerified 
+            ? 'text-xs bg-emerald-100 text-emerald-800 font-bold px-2.5 py-0.5 rounded-full flex items-center gap-1'
+            : 'text-xs bg-rose-100 text-rose-800 font-bold px-2.5 py-0.5 rounded-full flex items-center gap-1';
+          document.getElementById('pharmEfdaBadge').innerHTML = ph.isVerified
+            ? '<i class="fa-solid fa-shield-halved text-[10px]"></i> EFDA Verified'
+            : '<i class="fa-solid fa-triangle-exclamation text-[10px]"></i> Unverified / Revoked';
+        }
+      } catch (err) {
+        console.error('Error loading inventory:', err);
+      }
+
+      loadActiveBroadcasts();
+    }
+
+    function renderInventoryTable(items) {
+      const tbody = document.getElementById('pharmacyInventoryTbody');
+      const pharmacyId = document.getElementById('actingPharmacySelect').value;
+
+      if (!items || items.length === 0) {
+        tbody.innerHTML = `<tr><td colspan="5" class="p-6 text-center text-slate-400 text-xs">No items currently registered on this pharmacy shelf. Use Method 1, 2, or 3 above to add items!</td></tr>`;
+        return;
+      }
+
+      tbody.innerHTML = items.map(item => `
+        <tr class="hover:bg-slate-50 transition">
+          <td class="p-3 font-semibold text-slate-900">${item.name}</td>
+          <td class="p-3 text-slate-500">${item.genericName || '-'} <span class="text-[10px] bg-slate-100 text-slate-600 px-1.5 py-0.5 rounded font-medium ml-1">${item.category || 'General'}</span></td>
+          <td class="p-3 font-bold text-slate-900">${item.priceETB} ETB</td>
+          <td class="p-3">
+            <span class="inline-flex items-center px-2 py-0.5 rounded text-[11px] font-semibold ${item.inStock ? 'bg-emerald-100 text-emerald-800' : 'bg-rose-100 text-rose-800'}">
+              ${item.inStock ? '● In Stock' : '○ Out of Stock'}
+            </span>
+          </td>
+          <td class="p-3 text-right space-x-2">
+            <button onclick="toggleStock('${pharmacyId}', '${item.name}', ${!item.inStock})" class="text-xs ${item.inStock ? 'text-amber-600 hover:text-amber-800' : 'text-emerald-600 hover:text-emerald-800'} font-semibold">
+              ${item.inStock ? 'Mark Out of Stock' : 'Mark In Stock'}
+            </button>
+            <button onclick="deleteItem('${pharmacyId}', '${item.name}')" class="text-xs text-rose-500 hover:text-rose-700 ml-2">
+              <i class="fa-solid fa-trash"></i>
+            </button>
+          </td>
+        </tr>
+      `).join('');
+    }
+
+    function filterInventoryTable() {
+      const q = document.getElementById('filterInventoryInput').value.toLowerCase();
+      const filtered = currentPharmacyInventory.filter(i => 
+        i.name.toLowerCase().includes(q) || (i.genericName && i.genericName.toLowerCase().includes(q))
+      );
+      renderInventoryTable(filtered);
+    }
+
+    async function toggleStock(pharmacyId, medicineName, inStock) {
+      await fetch(`/api/pharmacy/${pharmacyId}/inventory/toggle`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ medicineName, inStock })
+      });
+      loadPharmacyInventory();
+    }
+
+    async function deleteItem(pharmacyId, medicineName) {
+      if (confirm(`Remove "${medicineName}" from this pharmacy's inventory?`)) {
+        await fetch(`/api/pharmacy/${pharmacyId}/inventory/${encodeURIComponent(medicineName)}`, {
+          method: 'DELETE'
+        });
+        loadPharmacyInventory();
+      }
+    }
+
+    // --- METHOD 1: CHECKLIST MODAL ---
+    async function openMasterChecklistModal() {
+      document.getElementById('masterChecklistModal').classList.remove('hidden');
+      const container = document.getElementById('masterChecklistItemsContainer');
+      container.innerHTML = `<div class="text-center py-6 text-slate-400 text-xs">Loading Ethiopia Master Catalog...</div>`;
+
+      try {
+        const res = await fetch('/api/pharmacy/catalog/master');
+        const data = await res.json();
+        if (data.success) {
+          masterCatalog = data.catalog;
+          container.innerHTML = masterCatalog.map((item, idx) => `
+            <div class="p-3 rounded-xl border border-slate-200 bg-white hover:border-emerald-300 transition flex items-center justify-between gap-3">
+              <div class="flex items-center space-x-3">
+                <input type="checkbox" id="chk_${idx}" class="master-chk w-4 h-4 text-emerald-600 rounded" checked>
+                <div>
+                  <label for="chk_${idx}" class="font-bold text-xs text-slate-900 cursor-pointer block">${item.name}</label>
+                  <span class="text-[11px] text-slate-500">${item.genericName} • <span class="bg-slate-100 text-slate-600 px-1.5 py-0.5 rounded">${item.category}</span></span>
+                </div>
+              </div>
+              <div class="flex items-center space-x-1">
+                <span class="text-xs text-slate-400">ETB:</span>
+                <input type="number" id="price_${idx}" value="${item.defaultPriceETB}" class="w-20 text-xs font-bold px-2 py-1 border border-slate-300 rounded text-right">
+              </div>
+            </div>
+          `).join('');
+        }
+      } catch (err) {
+        container.innerHTML = `<div class="text-xs text-rose-500">Failed to load catalog.</div>`;
+      }
+    }
+
+    function toggleSelectAllChecklist(selectAll) {
+      document.querySelectorAll('.master-chk').forEach(c => c.checked = selectAll);
+    }
+
+    async function submitChecklistImport() {
+      const pharmacyId = document.getElementById('actingPharmacySelect').value;
+      const selectedItems = [];
+
+      masterCatalog.forEach((item, idx) => {
+        const chk = document.getElementById(`chk_${idx}`);
+        const priceInput = document.getElementById(`price_${idx}`);
+        if (chk && chk.checked) {
+          selectedItems.push({
+            name: item.name,
+            genericName: item.genericName,
+            category: item.category,
+            priceETB: parseFloat(priceInput.value) || item.defaultPriceETB
+          });
+        }
+      });
+
+      if (selectedItems.length === 0) {
+        alert('Please select at least 1 medicine to import.');
+        return;
+      }
+
+      const res = await fetch(`/api/pharmacy/${pharmacyId}/inventory/checklist`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ items: selectedItems })
+      });
+      const data = await res.json();
+      if (data.success) {
+        alert(data.message);
+        closeModal('masterChecklistModal');
+        loadPharmacyInventory();
+      }
+    }
+
+    // --- METHOD 2: SINGLE ADD ---
+    function openSingleAddModal() {
+      document.getElementById('singleAddModal').classList.remove('hidden');
+    }
+
+    async function submitSingleMedicineAdd() {
+      const pharmacyId = document.getElementById('actingPharmacySelect').value;
+      const name = document.getElementById('singleMedName').value.trim();
+      const genericName = document.getElementById('singleGenericName').value.trim();
+      const category = document.getElementById('singleCategory').value;
+      const priceETB = parseFloat(document.getElementById('singlePriceETB').value);
+
+      if (!name || isNaN(priceETB)) {
+        alert('Please fill in Medicine Name and Price in ETB.');
+        return;
+      }
+
+      const res = await fetch(`/api/pharmacy/${pharmacyId}/inventory/add`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name, genericName, category, priceETB, inStock: true })
+      });
+      const data = await res.json();
+      if (data.success) {
+        alert('Medicine added to shelf!');
+        document.getElementById('singleMedName').value = '';
+        document.getElementById('singlePriceETB').value = '';
+        closeModal('singleAddModal');
+        loadPharmacyInventory();
+      }
+    }
+
+    // --- METHOD 3: DIRECT FILE BROWSE & IMPORT ---
+    let parsedFileItems = [];
+
+    function openCsvModal() {
+      document.getElementById('csvModal').classList.remove('hidden');
+      clearSelectedFile();
+    }
+
+    function clearSelectedFile() {
+      parsedFileItems = [];
+      const fileInput = document.getElementById('fileUploadInput');
+      if (fileInput) fileInput.value = '';
+      document.getElementById('filePreviewContainer').classList.add('hidden');
+      document.getElementById('dropZone').classList.remove('hidden');
+      const btn = document.getElementById('commitImportBtn');
+      if (btn) {
+        btn.disabled = true;
+        btn.innerText = 'Import Medicines to Shelf';
+      }
+    }
+
+    function togglePasteFallback() {
+      const area = document.getElementById('pasteFallbackArea');
+      const chev = document.getElementById('pasteChevron');
+      const isHidden = area.classList.toggle('hidden');
+      chev.className = isHidden ? 'fa-solid fa-chevron-right text-[10px]' : 'fa-solid fa-chevron-down text-[10px]';
+    }
+
+    function handleManualPasteInput() {
+      const text = document.getElementById('csvInputText').value.trim();
+      if (!text) {
+        if (parsedFileItems.length === 0) {
+          document.getElementById('commitImportBtn').disabled = true;
+        }
+        return;
+      }
+      const lines = text.split('\n');
+      const items = [];
+      for (const line of lines) {
+        const parts = line.split(',').map(p => p.trim());
+        if (parts.length >= 2) {
+          const name = parts[0];
+          const price = parseFloat(parts[1]);
+          const cat = parts[2] || 'Imported';
+          if (name && !isNaN(price)) {
+            items.push({ name, priceETB: price, category: cat });
+          }
+        }
+      }
+      if (items.length > 0) {
+        parsedFileItems = items;
+        document.getElementById('commitImportBtn').disabled = false;
+        document.getElementById('commitImportBtn').innerText = `Import ${items.length} Medicines to Shelf`;
+      }
+    }
+
+    function downloadSampleTemplate() {
+      const sampleCsv = "Medicine Name,Price (ETB),Category,Generic Name\n" +
+        "Augmentin 625mg,390,Antibiotics,Amoxicillin + Clavulanate\n" +
+        "Ventolin Inhaler 100mcg,320,Respiratory,Salbutamol\n" +
+        "Metformin 500mg,120,Diabetes,Metformin HCl\n" +
+        "Amlodipine 5mg,110,Hypertension,Amlodipine Besylate\n" +
+        "Omeprazole 20mg,70,Gastrointestinal,Omeprazole";
+
+      const blob = new Blob([sampleCsv], { type: 'text/csv;charset=utf-8;' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = 'medfinder_ethiopia_sample_inventory.csv';
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+    }
+
+    async function handleFileSelect(event) {
+      const file = event.target.files[0];
+      if (!file) return;
+
+      const fileName = file.name;
+
+      try {
+        const reader = new FileReader();
+
+        reader.onload = function(e) {
+          const data = new Uint8Array(e.target.result);
+          // Parse using SheetJS (supports .xlsx, .xls, .csv seamlessly)
+          const workbook = XLSX.read(data, { type: 'array' });
+          const firstSheetName = workbook.SheetNames[0];
+          const worksheet = workbook.Sheets[firstSheetName];
+          const jsonRows = XLSX.utils.sheet_to_json(worksheet, { header: 1 });
+
+          if (!jsonRows || jsonRows.length <= 1) {
+            alert('Spreadsheet seems empty or only contains headers.');
+            return;
+          }
+
+          // Detect columns (Name, Price, Category)
+          const header = jsonRows[0].map(h => String(h || '').trim().toLowerCase());
+          let nameIdx = header.findIndex(h => h.includes('name') || h.includes('medicine') || h.includes('drug') || h.includes('item'));
+          let priceIdx = header.findIndex(h => h.includes('price') || h.includes('etb') || h.includes('cost') || h.includes('rate'));
+          let catIdx = header.findIndex(h => h.includes('category') || h.includes('type') || h.includes('group'));
+          let genericIdx = header.findIndex(h => h.includes('generic'));
+
+          if (nameIdx === -1) nameIdx = 0;
+          if (priceIdx === -1) priceIdx = 1;
+          if (catIdx === -1) catIdx = 2;
+
+          const items = [];
+          for (let i = 1; i < jsonRows.length; i++) {
+            const row = jsonRows[i];
+            if (!row || row.length === 0) continue;
+
+            const name = String(row[nameIdx] || '').trim();
+            const rawPrice = String(row[priceIdx] || '').replace(/[^0-9.]/g, '');
+            const price = parseFloat(rawPrice);
+            const category = catIdx >= 0 && row[catIdx] ? String(row[catIdx]).trim() : 'General';
+            const genericName = genericIdx >= 0 && row[genericIdx] ? String(row[genericIdx]).trim() : '';
+
+            if (name && !isNaN(price)) {
+              items.push({ name, priceETB: price, category, genericName });
+            }
+          }
+
+          if (items.length === 0) {
+            alert('Could not find valid medicine names and prices in this file. Please check format or download the sample template.');
+            return;
+          }
+
+          parsedFileItems = items;
+
+          // Show Preview Card
+          document.getElementById('dropZone').classList.add('hidden');
+          document.getElementById('filePreviewContainer').classList.remove('hidden');
+          document.getElementById('previewFileName').innerText = fileName;
+          document.getElementById('previewItemCount').innerText = `${items.length} Medicines Detected`;
+
+          const tbody = document.getElementById('previewTableTbody');
+          const previewSlice = items.slice(0, 5);
+          tbody.innerHTML = previewSlice.map(it => `
+            <tr>
+              <td class="p-2 font-medium text-slate-900">${it.name}</td>
+              <td class="p-2 text-slate-500">${it.category}</td>
+              <td class="p-2 font-bold text-slate-900">${it.priceETB} ETB</td>
+            </tr>
+          `).join('');
+
+          const btn = document.getElementById('commitImportBtn');
+          btn.disabled = false;
+          btn.innerText = `Import All ${items.length} Medicines to Shelf`;
+        };
+
+        reader.readAsArrayBuffer(file);
+      } catch (err) {
+        alert('Failed to read spreadsheet: ' + err.message);
+      }
+    }
+
+    async function submitDirectFileImport() {
+      const pharmacyId = document.getElementById('actingPharmacySelect').value;
+
+      if (!parsedFileItems || parsedFileItems.length === 0) {
+        alert('No medicines found to import. Please select a valid spreadsheet file.');
+        return;
+      }
+
+      const btn = document.getElementById('commitImportBtn');
+      btn.disabled = true;
+      btn.innerText = 'Importing...';
+
+      try {
+        const res = await fetch(`/api/pharmacy/${pharmacyId}/inventory/checklist`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ items: parsedFileItems })
+        });
+
+        const data = await res.json();
+        if (data.success) {
+          alert(`🎉 Successfully imported ${data.count} medicines directly to this pharmacy's shelf!`);
+          closeModal('csvModal');
+          loadPharmacyInventory();
+        } else {
+          alert('Import failed: ' + (data.error || 'Unknown error'));
+        }
+      } catch (err) {
+        alert('Server error: ' + err.message);
+      } finally {
+        btn.disabled = false;
+      }
+    }
+
+    // --- BROADCAST POLLING & CLAIM ---
+    async function loadActiveBroadcasts() {
+      const container = document.getElementById('broadcastsListContainer');
+      if (!lastBroadcastId) {
+        container.innerHTML = `<div class="text-center py-6 text-slate-400 text-xs">No active broadcast queries pending right now. Run a search for a rare drug (like "Humulin N") in Tab 1 to trigger one.</div>`;
+        return;
+      }
+
+      const res = await fetch(`/api/search/broadcast/${lastBroadcastId}`);
+      const data = await res.json();
+
+      container.innerHTML = `
+        <div class="p-4 rounded-xl border border-amber-300 bg-amber-50/50 space-y-3">
+          <div class="flex items-center justify-between">
+            <span class="text-xs font-bold text-amber-900 bg-amber-100 px-2 py-0.5 rounded">Incoming Patient Query</span>
+            <span class="text-xs text-slate-400">ID: ${data.requestId}</span>
+          </div>
+          <p class="text-sm font-semibold text-slate-800">Customer looking for: <span class="text-emerald-700">${data.medicineName}</span></p>
+
+          <div class="flex items-center gap-3 pt-2">
+            <input type="number" id="pharmacistPriceInput" placeholder="Enter Price (ETB), e.g. 420" value="420" class="text-xs px-3 py-2 border border-slate-300 rounded-lg w-48 bg-white">
+            <button onclick="claimBroadcast('${data.requestId}')" class="bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold px-4 py-2 rounded-lg transition">
+              Confirm Stock & Forward to Patient
+            </button>
+          </div>
+        </div>
+      `;
+    }
+
+    async function claimBroadcast(requestId) {
+      const pharmacyId = document.getElementById('actingPharmacySelect').value;
+      const priceETB = document.getElementById('pharmacistPriceInput').value;
+
+      const res = await fetch('/api/pharmacy/respond', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ requestId, pharmacyId, hasStock: true, priceETB })
+      });
+      const data = await res.json();
+      if (data.success) {
+        alert('Stock confirmed! Patient has been alerted with your contact & price.');
+        loadActiveBroadcasts();
+      }
+    }
+
+    async function pollBroadcast(reqId) {
+      const res = await fetch(`/api/search/broadcast/${reqId}`);
+      const data = await res.json();
+      const liveBox = document.getElementById('broadcastLiveResponses');
+      if (data.responses && data.responses.length > 0) {
+        liveBox.innerHTML = data.responses.map(r => `
+          <div class="p-3 bg-emerald-50 border border-emerald-200 rounded-lg flex items-center justify-between">
+            <div>
+              <strong class="text-emerald-900">${r.pharmacyName}</strong>
+              <div class="text-[11px] text-slate-500">Price: <strong>${r.priceETB} ETB</strong> • Distance: ${r.distanceKm} km</div>
+            </div>
+            <a href="tel:${r.phone}" class="bg-emerald-600 text-white px-2.5 py-1 rounded text-xs font-semibold">${r.phone}</a>
+          </div>
+        `).join('');
+      } else {
+        liveBox.innerHTML = `<span class="text-slate-400">No responses yet. Switch to Tab 2 (Pharmacy Studio) to claim this request!</span>`;
+      }
+    }
+
+    // --- ADMIN ACTIONS ---
+    async function reloadAdminPolicy() {
+      await fetchPolicy();
+      loadAdminPharmacies();
+      loadTelegramApplications();
+      checkRealBotStatus();
+      if (!currentPolicy) return;
+      document.getElementById('adminCutoffInput').value = currentPolicy.monetization.freePromotionUntil.substring(0, 16);
+      document.getElementById('adminSearchFee').value = currentPolicy.monetization.pricing.searchFeeETB;
+      document.getElementById('adminMonthlyFee').value = currentPolicy.monetization.pricing.monthlyPassETB;
+      document.getElementById('adminQuarterlyFee').value = currentPolicy.monetization.pricing.threeMonthPassETB;
+      document.getElementById('adminInitialRadius').value = currentPolicy.geoMatching.initialRadiusKm;
+      document.getElementById('adminExpandedRadius').value = currentPolicy.geoMatching.expandedRadiusKm;
+      document.getElementById('adminMaxPing').value = currentPolicy.geoMatching.maxPharmaciesPinged;
+    }
+
+    // --- TELEGRAM VERIFICATION BOT & SIMULATOR LOGIC (CHANNEL B) ---
+    let telegramChatStarted = false;
+    const currentTelegramChatId = 'tg_user_pharma_' + Math.floor(1000 + Math.random() * 9000);
+
+    function openTelegramBotModal() {
+      document.getElementById('telegramBotModal').classList.remove('hidden');
+      if (!telegramChatStarted) {
+        telegramChatStarted = true;
+        sendTelegramSimulatorMessage('/start');
+      }
+    }
+
+    function resetTelegramBotChat() {
+      document.getElementById('telegramChatLogs').innerHTML = '';
+      document.getElementById('telegramQuickReplies').innerHTML = '';
+      sendTelegramSimulatorMessage('/start');
+    }
+
+    async function sendTelegramSimulatorMessage(overrideText) {
+      const inputEl = document.getElementById('telegramUserInput');
+      const text = overrideText !== undefined ? overrideText : inputEl.value.trim();
+      if (!text) return;
+      if (overrideText === undefined) inputEl.value = '';
+
+      // Append User message bubble
+      appendTelegramBubble('user', text);
+
+      const logs = document.getElementById('telegramChatLogs');
+      logs.scrollTop = logs.scrollHeight;
+
+      // Show typing indicator
+      const typingId = 'typing_' + Date.now();
+      const typingNode = document.createElement('div');
+      typingNode.id = typingId;
+      typingNode.className = 'flex items-center space-x-2 text-slate-400 text-[11px] pl-2 py-1';
+      typingNode.innerHTML = `<i class="fa-solid fa-circle-notch fa-spin text-sky-400"></i><span>@MedFinderVerifyBot is typing...</span>`;
+      logs.appendChild(typingNode);
+      logs.scrollTop = logs.scrollHeight;
+
+      let locationPayload = null;
+      if (text.includes('Share Current GPS') || text.includes('ቦታዬን በጂፒኤስ ላክ')) {
+        locationPayload = { latitude: 9.0015, longitude: 38.7845 };
+      }
+
+      try {
+        const res = await fetch('/api/telegram/simulate-chat', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            chatId: currentTelegramChatId,
+            username: '@dr_pharmacist_addis',
+            text: text,
+            location: locationPayload
+          })
+        });
+        const data = await res.json();
+        
+        const typingEl = document.getElementById(typingId);
+        if (typingEl) typingEl.remove();
+
+        if (data.success && data.response) {
+          const resp = data.response;
+          appendTelegramBubble('bot', resp.replyText, resp.inlineKeyboard);
+
+          // Render quick reply chips
+          const quickBox = document.getElementById('telegramQuickReplies');
+          if (resp.quickReplies && resp.quickReplies.length > 0) {
+            quickBox.innerHTML = resp.quickReplies.map(btn => `
+              <button onclick="sendTelegramSimulatorMessage('${btn.replace(/'/g, "\\'")}')" class="bg-[#242f3d] hover:bg-sky-600 text-sky-200 hover:text-white px-3 py-1 rounded-full text-[11px] font-medium transition border border-slate-700/80 shadow-sm">
+                ${btn}
+              </button>
+            `).join('');
+          } else {
+            quickBox.innerHTML = '';
+          }
+
+          if (resp.isComplete) {
+            loadTelegramApplications();
+            loadAdminPharmacies();
+          }
+        }
+      } catch (err) {
+        const typingEl = document.getElementById(typingId);
+        if (typingEl) typingEl.remove();
+        appendTelegramBubble('bot', '⚠️ Connection error: ' + err.message);
+      }
+
+      logs.scrollTop = logs.scrollHeight;
+    }
+
+    function appendTelegramBubble(sender, text, inlineKeyboard) {
+      const logs = document.getElementById('telegramChatLogs');
+      const timeStr = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+
+      let formattedText = text
+        .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
+        .replace(/\*(.*?)\*/g, '<em>$1</em>')
+        .replace(/\[(.*?)\]\((.*?)\)/g, '<a href="$2" target="_blank" class="text-sky-400 hover:underline font-semibold">$1</a>')
+        .replace(/\n/g, '<br>');
+
+      // Convert /hold_... codes into clickable simulator action links
+      formattedText = formattedText.replace(/\/hold_([a-zA-Z0-9_\-]+)/g, (match) => {
+        return `<button onclick="sendTelegramSimulatorMessage('${match}')" class="inline-block bg-sky-900/60 hover:bg-sky-800 text-sky-200 px-2 py-0.5 rounded text-[11px] font-mono font-bold border border-sky-600/40 my-0.5 cursor-pointer">${match}</button>`;
+      });
+
+      let inlineButtonsHtml = '';
+      if (inlineKeyboard && inlineKeyboard.length > 0) {
+        inlineButtonsHtml = '<div class="mt-2.5 pt-2 border-t border-slate-700/50 space-y-1.5">';
+        inlineKeyboard.forEach(row => {
+          inlineButtonsHtml += '<div class="flex gap-1.5 flex-wrap">';
+          row.forEach(btn => {
+            if (btn.web_app && btn.web_app.url) {
+              inlineButtonsHtml += `<a href="${btn.web_app.url}" target="_blank" class="flex-1 bg-gradient-to-r from-sky-500 to-blue-600 hover:from-sky-600 hover:to-blue-700 text-white font-bold text-center text-xs px-3 py-2 rounded-xl shadow transition flex items-center justify-center gap-1.5"><i class="fa-brands fa-telegram"></i> <span>${btn.text}</span></a>`;
+            } else if (btn.url) {
+              inlineButtonsHtml += `<a href="${btn.url}" target="_blank" class="flex-1 bg-sky-700 hover:bg-sky-600 text-white font-bold text-center text-xs px-3 py-1.5 rounded-xl shadow transition flex items-center justify-center gap-1.5"><span>${btn.text}</span></a>`;
+            } else {
+              inlineButtonsHtml += `<button onclick="sendTelegramSimulatorMessage('${btn.callback_data || btn.text}')" class="flex-1 bg-slate-800 hover:bg-slate-700 text-sky-200 font-semibold text-center text-xs px-3 py-1.5 rounded-xl border border-slate-700 transition"><span>${btn.text}</span></button>`;
+            }
+          });
+          inlineButtonsHtml += '</div>';
+        });
+        inlineButtonsHtml += '</div>';
+      }
+
+      const bubble = document.createElement('div');
+      if (sender === 'user') {
+        bubble.className = 'flex justify-end';
+        bubble.innerHTML = `
+          <div class="bg-[#2b5278] text-white px-3.5 py-2 rounded-2xl rounded-tr-none max-w-[80%] shadow-sm space-y-1">
+            <div class="leading-relaxed">${formattedText}</div>
+            <div class="text-[9px] text-sky-200 text-right font-mono">${timeStr} ✓✓</div>
+          </div>
+        `;
+      } else {
+        bubble.className = 'flex justify-start items-start space-x-2';
+        bubble.innerHTML = `
+          <div class="w-7 h-7 rounded-full bg-sky-500 text-white flex items-center justify-center text-xs flex-shrink-0 mt-0.5 shadow">
+            <i class="fa-brands fa-telegram"></i>
+          </div>
+          <div class="bg-[#182533] text-slate-100 border border-slate-700/60 px-3.5 py-2.5 rounded-2xl rounded-tl-none max-w-[88%] shadow space-y-1">
+            <div class="leading-relaxed">${formattedText}</div>
+            ${inlineButtonsHtml}
+            <div class="text-[9px] text-slate-400 text-right font-mono">${timeStr}</div>
+          </div>
+        `;
+      }
+      logs.appendChild(bubble);
+      logs.scrollTop = logs.scrollHeight;
+    }
+
+    // --- ADMIN TELEGRAM APPLICATION REVIEW QUEUE & DOCUMENT INSPECTOR ---
+    let telegramAppsCache = [];
+    let currentInspectZoom = 1;
+    let currentInspectingAppId = null;
+
+    async function loadTelegramApplications() {
+      const tbody = document.getElementById('telegramAppsTbody');
+      if (!tbody) return;
+      tbody.innerHTML = `<tr><td colspan="6" class="p-4 text-center text-slate-400">Loading Telegram applications...</td></tr>`;
+
+      try {
+        const res = await fetch('/api/telegram/applications');
+        const data = await res.json();
+        if (data.success && data.applications) {
+          const apps = data.applications;
+          telegramAppsCache = apps;
+          const badge = document.getElementById('telegramQueueBadge');
+          if (badge) badge.innerText = `${apps.length} Applications`;
+
+          if (apps.length === 0) {
+            tbody.innerHTML = `<tr><td colspan="6" class="p-6 text-center text-slate-400 text-xs">No verification applications submitted yet. Test via Channel B Bot Simulator!</td></tr>`;
+            return;
+          }
+
+          tbody.innerHTML = apps.map(a => {
+            const docThumbUrl = a.efdaDocUrl || a.counterPhotoUrl || '/api/telegram/media/AgACAgQAAxkBAAMVar4JCCIcXLlv1JhWQ0SePYd-FyEAAlcPaxvYU_BRoZjmQdTeWWQBAAMCAAN5AAM9BA';
+            return `
+            <tr class="hover:bg-slate-50 transition">
+              <td class="p-3">
+                <span class="font-mono font-bold text-xs text-sky-700 bg-sky-50 px-2 py-0.5 rounded border border-sky-200">${a.id}</span>
+                <span class="text-[11px] text-slate-500 block mt-0.5">${a.telegramUsername || a.telegramChatId}</span>
+              </td>
+              <td class="p-3">
+                <strong class="text-slate-900 block">${a.pharmacyName}</strong>
+                <span class="text-[11px] text-slate-500">📍 ${a.subCity}, Addis Ababa ${a.gpsLocationVerified ? '🟢 (GPS Locked)' : ''}</span>
+              </td>
+              <td class="p-3">
+                <span class="text-slate-800 font-medium block">${a.pharmacistName}</span>
+                <span class="text-[11px] text-slate-500 font-mono">${a.phone}</span>
+              </td>
+              <td class="p-3">
+                <div class="flex items-start gap-2.5">
+                  <div class="relative group cursor-pointer flex-shrink-0" onclick="openDocInspectModal('${a.id}')" title="Click to inspect wall certificate in high-resolution lightbox">
+                    <img src="${docThumbUrl}" alt="Certificate Photo" class="w-12 h-12 object-cover rounded-lg border-2 border-sky-300 shadow-sm group-hover:scale-105 group-hover:border-emerald-500 transition duration-150 bg-slate-100" onerror="this.onerror=null; this.src='https://images.unsplash.com/photo-1589829545856-d10d557cf95f?auto=format&fit=crop&w=400&q=80'">
+                    <span class="absolute inset-0 bg-slate-900/40 opacity-0 group-hover:opacity-100 rounded-lg flex items-center justify-center text-white transition text-xs">
+                      <i class="fa-solid fa-magnifying-glass-plus"></i>
+                    </span>
+                  </div>
+                  <div class="space-y-1">
+                    <button onclick="openDocInspectModal('${a.id}')" class="text-[11px] font-bold text-sky-700 hover:text-emerald-700 hover:underline flex items-center gap-1">
+                      <i class="fa-solid fa-file-shield text-emerald-600"></i>
+                      <span>Inspect Certificate</span>
+                    </button>
+                    <span class="font-mono text-[11px] text-slate-700 bg-slate-100 px-1.5 py-0.5 rounded block">CoC: ${a.efdaLicenseNumber || 'EFDA Verification'}</span>
+                    <span class="font-mono text-[10px] text-slate-500 block">${a.tinNumber || 'TIN Verification'}</span>
+                  </div>
+                </div>
+              </td>
+              <td class="p-3">
+                ${a.status === 'APPROVED' 
+                  ? '<span class="bg-emerald-100 text-emerald-800 font-bold px-2 py-0.5 rounded text-[10px] inline-flex items-center gap-1"><i class="fa-solid fa-check"></i> Approved</span>'
+                  : a.status === 'REJECTED'
+                    ? '<span class="bg-rose-100 text-rose-800 font-bold px-2 py-0.5 rounded text-[10px] inline-flex items-center gap-1"><i class="fa-solid fa-xmark"></i> Rejected</span>'
+                    : a.status === 'INFO_REQUESTED'
+                      ? '<span class="bg-purple-100 text-purple-800 font-bold px-2 py-0.5 rounded text-[10px] inline-flex items-center gap-1 border border-purple-200"><i class="fa-solid fa-hourglass-half"></i> Info Requested</span>'
+                      : a.status === 'RESUBMITTED'
+                        ? '<span class="bg-sky-100 text-sky-800 font-bold px-2 py-0.5 rounded text-[10px] inline-flex items-center gap-1 border border-sky-300 shadow-sm animate-pulse"><i class="fa-solid fa-rotate text-sky-600"></i> Resubmitted</span>'
+                        : '<span class="bg-amber-100 text-amber-800 font-bold px-2 py-0.5 rounded text-[10px] inline-flex items-center gap-1"><i class="fa-solid fa-clock"></i> Pending Review</span>'}
+                ${a.status === 'RESUBMITTED' ? '<span class="text-[9px] text-sky-700 block mt-0.5 font-semibold">✨ New document attached</span>' : ''}
+                ${a.status === 'INFO_REQUESTED' ? '<span class="text-[9px] text-purple-600 block mt-0.5">Waiting for pharmacy</span>' : ''}
+              </td>
+              <td class="p-3 text-right space-x-1.5 whitespace-nowrap">
+                ${a.status !== 'APPROVED' ? `
+                  <button onclick="openDocInspectModal('${a.id}')" class="text-xs bg-sky-600 hover:bg-sky-700 text-white font-semibold px-2.5 py-1 rounded-lg transition shadow-sm inline-flex items-center gap-1">
+                    <i class="fa-solid fa-magnifying-glass"></i> Inspect &amp; Verify
+                  </button>
+                  <button onclick="openRequestInfoModal('${a.id}')" class="text-xs bg-purple-50 hover:bg-purple-100 text-purple-700 border border-purple-200 font-semibold px-2 py-1 rounded-lg transition shadow-sm inline-flex items-center gap-1">
+                    <i class="fa-solid fa-circle-question text-purple-600"></i> Request Info
+                  </button>
+                  <button onclick="reviewTelegramApplication('${a.id}', 'APPROVED')" class="text-xs bg-emerald-600 hover:bg-emerald-700 text-white font-semibold px-2.5 py-1 rounded-lg transition shadow-sm">
+                    ✅ 1-Click Approve
+                  </button>
+                ` : `
+                  <button onclick="openDocInspectModal('${a.id}')" class="text-xs bg-slate-100 hover:bg-slate-200 text-slate-700 font-semibold px-2.5 py-1 rounded-lg transition inline-flex items-center gap-1">
+                    <i class="fa-solid fa-file-lines"></i> View Certificate
+                  </button>
+                  <span class="text-xs text-emerald-600 font-semibold inline-flex items-center gap-1 ml-1"><i class="fa-solid fa-shield-halved"></i> Verified</span>
+                `}
+              </td>
+            </tr>
+          `;
+          }).join('');
+        }
+      } catch (err) {
+        tbody.innerHTML = `<tr><td colspan="6" class="p-4 text-center text-rose-500">Failed to load applications: ${err.message}</td></tr>`;
+      }
+    }
+
+    // --- STANDARDIZED REGULATORY COMPLIANCE PRESETS ---
+    const COMPLIANCE_PRESET_NOTES = [
+      {
+        id: 'blurry_photo',
+        icon: 'fa-camera',
+        title: 'Blurry / Unclear Certificate Photo',
+        titleAm: 'የደበዘዘ / ጥራት የጎደለው የCoC ፎቶ',
+        badge: 'Photo Quality',
+        note: 'The uploaded Certificate of Competence (CoC) photo is blurry or unreadable. Please upload a clear, focused photo showing the registration number and EFDA official stamp clearly.',
+      },
+      {
+        id: 'glass_glare',
+        icon: 'fa-sun',
+        title: 'Glass Reflection / Camera Glare',
+        titleAm: 'የመስታወት ነጸብራቅ ወይም የፍላሽ ብርሃን',
+        badge: 'Legibility',
+        note: 'The certificate photo has heavy flash reflection or glass glare covering license details. Please take a glare-free photo without camera flash or photograph outside framing.',
+      },
+      {
+        id: 'gps_mismatch',
+        icon: 'fa-location-dot',
+        title: 'Premise Location / GPS Mismatch',
+        titleAm: 'የአድራሻ / የቀጥታ ጂፒኤስ አለመጣጣም',
+        badge: 'Geo-Verification',
+        note: 'The shared location does not match the registered premise address on your EFDA filing. Please share your live GPS location directly from inside the pharmacy premises.',
+      },
+      {
+        id: 'pharmacist_license',
+        icon: 'fa-user-doctor',
+        title: 'Lead Pharmacist License Missing',
+        titleAm: 'የኃላፊ ባለሙያ የታደሰ የሙያ ፈቃድ',
+        badge: 'Credentials',
+        note: "The supervising pharmacist's EPA professional practice license is missing or illegible. Please submit a clear copy of the lead pharmacist's active license.",
+      },
+      {
+        id: 'expired_coc',
+        icon: 'fa-calendar-xmark',
+        title: 'Expired Certificate / Renewal Needed',
+        titleAm: 'የጊዜው ያለፈበት ሰነድ / የታደሰበት ማረጋገጫ',
+        badge: 'Validity',
+        note: 'The Certificate of Competence shown appears expired. If renewed, please upload the current year valid EFDA renewal certificate or official payment receipt.',
+      },
+      {
+        id: 'tin_mismatch',
+        icon: 'fa-landmark',
+        title: 'TIN / Trade Registry Mismatch',
+        titleAm: 'የTIN ቁጥር / የንግድ ስም አለመጣጣም',
+        badge: 'Tax & Trade',
+        note: 'The provided TIN number does not match Ministry of Trade & Regional Integration records for this pharmacy name. Please upload a clear photo of your business TIN registration.',
+      },
+      {
+        id: 'counter_storefront',
+        icon: 'fa-store',
+        title: 'Storefront Sign & Counter Photo',
+        titleAm: 'የፋርማሲው የፊት ለፊት ታፔላ እና ካውንተር',
+        badge: 'Premise Photo',
+        note: 'Please upload a photo of the pharmacy outdoor storefront signboard and dispensing counter matching the registered trade name alongside the wall certificate.',
+      }
+    ];
+
+    let currentRequestInfoAppId = null;
+
+    function applyCompliancePreset(presetId) {
+      const preset = COMPLIANCE_PRESET_NOTES.find(p => p.id === presetId);
+      if (!preset) return;
+      const notesEl = document.getElementById('inspectModalNotes');
+      if (notesEl) {
+        notesEl.value = preset.note;
+        notesEl.focus();
+      }
+      const selectEl = document.getElementById('inspectModalPresetSelect');
+      if (selectEl) selectEl.value = presetId;
+    }
+
+    function openRequestInfoModal(id) {
+      const app = telegramAppsCache.find(a => a.id === id);
+      if (!app) return;
+      currentRequestInfoAppId = id;
+
+      document.getElementById('reqInfoAppBadge').innerText = app.id;
+      document.getElementById('reqInfoPharmName').innerText = app.pharmacyName || 'Registered Pharmacy';
+      document.getElementById('reqInfoPharmTitle').innerText = `Compliance Clarification for ${app.pharmacyName}`;
+      document.getElementById('reqInfoPharmTg').innerText = `${app.telegramUsername || app.telegramChatId} • 📍 ${app.subCity || 'Bole'}, Addis Ababa`;
+      
+      renderPresetCards();
+      selectRequestInfoPreset('blurry_photo');
+
+      document.getElementById('requestInfoModal').classList.remove('hidden');
+    }
+
+    function closeRequestInfoModal() {
+      document.getElementById('requestInfoModal').classList.add('hidden');
+      currentRequestInfoAppId = null;
+    }
+
+    function renderPresetCards() {
+      const container = document.getElementById('presetCardsContainer');
+      if (!container) return;
+
+      container.innerHTML = COMPLIANCE_PRESET_NOTES.map(p => `
+        <div onclick="selectRequestInfoPreset('${p.id}')" id="presetCard_${p.id}" class="preset-card cursor-pointer p-2.5 rounded-xl border border-slate-200 bg-white hover:border-purple-300 hover:bg-purple-50/40 transition shadow-sm space-y-1">
+          <div class="flex items-center justify-between">
+            <span class="text-xs font-bold text-slate-900 flex items-center gap-1.5">
+              <i class="fa-solid ${p.icon} text-purple-600 text-xs"></i>
+              <span>${p.title}</span>
+            </span>
+            <span class="text-[9px] bg-slate-100 text-slate-600 px-1.5 py-0.5 rounded font-medium">${p.badge}</span>
+          </div>
+          <p class="text-[10px] text-purple-700 font-medium">${p.titleAm}</p>
+        </div>
+      `).join('');
+    }
+
+    function selectRequestInfoPreset(presetId) {
+      const preset = COMPLIANCE_PRESET_NOTES.find(p => p.id === presetId);
+      if (!preset) return;
+
+      document.querySelectorAll('.preset-card').forEach(c => {
+        c.classList.remove('border-purple-500', 'bg-purple-50', 'ring-2', 'ring-purple-200');
+        c.classList.add('border-slate-200', 'bg-white');
+      });
+      const activeCard = document.getElementById(`presetCard_${presetId}`);
+      if (activeCard) {
+        activeCard.classList.remove('border-slate-200', 'bg-white');
+        activeCard.classList.add('border-purple-500', 'bg-purple-50', 'ring-2', 'ring-purple-200');
+      }
+
+      const noteTextarea = document.getElementById('reqInfoCustomNote');
+      if (noteTextarea) {
+        noteTextarea.value = preset.note;
+      }
+    }
+
+    function submitRequestInfoFromModal() {
+      if (!currentRequestInfoAppId) return;
+      const note = document.getElementById('reqInfoCustomNote').value.trim();
+      if (!note) {
+        alert('Please select a preset or type an inspection note.');
+        return;
+      }
+      closeRequestInfoModal();
+      reviewTelegramApplication(currentRequestInfoAppId, 'INFO_REQUESTED', note);
+    }
+
+    function openDocInspectModal(id) {
+      const app = telegramAppsCache.find(a => a.id === id);
+      if (!app) return;
+      currentInspectingAppId = id;
+      currentInspectZoom = 1;
+
+      document.getElementById('inspectModalPharmName').innerText = app.pharmacyName || 'Registered Pharmacy';
+      document.getElementById('inspectModalAppBadge').innerText = app.id;
+      document.getElementById('inspectModalPharmacist').innerText = app.pharmacistName || 'Licensed Pharmacist';
+      document.getElementById('inspectModalTgUser').innerText = app.telegramUsername || app.telegramChatId;
+      document.getElementById('inspectModalPhone').innerText = app.phone || 'N/A';
+      document.getElementById('inspectModalLocation').innerText = `${app.subCity || 'Bole'} Sub-City, Addis Ababa (${app.addressDetails || 'Physical Location'})`;
+      
+      document.getElementById('inspectModalLicenseInput').value = app.efdaLicenseNumber || 'EFDA/PH/AA/2024/3297';
+      if (app.requestedInfoReason) {
+        document.getElementById('inspectModalNotes').value = `[Compliance Request]: "${app.requestedInfoReason}"\n${app.adminNotes || ''}`;
+      } else {
+        document.getElementById('inspectModalNotes').value = app.adminNotes || 'Wall Certificate CoC verified against EFDA iRIS registry. Physical premise match confirmed.';
+      }
+
+      // Reset preset select
+      const presetSelect = document.getElementById('inspectModalPresetSelect');
+      if (presetSelect) presetSelect.value = '';
+
+      let docUrl = app.efdaDocUrl || app.counterPhotoUrl;
+      if (!docUrl && app.telegramChatId) {
+        docUrl = `/api/telegram/media/${app.id}`;
+      }
+      if (!docUrl) {
+        docUrl = 'https://images.unsplash.com/photo-1589829545856-d10d557cf95f?auto=format&fit=crop&w=1200&q=80';
+      }
+
+      const imgEl = document.getElementById('docInspectImg');
+      imgEl.src = docUrl;
+      imgEl.style.transform = 'scale(1)';
+      document.getElementById('inspectZoomLevel').innerText = '100%';
+
+      const newTabLink = document.getElementById('inspectModalNewTabLink');
+      if (newTabLink) newTabLink.href = docUrl;
+
+      document.getElementById('docInspectModal').classList.remove('hidden');
+    }
+
+    function closeDocInspectModal() {
+      document.getElementById('docInspectModal').classList.add('hidden');
+      currentInspectingAppId = null;
+    }
+
+    function zoomDocInspect(factor) {
+      currentInspectZoom = Math.max(0.5, Math.min(3.0, currentInspectZoom + factor));
+      const img = document.getElementById('docInspectImg');
+      if (img) img.style.transform = `scale(${currentInspectZoom})`;
+      const zoomBadge = document.getElementById('inspectZoomLevel');
+      if (zoomBadge) zoomBadge.innerText = `${Math.round(currentInspectZoom * 100)}%`;
+    }
+
+    function resetDocInspectZoom() {
+      currentInspectZoom = 1;
+      const img = document.getElementById('docInspectImg');
+      if (img) img.style.transform = 'scale(1)';
+      const zoomBadge = document.getElementById('inspectZoomLevel');
+      if (zoomBadge) zoomBadge.innerText = '100%';
+    }
+
+    function approveFromDocInspect() {
+      if (!currentInspectingAppId) return;
+      const licNo = document.getElementById('inspectModalLicenseInput').value.trim();
+      const notes = document.getElementById('inspectModalNotes').value.trim() || 'Wall Certificate verified against EFDA iRIS registry. Approved.';
+      reviewTelegramApplication(currentInspectingAppId, 'APPROVED', notes, licNo);
+    }
+
+    function requestInfoFromDocInspect() {
+      if (!currentInspectingAppId) return;
+      const licNo = document.getElementById('inspectModalLicenseInput').value.trim();
+      const notes = document.getElementById('inspectModalNotes').value.trim();
+      if (!notes || notes.startsWith('Wall Certificate CoC verified')) {
+        // Open preset selector modal for intuitive choice!
+        openRequestInfoModal(currentInspectingAppId);
+        return;
+      }
+      reviewTelegramApplication(currentInspectingAppId, 'INFO_REQUESTED', notes, licNo);
+    }
+
+    function rejectFromDocInspect() {
+      if (!currentInspectingAppId) return;
+      const licNo = document.getElementById('inspectModalLicenseInput').value.trim();
+      const notes = document.getElementById('inspectModalNotes').value.trim() || 'Document rejected: Certificate could not be verified in EFDA iRIS registry.';
+      reviewTelegramApplication(currentInspectingAppId, 'REJECTED', notes, licNo);
+    }
+
+    async function reviewTelegramApplication(id, status, customNotes, customLicense) {
+      let defaultNote = status === 'APPROVED' 
+        ? 'Cross-checked against EFDA iRIS registry and MoTRI Trade license portal. Approved!' 
+        : status === 'REJECTED'
+          ? 'EFDA license number does not match registered premises address.'
+          : 'Please send a clearer photograph of your wall Certificate of Competence.';
+
+      let adminNotes = customNotes;
+      if (adminNotes === undefined) {
+        if (status === 'INFO_REQUESTED') {
+          openRequestInfoModal(id);
+          return;
+        }
+        adminNotes = prompt(`Enter compliance review note for application ${id}:`, defaultNote);
+        if (adminNotes === null) return;
+      }
+
+      try {
+        const payload = { status, adminNotes };
+        if (customLicense) {
+          payload.efdaLicenseNumber = customLicense;
+        }
+
+        const res = await fetch(`/api/telegram/applications/${id}/review`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload)
+        });
+        const data = await res.json();
+        if (data.success) {
+          const pharmName = (data.pharmacy && data.pharmacy.name) ? ` "${data.pharmacy.name}"` : '';
+          alert(`Application ${id} status updated to: ${status}!\nLive notification sent to pharmacist Telegram chat.${status === 'APPROVED' ? `\n\n✅ Pharmacy${pharmName} is now listed in the Regulatory Compliance & EFDA Verification Desk table and active in the Pharmacy Management dropdown.` : ''}`);
+          closeDocInspectModal();
+          await loadTelegramApplications();
+          await loadAdminPharmacies();
+        } else {
+          alert('Review failed: ' + (data.error || 'Unknown error'));
+        }
+      } catch (err) {
+        alert('Action error: ' + err.message);
+      }
+    }
+
+    async function loadAdminPharmacies() {
+      const tbody = document.getElementById('adminPharmaciesTbody');
+      if (!tbody) return;
+      tbody.innerHTML = `<tr><td colspan="6" class="p-4 text-center text-slate-400">Loading pharmacy compliance data...</td></tr>`;
+
+      try {
+        const res = await fetch('/api/admin/pharmacies');
+        const data = await res.json();
+        if (data.success && data.pharmacies) {
+          tbody.innerHTML = data.pharmacies.map(p => `
+            <tr class="hover:bg-slate-50 transition">
+              <td class="p-3">
+                <strong class="text-slate-900 block">${p.name}</strong>
+                <span class="text-[11px] text-slate-500">📍 ${p.subCity} • ${p.phone}</span>
+              </td>
+              <td class="p-3">
+                <span class="font-mono text-xs text-slate-700 bg-slate-100 px-2 py-0.5 rounded">${p.efdaLicenseNumber}</span>
+              </td>
+              <td class="p-3">
+                <span class="font-mono text-xs text-slate-700">${p.tinNumber}</span>
+              </td>
+              <td class="p-3">
+                <span class="font-bold ${p.trustScore >= 90 ? 'text-emerald-700' : p.trustScore >= 70 ? 'text-amber-700' : 'text-rose-700'}">★ ${p.trustScore}%</span>
+                <span class="text-[11px] text-slate-400 block">${p.strikeCount}/3 Strikes</span>
+              </td>
+              <td class="p-3">
+                ${p.isPermanentlyBanned 
+                  ? '<span class="bg-rose-100 text-rose-800 font-bold px-2 py-0.5 rounded text-[10px]">🚫 Permanently Banned</span>'
+                  : p.isVerified 
+                    ? '<span class="bg-emerald-100 text-emerald-800 font-bold px-2 py-0.5 rounded text-[10px]">✅ EFDA Verified</span>'
+                    : '<span class="bg-amber-100 text-amber-800 font-bold px-2 py-0.5 rounded text-[10px]">⏳ Pending / Unverified</span>'}
+              </td>
+              <td class="p-3 text-right">
+                <button onclick="togglePharmacyVerification('${p.id}')" class="text-xs font-semibold px-2.5 py-1 rounded-lg transition ${p.isVerified ? 'bg-rose-50 text-rose-700 hover:bg-rose-100' : 'bg-emerald-50 text-emerald-700 hover:bg-emerald-100'}">
+                  ${p.isVerified ? 'Revoke Status' : 'Approve & Verify'}
+                </button>
+              </td>
+            </tr>
+          `).join('');
+
+          // Dynamically synchronize the pharmacy dropdown selector in Tab 2!
+          updatePharmacySelectDropdown(data.pharmacies);
+        }
+      } catch (err) {
+        tbody.innerHTML = `<tr><td colspan="6" class="p-4 text-center text-rose-500">Failed to load pharmacies: ${err.message}</td></tr>`;
+      }
+    }
+
+    function updatePharmacySelectDropdown(pharmacies) {
+      const select = document.getElementById('actingPharmacySelect');
+      if (!select || !pharmacies || pharmacies.length === 0) return;
+      const currentVal = select.value;
+      select.innerHTML = pharmacies.map(p => `
+        <option value="${p.id}" ${p.id === currentVal ? 'selected' : ''}>
+          ${p.name} (${p.subCity || 'Addis Ababa'}${p.isVerified ? ' - ✅ Verified' : ''})
+        </option>
+      `).join('');
+      if (currentVal && Array.from(select.options).some(o => o.value === currentVal)) {
+        select.value = currentVal;
+      }
+    }
+
+    async function togglePharmacyVerification(pharmacyId) {
+      try {
+        const res = await fetch('/api/admin/pharmacy/toggle-verification', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ pharmacyId })
+        });
+        const data = await res.json();
+        if (data.success) {
+          loadAdminPharmacies();
+        }
+      } catch (err) {
+        alert('Action failed: ' + err.message);
+      }
+    }
+
+    // --- DUAL TELEGRAM BOT CLOUD GATEWAY ACTIONS (ROADMAP 2) ---
+    async function checkRealBotStatus() {
+      const pharmBadge = document.getElementById('pharmacyBotStatusBadge');
+      const patBadge = document.getElementById('patientBotStatusBadge');
+      const pharmDetails = document.getElementById('pharmacyBotDetails');
+      const patDetails = document.getElementById('patientBotDetails');
+
+      try {
+        const res = await fetch('/api/telegram/status');
+        const data = await res.json();
+        if (data.success && data.status) {
+          const pharm = data.status.pharmacyBot || {};
+          const pat = data.status.patientBot || {};
+
+          // Pharmacy Bot UI Status
+          if (pharmBadge) {
+            if (pharm.isConnected && pharm.botInfo) {
+              pharmBadge.className = 'text-[11px] font-bold px-2.5 py-0.5 rounded-full bg-emerald-100 text-emerald-800 flex items-center gap-1';
+              pharmBadge.innerHTML = `<span class="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span><span>🟢 Live: @${pharm.botInfo.username}</span>`;
+              if (pharmDetails) {
+                pharmDetails.classList.remove('hidden');
+                document.getElementById('pharmacyBotName').innerText = `@${pharm.botInfo.username} (${pharm.botInfo.first_name || 'Pharmacy Partner'})`;
+                document.getElementById('pharmacyBotLink').href = `https://t.me/${pharm.botInfo.username}?start=inventory`;
+              }
+            } else {
+              pharmBadge.className = 'text-[11px] font-medium px-2.5 py-0.5 rounded-full bg-slate-100 text-slate-500 flex items-center gap-1';
+              pharmBadge.innerHTML = `<span class="w-1.5 h-1.5 rounded-full bg-slate-400"></span><span>⚪ Offline</span>`;
+              if (pharmDetails) pharmDetails.classList.add('hidden');
+            }
+          }
+
+          // Patient Bot UI Status
+          if (patBadge) {
+            if (pat.isConnected && pat.botInfo) {
+              patBadge.className = 'text-[11px] font-bold px-2.5 py-0.5 rounded-full bg-sky-100 text-sky-800 flex items-center gap-1';
+              patBadge.innerHTML = `<span class="w-2 h-2 rounded-full bg-sky-500 animate-pulse"></span><span>🟢 Live: @${pat.botInfo.username}</span>`;
+              if (patDetails) {
+                patDetails.classList.remove('hidden');
+                document.getElementById('patientBotName').innerText = `@${pat.botInfo.username} (${pat.botInfo.first_name || 'Patient Search'})`;
+                document.getElementById('patientBotLink').href = `https://t.me/${pat.botInfo.username}?start=search`;
+              }
+            } else {
+              patBadge.className = 'text-[11px] font-medium px-2.5 py-0.5 rounded-full bg-slate-100 text-slate-500 flex items-center gap-1';
+              patBadge.innerHTML = `<span class="w-1.5 h-1.5 rounded-full bg-slate-400"></span><span>⚪ Ready for Token</span>`;
+              if (patDetails) patDetails.classList.add('hidden');
+            }
+          }
+        }
+      } catch (err) {
+        console.error('Error checking dual Telegram status:', err);
+      }
+    }
+
+    async function connectBotWithType(type) {
+      const inputId = type === 'pharmacy' ? 'pharmacyTokenInput' : 'patientTokenInput';
+      const tokenInput = document.getElementById(inputId);
+      const token = tokenInput ? tokenInput.value.trim() : '';
+
+      if (!token) {
+        alert(`Please paste a valid Bot Token for ${type === 'pharmacy' ? 'Pharmacy Bot' : 'Patient Bot'} from @BotFather.`);
+        return;
+      }
+
+      try {
+        const res = await fetch('/api/telegram/connect', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ botToken: token, botType: type })
+        });
+        const data = await res.json();
+        if (data.success && data.botInfo) {
+          alert(`🎉 Successfully connected ${type.toUpperCase()} Bot: @${data.botInfo.username} (${data.botInfo.first_name})!\n\nBoth Pharmacy and Patient bots now communicate with the live system!`);
+          if (tokenInput) tokenInput.value = '';
+          checkRealBotStatus();
+        } else {
+          alert('Failed to connect: ' + (data.error || 'Unknown error'));
+        }
+      } catch (err) {
+        alert('Connection error: ' + err.message);
+      }
+    }
+
+    async function disconnectBotWithType(type) {
+      if (confirm(`Disconnect live ${type.toUpperCase()} Telegram bot?`)) {
+        await fetch('/api/telegram/disconnect', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ botType: type })
+        });
+        checkRealBotStatus();
+        alert(`${type.toUpperCase()} Bot disconnected.`);
+      }
+    }
+
+    // Aliases for backward compatibility
+    function connectRealTelegramBot() { connectBotWithType('pharmacy'); }
+    function disconnectRealTelegramBot() { disconnectBotWithType('ALL'); }
+
+    function setCutoffDays(days) {
+      const d = new Date();
+      d.setDate(d.getDate() + days);
+      document.getElementById('adminCutoffInput').value = d.toISOString().substring(0, 16);
+    }
+
+    async function saveCutoffDate() {
+      const val = document.getElementById('adminCutoffInput').value;
+      const iso = new Date(val).toISOString();
+      const res = await fetch('/api/admin/config/set-free-period', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ freePromotionUntil: iso })
+      });
+      const data = await res.json();
+      if (data.success) {
+        alert(`Cutoff date updated to: ${data.freePromotionUntil}`);
+        fetchPolicy();
+      }
+    }
+
+    async function savePricing() {
+      const searchFeeETB = Number(document.getElementById('adminSearchFee').value);
+      const monthlyPassETB = Number(document.getElementById('adminMonthlyFee').value);
+      const threeMonthPassETB = Number(document.getElementById('adminQuarterlyFee').value);
+
+      const res = await fetch('/api/admin/config', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          monetization: {
+            ...currentPolicy.monetization,
+            pricing: {
+              ...currentPolicy.monetization.pricing,
+              searchFeeETB,
+              monthlyPassETB,
+              threeMonthPassETB
+            }
+          }
+        })
+      });
+      const data = await res.json();
+      if (data.success) {
+        alert('Dynamic pricing updated successfully!');
+        fetchPolicy();
+      }
+    }
+
+    async function saveGeoSettings() {
+      const initialRadiusKm = Number(document.getElementById('adminInitialRadius').value);
+      const expandedRadiusKm = Number(document.getElementById('adminExpandedRadius').value);
+      const maxPharmaciesPinged = Number(document.getElementById('adminMaxPing').value);
+
+      const res = await fetch('/api/admin/config', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          geoMatching: {
+            ...currentPolicy.geoMatching,
+            initialRadiusKm,
+            expandedRadiusKm,
+            maxPharmaciesPinged
+          }
+        })
+      });
+      const data = await res.json();
+      if (data.success) {
+        alert('Geo-broadcast rules updated!');
+        fetchPolicy();
+      }
+    }
+
+    // --- TELEBIRR TAB STATS ---
+    async function loadStats() {
+      const res = await fetch('/api/admin/stats');
+      const data = await res.json();
+      if (data.success) {
+        const stats = data.stats;
+        document.getElementById('telebirrInvoicesList').innerHTML = `
+          <div class="grid grid-cols-2 md:grid-cols-4 gap-4 pb-4">
+            <div class="bg-slate-50 p-4 rounded-xl border border-slate-200">
+              <span class="text-xs text-slate-500">Total Invoices</span>
+              <div class="text-xl font-bold text-slate-900">${stats.totalInvoicesGenerated}</div>
+            </div>
+            <div class="bg-slate-50 p-4 rounded-xl border border-slate-200">
+              <span class="text-xs text-slate-500">Paid Invoices</span>
+              <div class="text-xl font-bold text-emerald-600">${stats.paidInvoicesCount}</div>
+            </div>
+            <div class="bg-slate-50 p-4 rounded-xl border border-slate-200">
+              <span class="text-xs text-slate-500">Total Revenue</span>
+              <div class="text-xl font-bold text-slate-900">${stats.totalRevenueETB} ETB</div>
+            </div>
+            <div class="bg-slate-50 p-4 rounded-xl border border-slate-200">
+              <span class="text-xs text-slate-500">Active Passes</span>
+              <div class="text-xl font-bold text-indigo-600">${stats.activeSubscriptionsCount}</div>
+            </div>
+          </div>
+        `;
+      }
+    }
+
+    async function generateManualCheckout(userId) {
+      buyMonthlyPass(userId, currentPolicy?.monetization?.pricing?.monthlyPassETB || 25);
+    }
+
+    function handlePriceLockClick(idx) {
+      const p = currentSearchPharmacies[idx];
+      if (!p) return;
+      const patientUserId = document.getElementById('patientUserId').value || 'patient_addis_001';
+      const medicineName = document.getElementById('medicineInput').value || 'Insulin';
+      requestPriceLockHold(patientUserId, p.id, p.name, medicineName, p.priceETB);
+    }
+
+    function handleReportClick(idx) {
+      const p = currentSearchPharmacies[idx];
+      if (!p) return;
+      const medicineName = document.getElementById('medicineInput').value || 'Insulin';
+      openReportModal(p.id, p.name, medicineName);
+    }
+
+    // --- ANTI-SCAM: PRICE LOCK RESERVATIONS ---
+    async function requestPriceLockHold(patientUserId, pharmacyId, pharmacyName, medicineName, lockedPriceETB) {
+      try {
+        const res = await fetch('/api/reservation/create', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ patientUserId, pharmacyId, medicineName, lockedPriceETB })
+        });
+        const data = await res.json();
+        if (data.success) {
+          const resv = data.reservation;
+          document.getElementById('resCodeDisplay').innerText = `#${resv.reservationCode}`;
+          document.getElementById('resMedName').innerText = resv.medicineName;
+          document.getElementById('resPrice').innerText = `${resv.lockedPriceETB} ETB`;
+          document.getElementById('resPharmName').innerText = resv.pharmacyName;
+          document.getElementById('resPharmPhone').innerText = resv.phone;
+          document.getElementById('reservationModal').classList.remove('hidden');
+        } else {
+          alert('Could not create hold: ' + (data.error || 'Unknown error'));
+        }
+      } catch (err) {
+        alert('Server error: ' + err.message);
+      }
+    }
+
+    // --- ANTI-SCAM: REPORT PHARMACY VIOLATIONS ---
+    function openReportModal(pharmacyId, pharmacyName, medicineName) {
+      document.getElementById('reportPharmId').value = pharmacyId;
+      document.getElementById('reportPharmName').innerText = pharmacyName;
+      document.getElementById('reportMedName').innerText = medicineName;
+      document.getElementById('reportDescription').value = '';
+      document.getElementById('reportModal').classList.remove('hidden');
+    }
+
+    async function submitViolationReport() {
+      const patientUserId = document.getElementById('patientUserId').value || 'patient_addis_001';
+      const pharmacyId = document.getElementById('reportPharmId').value;
+      const medicineName = document.getElementById('reportMedName').innerText;
+      const issueRadio = document.querySelector('input[name="reportIssue"]:checked');
+      const issueType = issueRadio ? issueRadio.value : 'PRICE_GOUGING';
+      const description = document.getElementById('reportDescription').value;
+
+      try {
+        const res = await fetch('/api/report/violation', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ patientUserId, pharmacyId, medicineName, issueType, description })
+        });
+        const data = await res.json();
+        if (data.success) {
+          alert(`⚠️ Violation Logged Against Pharmacy!\n\n${data.penaltyApplied}\nPharmacy Trust Score dropped to: ${data.newTrustScore}%\nTotal Strikes: ${data.strikeCount}/3`);
+          closeModal('reportModal');
+          performSearch(); // Refresh search view to show updated trust score
+        }
+      } catch (err) {
+        alert('Failed to submit report: ' + err.message);
+      }
+    }
+
+    // --- ANTI-SCAM: COUNTER CHECK-IN (PHARMACIST SIDE) ---
+    async function verifyCounterReservation() {
+      const code = document.getElementById('counterCodeInput').value.replace(/[^0-9]/g, '');
+      if (!code) {
+        alert('Please enter a 4-digit reservation code.');
+        return;
+      }
+      try {
+        const res = await fetch('/api/reservation/verify', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ reservationCode: code })
+        });
+        const data = await res.json();
+        if (data.success) {
+          alert(`✅ Verified & Fulfilled!\n\nPatient: ${data.reservation.patientUserId}\nMedicine: ${data.reservation.medicineName}\nLocked Price: ${data.reservation.lockedPriceETB} ETB\n\nPharmacy Trust Score rewarded +1%!`);
+          document.getElementById('counterCodeInput').value = '';
+          loadPharmacyInventory();
+        } else {
+          alert(`❌ Check-In Error: ${data.message}`);
+        }
+      } catch (err) {
+        alert('Verification error: ' + err.message);
+      }
+    }
+
+    // Init on load
+    fetchPolicy();
+    loadAdminPharmacies();
+    loadTelegramApplications();
+
+    // Check for direct tab navigation from Telegram Bot (e.g. ?tab=pharmacy&pharmId=pharm-bole-01)
+    window.addEventListener('DOMContentLoaded', () => {
+      const urlParams = new URLSearchParams(window.location.search);
+      const tabParam = urlParams.get('tab');
+      const pharmIdParam = urlParams.get('pharmId');
+
+      if (tabParam === 'pharmacy') {
+        switchTab('pharmacy');
+        if (pharmIdParam) {
+          const selectEl = document.getElementById('actingPharmacySelect');
+          if (selectEl) {
+            selectEl.value = pharmIdParam;
+            loadPharmacyInventory();
+          }
+        }
+      } else if (tabParam === 'admin') {
+        switchTab('admin');
+      }
+    });
+  </script>
+</body>
+</html>
+

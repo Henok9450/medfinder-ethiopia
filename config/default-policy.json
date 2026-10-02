@@ -1,0 +1,92 @@
+{
+  "version": "1.0.0",
+  "updatedAt": "2026-09-29T12:00:00.000Z",
+  "monetization": {
+    "globalMode": "HYBRID",
+    "freePromotionUntil": "2026-12-31T23:59:59.000Z",
+    "freemiumQuotaPerMonth": 2,
+    "pricing": {
+      "searchFeeETB": 5,
+      "monthlyPassETB": 25,
+      "threeMonthPassETB": 60,
+      "pharmacyMonthlyFeeETB": 0
+    },
+    "regionalOverrides": [
+      {
+        "city": "Addis Ababa",
+        "subCity": "Bole",
+        "mode": "HYBRID",
+        "freePromotionUntil": "2026-12-31T23:59:59.000Z",
+        "searchFeeETB": 5
+      },
+      {
+        "city": "Hawassa",
+        "mode": "FREE",
+        "freePromotionUntil": "2027-06-30T23:59:59.000Z"
+      }
+    ],
+    "paymentGateways": {
+      "telebirr": {
+        "enabled": true,
+        "appId": "TELEBIRR_PROD_10098",
+        "shortCode": "204899",
+        "sandbox": true
+      },
+      "cbeBirr": {
+        "enabled": true,
+        "sandbox": true
+      }
+    }
+  },
+  "geoMatching": {
+    "initialRadiusKm": 3.5,
+    "autoExpandOnTimeout": true,
+    "expandedRadiusKm": 8.0,
+    "timeoutSecondsBeforeExpand": 90,
+    "maxPharmaciesPinged": 15,
+    "requestTtlMinutes": 60,
+    "allowCompetitiveBids": true
+  },
+  "features": {
+    "enablePrescriptionOcr": true,
+    "enableVoiceSearch": true,
+    "enablePharmacyDirectCall": true,
+    "enableMedicineReservationHold": true,
+    "reservationHoldMinutes": 60
+  },
+  "localization": {
+    "defaultLanguage": "am",
+    "supportedLanguages": [
+      "am",
+      "or",
+      "en"
+    ],
+    "templates": {
+      "welcome": {
+        "am": "እንኳን ወደ MedFinder ኢትዮጵያ በደህና መጡ! 💊 የሚፈልጉትን መድኃኒት ስም ይጻፉ ወይም በድምጽ/በፎቶ ይላኩ።",
+        "or": "Baga gara MedFinder Itoophiyaa nagaan dhuftan! 💊 Maqaa qoricha barbaaddanii barreessaa.",
+        "en": "Welcome to MedFinder Ethiopia! 💊 Type the medicine name or send a prescription photo."
+      },
+      "free_promo_notice": {
+        "am": "🎉 ልዩ የነጻ ጊዜ ማስተዋወቂያ! እስከ {{free_until}} ድረስ አገልግሎቱ ሙሉ በሙሉ ነጻ ነው።",
+        "or": "🎉 Yeroo bilaashaa addaa! Hanga {{free_until}}tti tajaajilli kun guutummaatti bilaasha.",
+        "en": "🎉 Special Free Launch Period! All searches are completely free until {{free_until}}."
+      },
+      "paywall_prompt": {
+        "am": "የነጻ ፍለጋ ኮታዎ አልቋል። ፍለጋውን ለመቀጠል በቴሌብር {{amount}} ብር ይክፈሉ ወይም የ25 ብር ወርሃዊ ፓስ ይግዙ።",
+        "or": "Kootaan bilaashaa keessan dhumateera. Itti fufuuf Telebirr dhaan {{amount}} ETB kaffalaa.",
+        "en": "Your free quota has expired. Pay {{amount}} ETB via Telebirr or get a 25 ETB monthly pass."
+      },
+      "pharmacy_ping": {
+        "am": "🚨 አጣዳፊ ጥያቄ፦ አካባቢዎ ያለ ደንበኛ '{{medicine_name}}' ይፈልጋል። ክምችት አለዎት?",
+        "or": "🚨 Gaaffii ariifachiisaa: Maamilli naannoo keessanii '{{medicine_name}}' barbaada. Qabduu?",
+        "en": "🚨 Urgent Query: Customer nearby needs '{{medicine_name}}'. Do you have stock?"
+      },
+      "medicine_found": {
+        "am": "✅ መድኃኒቱ ተገኝቷል!\nፋርማሲ፦ {{pharmacy_name}}\nዋጋ፦ {{price}} ብር\nርቀት፦ {{distance}} ኪ.ሜ\nስልክ፦ {{phone}}",
+        "or": "✅ Qorichi argameera!\nFaarmaasii: {{pharmacy_name}}\nGatii: {{price}} ETB\nFageenya: {{distance}} km\nBilbila: {{phone}}",
+        "en": "✅ Medicine Found!\nPharmacy: {{pharmacy_name}}\nPrice: {{price}} ETB\nDistance: {{distance}} km\nPhone: {{phone}}"
+      }
+    }
+  }
+}

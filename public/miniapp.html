@@ -1,0 +1,460 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+  <title>MedFinder Ethiopia — Telegram Mini App</title>
+
+  <!-- Telegram WebApp SDK -->
+  <script src="https://telegram.org/js/telegram-web-app.js"></script>
+
+  <!-- Tailwind CSS & FontAwesome -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+
+  <style>
+    body {
+      font-family: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      background-color: var(--tg-theme-bg-color, #f8fafc);
+      color: var(--tg-theme-text-color, #0f172a);
+      -webkit-tap-highlight-color: transparent;
+    }
+    .tg-card {
+      background-color: var(--tg-theme-secondary-bg-color, #ffffff);
+    }
+    .tg-button {
+      background-color: var(--tg-theme-button-color, #059669);
+      color: var(--tg-theme-button-text-color, #ffffff);
+    }
+    .hide-scrollbar::-webkit-scrollbar {
+      display: none;
+    }
+    .hide-scrollbar {
+      -ms-overflow-style: none;
+      scrollbar-width: none;
+    }
+  </style>
+</head>
+<body class="min-h-screen pb-20 select-none">
+
+  <!-- TOP APP BAR -->
+  <header class="sticky top-0 z-40 bg-white/90 backdrop-blur-md border-b border-slate-200/80 px-4 py-3 shadow-xs">
+    <div class="flex items-center justify-between">
+      <div class="flex items-center space-x-2.5">
+        <div class="w-9 h-9 rounded-xl bg-gradient-to-tr from-emerald-600 to-teal-500 text-white flex items-center justify-center text-base shadow-sm">
+          <i class="fa-solid fa-prescription-bottle-medical"></i>
+        </div>
+        <div>
+          <div class="flex items-center gap-1.5">
+            <h1 class="font-extrabold text-sm text-slate-900 tracking-tight">MedFinder Ethiopia</h1>
+            <span class="text-xs">🇪🇹</span>
+          </div>
+          <p id="userGreeting" class="text-[11px] text-slate-500 font-medium">ጤና ይስጥልኝ! Find medicines in Addis</p>
+        </div>
+      </div>
+
+      <!-- Quick Location Badge -->
+      <button onclick="requestGpsLocation()" class="flex items-center space-x-1.5 px-2.5 py-1 rounded-full bg-emerald-50 border border-emerald-200/80 text-emerald-800 text-[11px] font-semibold active:scale-95 transition">
+        <i class="fa-solid fa-location-dot text-emerald-600 text-[10px]"></i>
+        <span id="activeLocationLabel">Bole</span>
+      </button>
+    </div>
+  </header>
+
+  <!-- MAIN CONTAINER -->
+  <main class="max-w-md mx-auto px-4 pt-3 space-y-4">
+
+    <!-- SEARCH HERO CARD -->
+    <section class="bg-gradient-to-br from-slate-900 via-slate-800 to-emerald-950 rounded-2xl p-4 text-white shadow-lg relative overflow-hidden">
+      <div class="relative z-10 space-y-3">
+        <div>
+          <span class="text-[10px] uppercase font-bold tracking-wider text-emerald-400 bg-emerald-950/80 px-2 py-0.5 rounded-full border border-emerald-500/30">
+            Official Telegram Mini App
+          </span>
+          <h2 class="text-base font-extrabold mt-1 leading-snug">
+            የሚፈልጉትን መድኃኒት ይፈልጉ
+            <span class="text-emerald-300 block text-xs font-medium">Search across EFDA-verified pharmacies</span>
+          </h2>
+        </div>
+
+        <!-- SEARCH INPUT -->
+        <div class="relative flex items-center">
+          <i class="fa-solid fa-magnifying-glass absolute left-3.5 text-slate-400 text-xs"></i>
+          <input 
+            type="text" 
+            id="searchInput"
+            placeholder="e.g. Insulin, Augmentin, Ventolin..." 
+            onkeydown="if(event.key==='Enter') executeSearch()"
+            class="w-full bg-white/10 backdrop-blur-md text-white placeholder-slate-400 text-xs font-medium pl-9 pr-20 py-2.5 rounded-xl border border-white/20 outline-none focus:ring-2 focus:ring-emerald-400 focus:bg-white/15 transition shadow-inner"
+          >
+          <button 
+            onclick="executeSearch()"
+            class="absolute right-1.5 bg-emerald-500 hover:bg-emerald-400 active:bg-emerald-600 text-slate-950 text-xs font-bold px-3 py-1.5 rounded-lg transition flex items-center space-x-1 shadow-sm"
+          >
+            <span>Search</span>
+            <i class="fa-solid fa-arrow-right text-[10px]"></i>
+          </button>
+        </div>
+
+        <!-- POPULAR CHIPS -->
+        <div class="flex items-center space-x-1.5 overflow-x-auto hide-scrollbar pt-1">
+          <span class="text-[10px] text-slate-400 whitespace-nowrap">🔥 Popular:</span>
+          <button onclick="quickSearch('Insulin')" class="px-2.5 py-0.5 rounded-full bg-white/10 hover:bg-white/20 text-[10px] text-emerald-200 border border-white/10 whitespace-nowrap active:scale-95 transition">Insulin</button>
+          <button onclick="quickSearch('Augmentin')" class="px-2.5 py-0.5 rounded-full bg-white/10 hover:bg-white/20 text-[10px] text-emerald-200 border border-white/10 whitespace-nowrap active:scale-95 transition">Augmentin</button>
+          <button onclick="quickSearch('Ventolin')" class="px-2.5 py-0.5 rounded-full bg-white/10 hover:bg-white/20 text-[10px] text-emerald-200 border border-white/10 whitespace-nowrap active:scale-95 transition">Ventolin</button>
+          <button onclick="quickSearch('Metformin')" class="px-2.5 py-0.5 rounded-full bg-white/10 hover:bg-white/20 text-[10px] text-emerald-200 border border-white/10 whitespace-nowrap active:scale-95 transition">Metformin</button>
+          <button onclick="quickSearch('Losartan')" class="px-2.5 py-0.5 rounded-full bg-white/10 hover:bg-white/20 text-[10px] text-emerald-200 border border-white/10 whitespace-nowrap active:scale-95 transition">Losartan</button>
+        </div>
+      </div>
+
+      <!-- Background Glow -->
+      <div class="absolute -right-8 -bottom-8 w-36 h-36 bg-emerald-500/20 rounded-full blur-2xl"></div>
+    </section>
+
+    <!-- LOCATION & SUB-CITY PICKER -->
+    <section class="space-y-1.5">
+      <div class="flex items-center justify-between text-xs px-0.5">
+        <span class="font-bold text-slate-800 flex items-center gap-1">
+          <i class="fa-solid fa-location-crosshairs text-emerald-600"></i>
+          <span>Addis Ababa Sub-City Radar</span>
+        </span>
+        <button onclick="requestGpsLocation()" class="text-emerald-700 hover:text-emerald-800 text-[11px] font-semibold flex items-center gap-1 active:scale-95 transition">
+          <i class="fa-solid fa-satellite-dish text-[10px]"></i>
+          <span>Use Live GPS</span>
+        </button>
+      </div>
+
+      <!-- Sub-city Pills -->
+      <div class="flex items-center space-x-1.5 overflow-x-auto hide-scrollbar py-0.5" id="subCityChips">
+        <button onclick="setSubCity('Bole', 9.0015, 38.7845)" class="subcity-btn px-3 py-1.5 rounded-xl text-xs font-semibold bg-emerald-600 text-white border border-emerald-600 whitespace-nowrap shadow-xs active:scale-95 transition">📍 Bole</button>
+        <button onclick="setSubCity('Kirkos', 9.0105, 38.7455)" class="subcity-btn px-3 py-1.5 rounded-xl text-xs font-semibold bg-white text-slate-700 border border-slate-200 hover:border-slate-300 whitespace-nowrap shadow-2xs active:scale-95 transition">Kirkos</button>
+        <button onclick="setSubCity('Yeka', 9.0201, 38.8021)" class="subcity-btn px-3 py-1.5 rounded-xl text-xs font-semibold bg-white text-slate-700 border border-slate-200 hover:border-slate-300 whitespace-nowrap shadow-2xs active:scale-95 transition">Yeka</button>
+        <button onclick="setSubCity('Arada', 9.0345, 38.7512)" class="subcity-btn px-3 py-1.5 rounded-xl text-xs font-semibold bg-white text-slate-700 border border-slate-200 hover:border-slate-300 whitespace-nowrap shadow-2xs active:scale-95 transition">Arada</button>
+        <button onclick="setSubCity('Nifas Silk', 8.9567, 38.7612)" class="subcity-btn px-3 py-1.5 rounded-xl text-xs font-semibold bg-white text-slate-700 border border-slate-200 hover:border-slate-300 whitespace-nowrap shadow-2xs active:scale-95 transition">Nifas Silk</button>
+        <button onclick="setSubCity('Lideta', 9.0080, 38.7300)" class="subcity-btn px-3 py-1.5 rounded-xl text-xs font-semibold bg-white text-slate-700 border border-slate-200 hover:border-slate-300 whitespace-nowrap shadow-2xs active:scale-95 transition">Lideta</button>
+        <button onclick="setSubCity('Gullele', 9.0600, 38.7300)" class="subcity-btn px-3 py-1.5 rounded-xl text-xs font-semibold bg-white text-slate-700 border border-slate-200 hover:border-slate-300 whitespace-nowrap shadow-2xs active:scale-95 transition">Gullele</button>
+      </div>
+    </section>
+
+    <!-- SEARCH RESULTS RADAR CONTAINER -->
+    <section class="space-y-3 pt-1">
+      <div class="flex items-center justify-between text-xs px-0.5">
+        <h3 class="font-extrabold text-slate-900 flex items-center gap-1.5">
+          <i class="fa-solid fa-radar text-emerald-600"></i>
+          <span id="resultsTitle">Verified Pharmacies Nearby</span>
+        </h3>
+        <span id="resultsCountBadge" class="text-[10px] font-bold px-2 py-0.5 rounded-full bg-slate-100 text-slate-600">3 Verified</span>
+      </div>
+
+      <!-- DYNAMIC PHARMACY CARDS -->
+      <div id="pharmacyList" class="space-y-2.5">
+        <!-- Rendered by JavaScript -->
+      </div>
+    </section>
+
+  </main>
+
+  <!-- 60-MINUTE PRICE LOCK RESERVATION MODAL -->
+  <div id="reservationModal" class="hidden fixed inset-0 z-50 bg-black/75 backdrop-blur-sm flex items-end sm:items-center justify-center p-0 sm:p-4 transition-opacity">
+    <div class="bg-white rounded-t-3xl sm:rounded-2xl max-w-sm w-full p-5 shadow-2xl space-y-4 border border-slate-100 animate-slide-up">
+      <div class="flex items-center justify-between pb-2 border-b border-slate-100">
+        <div class="flex items-center space-x-2">
+          <div class="w-8 h-8 rounded-full bg-emerald-100 text-emerald-700 flex items-center justify-center text-sm font-bold">
+            <i class="fa-solid fa-lock"></i>
+          </div>
+          <div>
+            <h4 class="font-bold text-xs text-slate-900">Price-Lock Hold (60 Mins)</h4>
+            <p class="text-[10px] text-slate-500">Anti-Scam Guaranteed Reservation</p>
+          </div>
+        </div>
+        <button onclick="closeReservationModal()" class="w-7 h-7 rounded-full bg-slate-100 text-slate-500 hover:text-slate-800 flex items-center justify-center text-xs">
+          <i class="fa-solid fa-xmark"></i>
+        </button>
+      </div>
+
+      <div class="bg-gradient-to-br from-emerald-500 to-teal-600 p-4 rounded-xl text-white text-center space-y-1 shadow-sm">
+        <span class="text-[10px] uppercase font-bold tracking-wider text-emerald-100">Official Hold Code</span>
+        <div id="resModalCode" class="text-3xl font-mono font-extrabold tracking-widest">#7482</div>
+        <p class="text-[10px] text-emerald-100">Show this code at the pharmacy counter to collect</p>
+      </div>
+
+      <div class="space-y-2 text-xs">
+        <div class="flex justify-between py-1 border-b border-slate-100">
+          <span class="text-slate-500">Medicine:</span>
+          <strong id="resModalMedicine" class="text-slate-900">Insulin</strong>
+        </div>
+        <div class="flex justify-between py-1 border-b border-slate-100">
+          <span class="text-slate-500">Pharmacy:</span>
+          <strong id="resModalPharmacy" class="text-slate-900">Kenema Pharmacy Bole</strong>
+        </div>
+        <div class="flex justify-between py-1 border-b border-slate-100">
+          <span class="text-slate-500">Locked Price:</span>
+          <strong id="resModalPrice" class="text-emerald-700 font-extrabold text-sm">450 ETB</strong>
+        </div>
+        <div class="flex justify-between py-1 border-b border-slate-100">
+          <span class="text-slate-500">Expires In:</span>
+          <strong id="resModalTimer" class="text-amber-700 font-mono font-bold">59:45</strong>
+        </div>
+      </div>
+
+      <div class="pt-1 space-y-2">
+        <button onclick="confirmReservation()" class="w-full bg-slate-900 hover:bg-black text-white font-bold text-xs py-2.5 rounded-xl transition shadow-sm flex items-center justify-center gap-1.5">
+          <i class="fa-solid fa-circle-check text-emerald-400"></i>
+          <span>Save Voucher in Telegram</span>
+        </button>
+        <button onclick="closeReservationModal()" class="w-full bg-slate-100 text-slate-600 font-semibold text-xs py-2 rounded-xl">
+          Close
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- SCRIPT ENGINE -->
+  <script>
+    const tg = window.Telegram?.WebApp;
+
+    let currentLat = 9.0015;
+    let currentLng = 38.7845;
+    let currentSubCity = 'Bole';
+    let currentSearchTerm = 'Insulin';
+    let currentResults = [];
+    let activeHold = null;
+    let holdTimerInterval = null;
+
+    // 1. Initialize Telegram Mini App
+    document.addEventListener('DOMContentLoaded', () => {
+      if (tg) {
+        tg.ready();
+        tg.expand();
+        tg.enableClosingConfirmation();
+
+        // Personalize greeting
+        const user = tg.initDataUnsafe?.user;
+        if (user) {
+          const name = user.first_name || user.username || 'User';
+          document.getElementById('userGreeting').innerText = `ጤና ይስጥልኝ, ${name}! 👋 Ready to search`;
+        }
+      }
+
+      // Initial search on boot
+      executeSearch('Insulin');
+    });
+
+    // 2. Set Sub-City & update coordinates
+    function setSubCity(name, lat, lng) {
+      if (tg?.HapticFeedback) tg.HapticFeedback.impactOccurred('light');
+
+      currentSubCity = name;
+      currentLat = lat;
+      currentLng = lng;
+      document.getElementById('activeLocationLabel').innerText = name;
+
+      // Update button styles
+      document.querySelectorAll('.subcity-btn').forEach(btn => {
+        if (btn.innerText.includes(name)) {
+          btn.className = 'subcity-btn px-3 py-1.5 rounded-xl text-xs font-semibold bg-emerald-600 text-white border border-emerald-600 whitespace-nowrap shadow-xs active:scale-95 transition';
+        } else {
+          btn.className = 'subcity-btn px-3 py-1.5 rounded-xl text-xs font-semibold bg-white text-slate-700 border border-slate-200 hover:border-slate-300 whitespace-nowrap shadow-2xs active:scale-95 transition';
+        }
+      });
+
+      executeSearch();
+    }
+
+    // 3. Request Live Browser / Phone GPS
+    function requestGpsLocation() {
+      if (tg?.HapticFeedback) tg.HapticFeedback.impactOccurred('medium');
+
+      if (navigator.geolocation) {
+        document.getElementById('activeLocationLabel').innerText = 'Locating...';
+        navigator.geolocation.getCurrentPosition(
+          (pos) => {
+            currentLat = pos.coords.latitude;
+            currentLng = pos.coords.longitude;
+            document.getElementById('activeLocationLabel').innerText = 'Live GPS 🟢';
+            executeSearch();
+          },
+          (err) => {
+            alert('Location access denied. Using Bole, Addis Ababa as default.');
+            setSubCity('Bole', 9.0015, 38.7845);
+          },
+          { timeout: 7000 }
+        );
+      } else {
+        alert('Geolocation not supported by device.');
+      }
+    }
+
+    // 4. Quick Search Chip Click
+    function quickSearch(term) {
+      document.getElementById('searchInput').value = term;
+      executeSearch(term);
+    }
+
+    // 5. Execute Medicine Search via Backend
+    async function executeSearch(overrideTerm) {
+      if (tg?.HapticFeedback) tg.HapticFeedback.impactOccurred('light');
+
+      const term = overrideTerm || document.getElementById('searchInput').value.trim() || 'Insulin';
+      currentSearchTerm = term;
+
+      const listContainer = document.getElementById('pharmacyList');
+      listContainer.innerHTML = `
+        <div class="text-center py-8 space-y-2">
+          <div class="inline-block animate-spin text-emerald-600 text-2xl"><i class="fa-solid fa-circle-notch"></i></div>
+          <p class="text-xs text-slate-500 font-medium">Scanning Addis Ababa pharmacy shelves for <strong>${term}</strong>...</p>
+        </div>
+      `;
+
+      try {
+        const userId = tg?.initDataUnsafe?.user?.id ? `tg_${tg.initDataUnsafe.user.id}` : 'tg_patient_user';
+        const res = await fetch('/api/search', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            userId,
+            medicineName: term,
+            userLat: currentLat,
+            userLng: currentLng,
+            subCity: currentSubCity,
+            lang: 'am'
+          })
+        });
+
+        const data = await res.json();
+        if (data.success && Array.isArray(data.pharmacies) && data.pharmacies.length > 0) {
+          currentResults = data.pharmacies;
+          document.getElementById('resultsTitle').innerText = `${term} Available Nearby`;
+          document.getElementById('resultsCountBadge').innerText = `${data.pharmacies.length} In Stock`;
+          renderPharmacyCards(data.pharmacies);
+        } else {
+          listContainer.innerHTML = `
+            <div class="p-6 text-center bg-white rounded-2xl border border-slate-200/80 space-y-2">
+              <div class="w-10 h-10 rounded-full bg-amber-100 text-amber-700 flex items-center justify-center mx-auto text-base">
+                <i class="fa-solid fa-triangle-exclamation"></i>
+              </div>
+              <h4 class="font-bold text-xs text-slate-800">No Direct Stock Found for "${term}" in ${currentSubCity}</h4>
+              <p class="text-[11px] text-slate-500 leading-relaxed">
+                We've initiated a broadcast alert to surrounding pharmacies. Try switching your sub-city above or expanding your GPS radius.
+              </p>
+            </div>
+          `;
+          document.getElementById('resultsCountBadge').innerText = '0 Results';
+        }
+      } catch (err) {
+        listContainer.innerHTML = `
+          <div class="p-4 text-center bg-rose-50 rounded-xl text-rose-700 text-xs border border-rose-200">
+            Network error: ${err.message}. Please verify your connection.
+          </div>
+        `;
+      }
+    }
+
+    // 6. Render Pharmacy Availability Cards
+    function renderPharmacyCards(pharmacies) {
+      const container = document.getElementById('pharmacyList');
+      container.innerHTML = pharmacies.map((p, idx) => `
+        <div class="bg-white p-3.5 rounded-2xl border border-slate-200/90 hover:border-emerald-400 transition shadow-xs space-y-2.5">
+          <div class="flex items-start justify-between gap-2">
+            <div class="space-y-0.5">
+              <div class="flex items-center gap-1.5 flex-wrap">
+                <h4 class="font-bold text-xs text-slate-900">${p.name}</h4>
+                <span class="text-[9px] bg-emerald-100 text-emerald-800 font-extrabold px-1.5 py-0.2 rounded-md flex items-center gap-0.5">
+                  <i class="fa-solid fa-shield-halved text-[8px]"></i> EFDA Verified
+                </span>
+                <span class="text-[9px] bg-amber-50 text-amber-700 font-bold px-1.5 py-0.2 rounded border border-amber-200">
+                  ★ ${p.trustScore}% Trust
+                </span>
+              </div>
+              <p class="text-[11px] text-slate-500 flex items-center gap-1">
+                <i class="fa-solid fa-location-dot text-emerald-600 text-[10px]"></i>
+                <span>${p.subCity} • <strong>${p.distanceKm} km</strong> away</span>
+              </p>
+            </div>
+
+            <!-- Price Column -->
+            <div class="text-right flex-shrink-0">
+              <div class="text-sm font-extrabold text-slate-900">${p.priceETB} ETB</div>
+              <span class="text-[9px] bg-emerald-50 text-emerald-700 font-bold px-1.5 py-0.5 rounded block">🟢 In Stock Today</span>
+            </div>
+          </div>
+
+          <!-- Bottom Action Buttons -->
+          <div class="pt-2 border-t border-slate-100 flex items-center justify-between gap-1.5">
+            <button onclick="openReservationModal(${idx})" class="flex-1 bg-slate-900 hover:bg-black active:scale-95 text-white text-[11px] font-bold py-1.5 px-2.5 rounded-xl transition flex items-center justify-center gap-1 shadow-2xs">
+              <i class="fa-solid fa-lock text-[9px] text-emerald-400"></i>
+              <span>Lock Price (60 Mins)</span>
+            </button>
+            <a href="tel:${p.phone}" class="bg-slate-100 hover:bg-slate-200 text-slate-700 text-[11px] font-semibold py-1.5 px-2.5 rounded-xl transition flex items-center justify-center gap-1">
+              <i class="fa-solid fa-phone text-[9px] text-emerald-600"></i>
+              <span>Call</span>
+            </a>
+            <a href="https://maps.google.com/?q=${encodeURIComponent(p.name + ' ' + p.subCity + ' Addis Ababa')}" target="_blank" class="bg-slate-100 hover:bg-slate-200 text-slate-700 text-[11px] font-semibold py-1.5 px-2.5 rounded-xl transition flex items-center justify-center gap-1">
+              <i class="fa-solid fa-diamond-turn-right text-[9px] text-sky-600"></i>
+              <span>Map</span>
+            </a>
+          </div>
+        </div>
+      `).join('');
+    }
+
+    // 7. Open 60-Minute Price Lock Reservation Modal
+    async function openReservationModal(idx) {
+      if (tg?.HapticFeedback) tg.HapticFeedback.impactOccurred('medium');
+
+      const pharm = currentResults[idx];
+      if (!pharm) return;
+
+      const randomCode = Math.floor(1000 + Math.random() * 9000).toString();
+      activeHold = {
+        code: '#' + randomCode,
+        pharmacy: pharm.name,
+        price: pharm.priceETB,
+        medicine: currentSearchTerm,
+        phone: pharm.phone,
+        expiresInSeconds: 3600
+      };
+
+      document.getElementById('resModalCode').innerText = activeHold.code;
+      document.getElementById('resModalPharmacy').innerText = activeHold.pharmacy;
+      document.getElementById('resModalMedicine').innerText = activeHold.medicine;
+      document.getElementById('resModalPrice').innerText = activeHold.price + ' ETB';
+
+      // Start countdown
+      if (holdTimerInterval) clearInterval(holdTimerInterval);
+      updateTimerDisplay();
+      holdTimerInterval = setInterval(() => {
+        if (activeHold && activeHold.expiresInSeconds > 0) {
+          activeHold.expiresInSeconds--;
+          updateTimerDisplay();
+        } else {
+          clearInterval(holdTimerInterval);
+        }
+      }, 1000);
+
+      document.getElementById('reservationModal').classList.remove('hidden');
+    }
+
+    function updateTimerDisplay() {
+      if (!activeHold) return;
+      const mins = Math.floor(activeHold.expiresInSeconds / 60);
+      const secs = activeHold.expiresInSeconds % 60;
+      document.getElementById('resModalTimer').innerText = 
+        `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
+    }
+
+    function closeReservationModal() {
+      document.getElementById('reservationModal').classList.add('hidden');
+      if (holdTimerInterval) clearInterval(holdTimerInterval);
+    }
+
+    function confirmReservation() {
+      if (tg?.HapticFeedback) tg.HapticFeedback.notificationOccurred('success');
+
+      alert(`✅ Reservation voucher ${activeHold.code} saved!\nLocked Price: ${activeHold.price} ETB at ${activeHold.pharmacy}.\nShow this code at the pharmacy counter within 60 minutes.`);
+      closeReservationModal();
+    }
+  </script>
+</body>
+</html>
