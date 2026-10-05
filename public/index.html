@@ -143,29 +143,41 @@
 
           <div>
             <label class="block text-xs font-medium text-slate-600 mb-1">User Identifier</label>
-            <input type="text" id="patientUserId" value="patient_addis_001" class="w-full text-sm px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-emerald-500 outline-none">
+            <input type="text" id="patientUserId" placeholder="e.g. +251911223344 or Anonymous Patient" class="w-full text-sm px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-emerald-500 outline-none">
           </div>
 
           <div>
-            <label class="block text-xs font-medium text-slate-600 mb-1">Patient Location (Addis Ababa Sub-City)</label>
+            <div class="flex items-center justify-between mb-1">
+              <label class="block text-xs font-medium text-slate-600">Patient Location (Addis Ababa Sub-City)</label>
+              <button type="button" onclick="detectUserLocation()" class="text-[11px] text-emerald-700 hover:text-emerald-800 font-semibold flex items-center gap-1">
+                <i class="fa-solid fa-location-crosshairs"></i> Use GPS
+              </button>
+            </div>
             <select id="patientLocation" class="w-full text-sm px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-emerald-500 outline-none">
-              <option value="Bole" data-lat="9.0015" data-lng="38.7845">Bole (Near Airport / Edna Mall)</option>
-              <option value="Yeka" data-lat="9.0201" data-lng="38.8021">Yeka (Megenagna / Shola)</option>
-              <option value="Arada" data-lat="9.0345" data-lng="38.7512">Arada (Piazza / Churchill)</option>
-              <option value="Kirkos" data-lat="9.0105" data-lng="38.7455">Kirkos (Mexico / Kazanchis)</option>
-              <option value="Nifas Silk" data-lat="8.9567" data-lng="38.7612">Nifas Silk-Lafto (Saris / Gotera)</option>
+              <option value="Bole" data-lat="8.9950" data-lng="38.7880">Bole / ቦሌ (Airport / Edna Mall / CMC)</option>
+              <option value="Kirkos" data-lat="9.0110" data-lng="38.7520">Kirkos / ቂርቆስ (Mexico / Kazanchis / Meskel Sq)</option>
+              <option value="Yeka" data-lat="9.0300" data-lng="38.8100">Yeka / የካ (Megenagna / Shola / Signal)</option>
+              <option value="Arada" data-lat="9.0350" data-lng="38.7520">Arada / አራዳ (Piazza / Churchill / 4 Kilo)</option>
+              <option value="Nifas Silk" data-lat="8.9567" data-lng="38.7450">Nifas Silk-Lafto / ንፋስ ስልክ (Saris / Gotera / Jomo)</option>
+              <option value="Lideta" data-lat="9.0100" data-lng="38.7300">Lideta / ልደታ (Balcha / Mexico / Tor Hailoch)</option>
+              <option value="Addis Ketema" data-lat="9.0320" data-lng="38.7350">Addis Ketema / አዲስ ከተማ (Merkato / Autobis Tera)</option>
+              <option value="Gullele" data-lat="9.0600" data-lng="38.7400">Gullele / ጉለሌ (Shiro Meda / Semien Mazegaja)</option>
+              <option value="Kolfe Keranio" data-lat="9.0200" data-lng="38.7000">Kolfe Keranio / ኮልፌ ቀራኒዮ (Ayer Tena / Total)</option>
+              <option value="Akaki Kaliti" data-lat="8.8800" data-lng="38.7600">Akaki Kaliti / አቃቂ ቃሊቲ (Kality / Crown)</option>
+              <option value="Lemi Kura" data-lat="9.0150" data-lng="38.8400">Lemi Kura / ለሚ ኩራ (Ayat / Summit / Koye Feche)</option>
             </select>
           </div>
 
           <div>
             <label class="block text-xs font-medium text-slate-600 mb-1">Medicine Name (Brand or Generic)</label>
-            <input type="text" id="medicineInput" placeholder="e.g. Insulin, Augmentin, Ventolin" value="Insulin" class="w-full text-sm px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-emerald-500 outline-none">
+            <input type="text" id="medicineInput" placeholder="Enter medicine name (e.g. Paracetamol, Amoxicillin)..." class="w-full text-sm px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-emerald-500 outline-none">
             <div class="flex flex-wrap gap-1.5 mt-2">
-              <span class="text-xs text-slate-400">Quick tests:</span>
-              <button onclick="setDrug('Insulin')" class="text-xs bg-slate-100 hover:bg-emerald-50 text-slate-700 px-2 py-0.5 rounded">Insulin</button>
-              <button onclick="setDrug('Augmentin')" class="text-xs bg-slate-100 hover:bg-emerald-50 text-slate-700 px-2 py-0.5 rounded">Augmentin</button>
+              <span class="text-xs text-slate-400">Popular searches:</span>
+              <button onclick="setDrug('Paracetamol')" class="text-xs bg-slate-100 hover:bg-emerald-50 text-slate-700 px-2 py-0.5 rounded">Paracetamol</button>
+              <button onclick="setDrug('Amoxicillin')" class="text-xs bg-slate-100 hover:bg-emerald-50 text-slate-700 px-2 py-0.5 rounded">Amoxicillin</button>
+              <button onclick="setDrug('Omeprazole')" class="text-xs bg-slate-100 hover:bg-emerald-50 text-slate-700 px-2 py-0.5 rounded">Omeprazole</button>
+              <button onclick="setDrug('Metformin')" class="text-xs bg-slate-100 hover:bg-emerald-50 text-slate-700 px-2 py-0.5 rounded">Metformin</button>
               <button onclick="setDrug('Ventolin')" class="text-xs bg-slate-100 hover:bg-emerald-50 text-slate-700 px-2 py-0.5 rounded">Ventolin</button>
-              <button onclick="setDrug('Humulin N (Specialty Insulin)')" class="text-xs bg-amber-50 hover:bg-amber-100 text-amber-800 px-2 py-0.5 rounded font-medium">Rare: Humulin N</button>
             </div>
           </div>
 
@@ -1355,10 +1367,46 @@
       }
     }
 
+    function detectUserLocation() {
+      if (!navigator.geolocation) {
+        alert('Geolocation is not supported by your browser.');
+        return;
+      }
+      navigator.geolocation.getCurrentPosition(
+        (pos) => {
+          const lat = pos.coords.latitude;
+          const lng = pos.coords.longitude;
+          const select = document.getElementById('patientLocation');
+          let gpsOpt = select.querySelector('option[value="GPS"]');
+          if (!gpsOpt) {
+            gpsOpt = document.createElement('option');
+            gpsOpt.value = 'GPS';
+            select.insertBefore(gpsOpt, select.firstChild);
+          }
+          gpsOpt.setAttribute('data-lat', lat);
+          gpsOpt.setAttribute('data-lng', lng);
+          gpsOpt.textContent = `📍 Device GPS (${lat.toFixed(4)}, ${lng.toFixed(4)})`;
+          select.value = 'GPS';
+          alert('GPS location acquired!');
+        },
+        (err) => {
+          alert('Unable to retrieve location: ' + err.message);
+        }
+      );
+    }
+
     // --- PERFORM SEARCH ---
     async function performSearch() {
-      const userId = document.getElementById('patientUserId').value;
-      const medicineName = document.getElementById('medicineInput').value;
+      const userIdInput = document.getElementById('patientUserId').value.trim();
+      const userId = userIdInput || ('patient_' + Math.floor(100000 + Math.random() * 900000));
+      const medicineName = document.getElementById('medicineInput').value.trim();
+
+      if (!medicineName) {
+        alert('Please enter a medicine name to search.');
+        document.getElementById('medicineInput').focus();
+        return;
+      }
+
       const locSelect = document.getElementById('patientLocation');
       const subCity = locSelect.value;
       const selectedOption = locSelect.options[locSelect.selectedIndex];
@@ -1498,6 +1546,22 @@
         // 3. BROADCAST PING INITIATED FOR RARE DRUG
         if (data.mode === 'BROADCAST_PING_INITIATED') {
           lastBroadcastId = data.requestId;
+          if (data.pingedCount === 0) {
+            container.innerHTML = `
+              <div class="p-6 rounded-2xl border border-amber-200 bg-amber-50/50 space-y-3">
+                <div class="flex items-center space-x-3 text-amber-900">
+                  <div class="w-10 h-10 rounded-full bg-amber-100 text-amber-700 flex items-center justify-center text-lg">
+                    <i class="fa-solid fa-triangle-exclamation"></i>
+                  </div>
+                  <div>
+                    <h3 class="font-bold text-sm">No Registered Pharmacies in ${subCity} Yet</h3>
+                    <p class="text-xs text-amber-800 mt-0.5">Currently, no verified pharmacies in this sub-city have joined the live network. As pharmacies register through <strong>@MedFinder_Verifier_bot</strong>, their live inventory will immediately become searchable here.</p>
+                  </div>
+                </div>
+              </div>
+            `;
+            return;
+          }
           container.innerHTML = `
             <div class="p-6 rounded-2xl border border-sky-200 bg-sky-50/50 space-y-4">
               <div class="flex items-center space-x-3 text-sky-900">
