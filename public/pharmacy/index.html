@@ -232,14 +232,29 @@
                 ★ 98% Trust Score
               </span>
             </div>
-            <p class="text-xs text-slate-500 mt-1">
-              📍 <span id="dashSubCity">Addis Ababa</span> • License: <strong id="dashLicenseTxt" class="font-mono text-slate-700">EFDA-AA-2025</strong> • TIN: <span id="dashTinTxt" class="font-mono text-slate-700">—</span>
+            <p class="text-xs text-slate-500 mt-1 flex flex-wrap items-center gap-1.5">
+              <span>📍 <span id="dashSubCity">Addis Ababa</span></span>
+              <span>•</span>
+              <span id="pharmGpsCoordBadge" class="font-mono text-emerald-800 bg-emerald-50 px-2 py-0.5 rounded-md border border-emerald-200">GPS: Checking...</span>
+              <span>•</span>
+              <span>License: <strong id="dashLicenseTxt" class="font-mono text-slate-700">EFDA-AA-2025</strong></span>
+              <span>•</span>
+              <span>TIN: <span id="dashTinTxt" class="font-mono text-slate-700">—</span></span>
             </p>
           </div>
         </div>
 
-        <!-- Quick Summary Metrics -->
-        <div class="flex items-center space-x-3">
+        <!-- Quick Summary Metrics & GPS Lock Button -->
+        <div class="flex flex-wrap items-center gap-2">
+          <button id="pharmLockGpsBtn" onclick="requestPharmacyCounterGps()" class="px-3.5 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 active:scale-95 text-white text-xs font-bold flex items-center gap-2 shadow-sm transition">
+            <span class="relative flex h-2 w-2">
+              <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-200 opacity-75"></span>
+              <span class="relative inline-flex rounded-full h-2 w-2 bg-white"></span>
+            </span>
+            <i class="fa-solid fa-location-crosshairs text-xs"></i>
+            <span id="pharmLockGpsBtnText">Update Counter GPS</span>
+          </button>
+
           <div class="bg-slate-50 px-3.5 py-2 rounded-xl border border-slate-200 text-right">
             <span class="text-[10px] text-slate-400 uppercase font-semibold block">Total Catalog</span>
             <strong id="dashShelfCount" class="text-base font-extrabold text-slate-900">0 Items</strong>
@@ -652,6 +667,48 @@
         </div>
       </form>
     </div>
+  <!-- ============================================================== -->
+  <!-- MODAL 5: PHARMACY COUNTER GPS GUIDE MODAL                      -->
+  <!-- ============================================================== -->
+  <div id="pharmGpsModal" class="hidden fixed inset-0 z-50 bg-black/70 backdrop-blur-sm flex items-center justify-center p-4">
+    <div class="bg-white rounded-3xl max-w-sm w-full p-6 shadow-2xl space-y-4 border border-slate-100 text-center animate-in fade-in zoom-in duration-150">
+      <div class="w-14 h-14 bg-amber-100 text-amber-700 rounded-2xl mx-auto flex items-center justify-center text-2xl shadow-inner">
+        <i class="fa-solid fa-location-crosshairs"></i>
+      </div>
+
+      <div class="space-y-1">
+        <h3 class="text-base font-extrabold text-slate-900" id="pharmGpsModalTitle">የካውንተር ጂፒኤስ ፍቃድ (Counter GPS)</h3>
+        <p class="text-xs text-slate-500 leading-relaxed" id="pharmGpsModalDesc">
+          የፋርማሲዎን ትክክለኛ ካውንተር አድራሻ በታካሚዎች ፍለጋ ራዳር ላይ ለማስተካከል እባክዎ የስልክዎን/ኮምፒውተርዎን Location ፍቃድ ያብሩ።
+        </p>
+      </div>
+
+      <!-- STEP-BY-STEP TIPS -->
+      <div class="bg-slate-50 p-3.5 rounded-2xl text-left text-xs space-y-2 border border-slate-200">
+        <div class="flex items-start gap-2">
+          <span class="w-5 h-5 rounded-full bg-emerald-100 text-emerald-800 font-bold flex items-center justify-center text-[10px] shrink-0 mt-0.5">1</span>
+          <span class="text-slate-600">መሣሪያዎ ላይ <strong>Location (GPS)</strong> መብራቱን ያረጋግጡ።</span>
+        </div>
+        <div class="flex items-start gap-2">
+          <span class="w-5 h-5 rounded-full bg-emerald-100 text-emerald-800 font-bold flex items-center justify-center text-[10px] shrink-0 mt-0.5">2</span>
+          <span class="text-slate-600">ብሮውዘሩ ፍቃድ ሲጠይቅ <strong>"Allow"</strong> የሚለውን ይጫኑ።</span>
+        </div>
+        <div class="flex items-start gap-2">
+          <span class="w-5 h-5 rounded-full bg-emerald-100 text-emerald-800 font-bold flex items-center justify-center text-[10px] shrink-0 mt-0.5">3</span>
+          <span class="text-slate-600">ካውንተር ላይ እያሉ GPS ሲቆለፍ የታካሚዎች ፍለጋ ወደ እርስዎ ቀድሞ ይመራል።</span>
+        </div>
+      </div>
+
+      <div class="space-y-2 pt-1">
+        <button onclick="retryPharmacyGps()" class="w-full bg-emerald-600 hover:bg-emerald-700 active:scale-95 text-white font-bold text-xs py-3 rounded-xl transition shadow flex items-center justify-center gap-1.5">
+          <i class="fa-solid fa-satellite-dish"></i>
+          <span>እንደገና ሞክር (Retry GPS Lock)</span>
+        </button>
+        <button onclick="closeModal('pharmGpsModal')" class="w-full bg-slate-100 hover:bg-slate-200 text-slate-700 font-semibold text-xs py-2.5 rounded-xl transition">
+          ይቅር / ዝጋ (Close)
+        </button>
+      </div>
+    </div>
   </div>
 
   <!-- ============================================================== -->
@@ -919,7 +976,94 @@
       document.getElementById('regEfdaLicense').innerText = license;
       document.getElementById('regTinNumber').innerText = tin;
 
+      // Update GPS coordinate badge
+      const lat = pharm.latitude || 9.0015;
+      const lng = pharm.longitude || 38.7845;
+      const gpsBadge = document.getElementById('pharmGpsCoordBadge');
+      if (gpsBadge) {
+        gpsBadge.innerText = `GPS: ${lat.toFixed(4)}, ${lng.toFixed(4)}`;
+      }
+
       loadPharmacyInventory();
+    }
+
+    // --- PHARMACY COUNTER GPS HANDLERS ---
+    function requestPharmacyCounterGps() {
+      const btn = document.getElementById('pharmLockGpsBtn');
+      const btnText = document.getElementById('pharmLockGpsBtnText');
+      const badge = document.getElementById('pharmGpsCoordBadge');
+
+      if (!navigator.geolocation) {
+        showPharmacyGpsModal('Device Not Supported', 'ይህ ብሮውዘር ወይም ኮምፒውተር የጂፒኤስ አቀማመጥ (Geolocation) አይደግፍም።');
+        return;
+      }
+
+      if (btnText) btnText.innerText = 'Locking GPS...';
+
+      navigator.geolocation.getCurrentPosition(
+        async (pos) => {
+          const lat = pos.coords.latitude;
+          const lng = pos.coords.longitude;
+          const pharmacyId = currentAuthSession?.account?.pharmacyId;
+
+          try {
+            const res = await fetch(`/api/pharmacy/${pharmacyId}/location`, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                latitude: lat,
+                longitude: lng,
+              })
+            });
+            const data = await res.json();
+            if (data.success) {
+              if (btnText) btnText.innerText = 'Counter GPS Locked 🟢';
+              if (badge) badge.innerText = `GPS: ${lat.toFixed(4)}, ${lng.toFixed(4)} 🟢`;
+              closeModal('pharmGpsModal');
+              alert(`✅ የፋርማሲዎ ካውንተር ጂፒኤስ በተሳካ ሁኔታ ተቆልፏል!\nGPS Coordinates (${lat.toFixed(4)}, ${lng.toFixed(4)}) recorded.`);
+            } else {
+              alert('Could not update pharmacy GPS: ' + (data.error || 'Server error'));
+              if (btnText) btnText.innerText = 'Update Counter GPS';
+            }
+          } catch (err) {
+            alert('Failed to save GPS location to server: ' + err.message);
+            if (btnText) btnText.innerText = 'Update Counter GPS';
+          }
+        },
+        (err) => {
+          console.warn('[Pharmacy GPS] Error code:', err.code, err.message);
+          if (btnText) btnText.innerText = 'Update Counter GPS';
+
+          if (err.code === 1) {
+            showPharmacyGpsModal(
+              'Location Access Blocked / ፍቃድ ተከልክሏል',
+              'የብሮውዘሩ ወይም የመሣሪያው የLocation ፍቃድ አልበራም። እባክዎ ፍቃድ ይስጡና እንደገና ይሞክሩ።'
+            );
+          } else if (err.code === 2) {
+            showPharmacyGpsModal(
+              'GPS Signal Unavailable / ጂፒኤስ አልተገኘም',
+              'የመሣሪያዎ Location (GPS) ማብሪያ መጥፋቱን ያሳያል። እባክዎ የኮምፒውተርዎን ወይም የስልክዎን Location ያብሩ።'
+            );
+          } else {
+            showPharmacyGpsModal(
+              'GPS Request Timed Out',
+              'የጂፒኤስ መረጃ ለመቀበል ዘግይቷል። እባክዎ እንደገና ይሞክሩ።'
+            );
+          }
+        },
+        { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
+      );
+    }
+
+    function retryPharmacyGps() {
+      closeModal('pharmGpsModal');
+      requestPharmacyCounterGps();
+    }
+
+    function showPharmacyGpsModal(title, desc) {
+      if (title) document.getElementById('pharmGpsModalTitle').innerText = title;
+      if (desc) document.getElementById('pharmGpsModalDesc').innerText = desc;
+      document.getElementById('pharmGpsModal').classList.remove('hidden');
     }
 
     function logoutPharmacy() {

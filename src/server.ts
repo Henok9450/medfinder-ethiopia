@@ -337,6 +337,40 @@ app.get(['/pharmacy', '/pharmacy/setup', '/pharmacy/index.html'], (_req: Request
   res.sendFile(path.join(__dirname, '../public/pharmacy/index.html'));
 });
 
+// Update Pharmacy GPS Location from Counter Web Studio
+app.post('/api/pharmacy/:pharmacyId/location', (req: Request, res: Response) => {
+  const pharmacyId = String(req.params.pharmacyId);
+  const { latitude, longitude, subCity, addressDetails } = req.body;
+
+  if (latitude === undefined || longitude === undefined) {
+    return res.status(400).json({ success: false, error: 'latitude and longitude are required' });
+  }
+
+  const result = db.updatePharmacyLocation(pharmacyId, {
+    latitude: Number(latitude),
+    longitude: Number(longitude),
+    subCity: subCity ? String(subCity) : undefined,
+    addressDetails: addressDetails ? String(addressDetails) : undefined,
+  });
+
+  if (!result.success) {
+    return res.status(404).json(result);
+  }
+
+  res.json({
+    success: true,
+    message: 'Counter GPS location locked successfully!',
+    pharmacy: {
+      id: result.pharmacy?.id,
+      name: result.pharmacy?.name,
+      subCity: result.pharmacy?.subCity,
+      latitude: result.pharmacy?.latitude,
+      longitude: result.pharmacy?.longitude,
+      address: result.pharmacy?.address,
+    },
+  });
+});
+
 // ==========================================
 // 3B. PHARMACY INVENTORY & STOCK MANAGEMENT
 // ==========================================

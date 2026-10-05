@@ -131,9 +131,13 @@
               <option value="Lemi Kura" data-lat="9.0150" data-lng="38.8400">📍 Lemi Kura / ለሚ ኩራ (Ayat, Summit, Koye Feche)</option>
             </select>
           </div>
-          <button type="button" onclick="detectGpsLocation()" class="bg-white/10 hover:bg-white/20 active:bg-white/30 text-emerald-300 border border-white/15 px-3 py-2 rounded-xl text-[11px] font-bold flex items-center gap-1.5 transition whitespace-nowrap">
-            <i class="fa-solid fa-location-crosshairs text-emerald-400"></i>
-            <span>Use GPS</span>
+          <button type="button" id="findGpsBtn" onclick="detectGpsLocation()" class="group relative bg-emerald-600 hover:bg-emerald-500 active:scale-95 text-white px-3.5 py-2 rounded-xl text-[11px] font-bold flex items-center gap-1.5 transition shadow-sm whitespace-nowrap">
+            <span class="relative flex h-2 w-2">
+              <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-200 opacity-75"></span>
+              <span class="relative inline-flex rounded-full h-2 w-2 bg-white"></span>
+            </span>
+            <i class="fa-solid fa-location-crosshairs text-[11px]"></i>
+            <span id="findGpsBtnText">Enable Live GPS</span>
           </button>
         </div>
       </div>
@@ -255,6 +259,48 @@
     </div>
   </div>
 
+  <!-- INTERACTIVE LOCATION PERMISSION & ENABLE GUIDE MODAL -->
+  <div id="gpsGuideModal" class="hidden fixed inset-0 z-50 bg-black/70 backdrop-blur-sm flex items-center justify-center p-4">
+    <div class="bg-white rounded-3xl max-w-sm w-full p-6 shadow-2xl space-y-4 border border-slate-100 text-center animate-in fade-in zoom-in duration-150">
+      <div class="w-14 h-14 bg-amber-100 text-amber-700 rounded-2xl mx-auto flex items-center justify-center text-2xl shadow-inner">
+        <i class="fa-solid fa-location-dot"></i>
+      </div>
+
+      <div class="space-y-1">
+        <h3 class="text-base font-extrabold text-slate-900" id="gpsGuideTitle">የስልክዎን ጂፒኤስ ያብሩ (Enable Location)</h3>
+        <p class="text-xs text-slate-500 leading-relaxed" id="gpsGuideDesc">
+          በአቅራቢያዎ ያሉትን ፋርማሲዎች በትክክለኛ ርቀት ለማግኘት እባክዎ የስልክዎን Location አገልግሎት ያብሩ ወይም ፍቃድ ይስጡ።
+        </p>
+      </div>
+
+      <!-- STEP-BY-STEP TIPS -->
+      <div class="bg-slate-50 p-3.5 rounded-2xl text-left text-xs space-y-2 border border-slate-200">
+        <div class="flex items-start gap-2">
+          <span class="w-5 h-5 rounded-full bg-emerald-100 text-emerald-800 font-bold flex items-center justify-center text-[10px] shrink-0 mt-0.5">1</span>
+          <span class="text-slate-600">ስልክዎ ላይ <strong>Location (GPS)</strong> መብራቱን ያረጋግጡ።</span>
+        </div>
+        <div class="flex items-start gap-2">
+          <span class="w-5 h-5 rounded-full bg-emerald-100 text-emerald-800 font-bold flex items-center justify-center text-[10px] shrink-0 mt-0.5">2</span>
+          <span class="text-slate-600">ብሮውዘር ወይም ቴሌግራም ሲጠይቅ <strong>"Allow"</strong> የሚለውን ይጫኑ።</span>
+        </div>
+        <div class="flex items-start gap-2">
+          <span class="w-5 h-5 rounded-full bg-emerald-100 text-emerald-800 font-bold flex items-center justify-center text-[10px] shrink-0 mt-0.5">3</span>
+          <span class="text-slate-600">አሁንም ካልሰራ ከዝርዝሩ ውስጥ በአቅራቢያዎ ያለውን ክፍለ ከተማ ይምረጡ።</span>
+        </div>
+      </div>
+
+      <div class="space-y-2 pt-1">
+        <button onclick="retryGpsLocation()" class="w-full bg-emerald-600 hover:bg-emerald-700 active:scale-95 text-white font-bold text-xs py-3 rounded-xl transition shadow flex items-center justify-center gap-1.5">
+          <i class="fa-solid fa-satellite-dish"></i>
+          <span>እንደገና ሞክር (Retry GPS)</span>
+        </button>
+        <button onclick="closeGpsGuideModal()" class="w-full bg-slate-100 hover:bg-slate-200 text-slate-700 font-semibold text-xs py-2.5 rounded-xl transition">
+          በተመረጠው ክፍለ ከተማ ቀጥል (Use Sub-City)
+        </button>
+      </div>
+    </div>
+  </div>
+
   <!-- BOTTOM FOOTER -->
   <footer class="bg-white border-t border-slate-200 px-4 py-3 text-center text-xs text-slate-500">
     <div class="max-w-xl mx-auto flex items-center justify-between text-[11px]">
@@ -310,12 +356,18 @@
       }
     }
 
-    // 4. Geolocation Detection
+    // 4. Geolocation Detection with Interactive Error Handling & Guide
     function detectGpsLocation() {
+      const btn = document.getElementById('findGpsBtn');
+      const btnText = document.getElementById('findGpsBtnText');
+
       if (!navigator.geolocation) {
-        alert('Geolocation is not supported on this browser.');
+        showGpsGuideModal('Device Not Supported', 'ይህ ብሮውዘር የጂፒኤስ አቀማመጥን (Geolocation) አይደግፍም። እባክዎ ከክፍለ ከተማ ዝርዝር ይምረጡ።');
         return;
       }
+
+      if (btnText) btnText.innerText = 'Locating...';
+
       navigator.geolocation.getCurrentPosition(
         (pos) => {
           const lat = pos.coords.latitude;
@@ -331,12 +383,55 @@
           gpsOpt.setAttribute('data-lng', lng);
           gpsOpt.textContent = `📍 My Live GPS (${lat.toFixed(4)}, ${lng.toFixed(4)})`;
           select.value = 'GPS';
-          alert('GPS location acquired! Ready to radar nearby stock.');
+
+          if (btnText) btnText.innerText = 'GPS Locked 🟢';
+          closeGpsGuideModal();
+
+          // Auto-run search if medicine name already typed
+          const input = document.getElementById('medicineInput').value.trim();
+          if (input) executeMedicineSearch();
         },
         (err) => {
-          alert('Could not retrieve GPS: ' + err.message);
-        }
+          console.warn('[GPS] Error code:', err.code, err.message);
+          if (btnText) btnText.innerText = 'Enable Live GPS';
+
+          if (err.code === 1) {
+            // PERMISSION_DENIED
+            showGpsGuideModal(
+              'Location Access Blocked / ፍቃድ ተከልክሏል',
+              'የስልክዎ ወይም የብሮውዘሩ የLocation ፍቃድ ጠፍቷል። በአቅራቢያዎ ያሉ ፋርማሲዎችን በትክክለኛ ርቀት ለማግኘት እባክዎ Location ፍቃድ ይስጡ ወይም ክፍለ ከተማ ይምረጡ።'
+            );
+          } else if (err.code === 2) {
+            // POSITION_UNAVAILABLE
+            showGpsGuideModal(
+              'GPS Signal Unavailable / ጂፒኤስ አልተገኘም',
+              'የስልክዎ Location (GPS) ማብሪያ መጥፋቱን ያሳያል። እባክዎ የስልክዎን Location ያብሩና እንደገና ይሞክሩ።'
+            );
+          } else {
+            // TIMEOUT or OTHER
+            showGpsGuideModal(
+              'GPS Request Timed Out',
+              'የጂፒኤስ መረጃ ለመቀበል ዘግይቷል። እባክዎ እንደገና ይሞክሩ ወይም ክፍለ ከተማ ይምረጡ።'
+            );
+          }
+        },
+        { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
       );
+    }
+
+    function retryGpsLocation() {
+      closeGpsGuideModal();
+      detectGpsLocation();
+    }
+
+    function showGpsGuideModal(title, desc) {
+      if (title) document.getElementById('gpsGuideTitle').innerText = title;
+      if (desc) document.getElementById('gpsGuideDesc').innerText = desc;
+      document.getElementById('gpsGuideModal').classList.remove('hidden');
+    }
+
+    function closeGpsGuideModal() {
+      document.getElementById('gpsGuideModal').classList.add('hidden');
     }
 
     function handleSubCityChange() {

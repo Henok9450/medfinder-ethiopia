@@ -57,6 +57,7 @@ export interface Pharmacy {
   latitude: number;
   longitude: number;
   phone: string;
+  address?: string;
   telegramChatId?: string;
   isVerified: boolean;
   efdaLicenseNumber: string; // EFDA license e.g. "EFDA/PH/AA/2025/1102"
@@ -412,6 +413,27 @@ export class InMemoryDatabase {
       return true;
     }
     return false;
+  }
+
+  public updatePharmacyLocation(pharmacyId: string, data: { latitude: number; longitude: number; subCity?: string; addressDetails?: string }): { success: boolean; pharmacy?: Pharmacy; error?: string } {
+    const pharmacy = this.pharmacies.find((p) => p.id === pharmacyId);
+    if (!pharmacy) return { success: false, error: 'Pharmacy not found' };
+
+    pharmacy.latitude = data.latitude;
+    pharmacy.longitude = data.longitude;
+    if (data.subCity) pharmacy.subCity = data.subCity;
+    if (data.addressDetails) pharmacy.address = data.addressDetails;
+
+    // Also update associated application if present
+    const app = this.verificationApplications.find((a) => a.approvedPharmacyId === pharmacyId || a.pharmacyName.toLowerCase() === pharmacy.name.toLowerCase());
+    if (app) {
+      app.latitude = data.latitude;
+      app.longitude = data.longitude;
+      if (data.subCity) app.subCity = data.subCity;
+      app.gpsLocationVerified = true;
+    }
+
+    return { success: true, pharmacy };
   }
 
   public bulkImportChecklist(pharmacyId: string, items: Array<{ name: string; priceETB: number; category?: string; genericName?: string }>): number {

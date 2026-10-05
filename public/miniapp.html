@@ -113,20 +113,28 @@
     </section>
 
     <!-- LOCATION & SUB-CITY PICKER -->
-    <section class="space-y-1.5">
+    <section class="space-y-2">
       <div class="flex items-center justify-between text-xs px-0.5">
-        <span class="font-bold text-slate-800 flex items-center gap-1">
+        <span class="font-bold text-slate-800 flex items-center gap-1.5">
           <i class="fa-solid fa-location-crosshairs text-emerald-600"></i>
           <span>Addis Ababa Sub-City Radar</span>
         </span>
-        <button onclick="requestGpsLocation()" class="text-emerald-700 hover:text-emerald-800 text-[11px] font-semibold flex items-center gap-1 active:scale-95 transition">
+        <button id="liveGpsBtn" onclick="requestGpsLocation()" class="group relative px-3 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 active:scale-95 text-white text-[11px] font-bold flex items-center gap-1.5 shadow-sm shadow-emerald-600/30 transition">
+          <span class="relative flex h-2 w-2">
+            <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-200 opacity-75"></span>
+            <span class="relative inline-flex rounded-full h-2 w-2 bg-white"></span>
+          </span>
           <i class="fa-solid fa-satellite-dish text-[10px]"></i>
-          <span>Use Live GPS</span>
+          <span id="liveGpsBtnText">Enable Live GPS</span>
         </button>
       </div>
 
       <!-- Sub-city Pills -->
       <div class="flex items-center space-x-1.5 overflow-x-auto hide-scrollbar py-0.5" id="subCityChips">
+        <button id="gpsSubCityChip" onclick="requestGpsLocation()" class="hidden subcity-btn px-3 py-1.5 rounded-xl text-xs font-bold bg-emerald-700 text-white border border-emerald-600 whitespace-nowrap shadow-xs active:scale-95 transition flex items-center gap-1">
+          <span class="w-1.5 h-1.5 rounded-full bg-emerald-300 animate-pulse"></span>
+          <span id="gpsChipLabel">📍 Live GPS</span>
+        </button>
         <button onclick="setSubCity('Bole', 9.0015, 38.7845)" class="subcity-btn px-3 py-1.5 rounded-xl text-xs font-semibold bg-emerald-600 text-white border border-emerald-600 whitespace-nowrap shadow-xs active:scale-95 transition">📍 Bole</button>
         <button onclick="setSubCity('Kirkos', 9.0105, 38.7455)" class="subcity-btn px-3 py-1.5 rounded-xl text-xs font-semibold bg-white text-slate-700 border border-slate-200 hover:border-slate-300 whitespace-nowrap shadow-2xs active:scale-95 transition">Kirkos</button>
         <button onclick="setSubCity('Yeka', 9.0201, 38.8021)" class="subcity-btn px-3 py-1.5 rounded-xl text-xs font-semibold bg-white text-slate-700 border border-slate-200 hover:border-slate-300 whitespace-nowrap shadow-2xs active:scale-95 transition">Yeka</button>
@@ -214,6 +222,48 @@
     </div>
   </div>
 
+  <!-- INTERACTIVE LOCATION PERMISSION & ENABLE GUIDE MODAL -->
+  <div id="gpsGuideModal" class="hidden fixed inset-0 z-50 bg-black/70 backdrop-blur-sm flex items-center justify-center p-4">
+    <div class="bg-white rounded-3xl max-w-sm w-full p-6 shadow-2xl space-y-4 border border-slate-100 text-center animate-in fade-in zoom-in duration-150">
+      <div class="w-14 h-14 bg-amber-100 text-amber-700 rounded-2xl mx-auto flex items-center justify-center text-2xl shadow-inner">
+        <i class="fa-solid fa-location-dot"></i>
+      </div>
+
+      <div class="space-y-1">
+        <h3 class="text-base font-extrabold text-slate-900" id="gpsGuideTitle">የስልክዎን ጂፒኤስ ያብሩ (Enable Location)</h3>
+        <p class="text-xs text-slate-500 leading-relaxed" id="gpsGuideDesc">
+          በአቅራቢያዎ ያሉትን ፋርማሲዎች በትክክለኛ ርቀት ለማግኘት እባክዎ የስልክዎን Location አገልግሎት ያብሩ ወይም ፍቃድ ይስጡ።
+        </p>
+      </div>
+
+      <!-- STEP-BY-STEP TIPS -->
+      <div class="bg-slate-50 p-3.5 rounded-2xl text-left text-xs space-y-2 border border-slate-200">
+        <div class="flex items-start gap-2">
+          <span class="w-5 h-5 rounded-full bg-emerald-100 text-emerald-800 font-bold flex items-center justify-center text-[10px] shrink-0 mt-0.5">1</span>
+          <span class="text-slate-600">ስልክዎ ላይ <strong>Location (GPS)</strong> መብራቱን ያረጋግጡ።</span>
+        </div>
+        <div class="flex items-start gap-2">
+          <span class="w-5 h-5 rounded-full bg-emerald-100 text-emerald-800 font-bold flex items-center justify-center text-[10px] shrink-0 mt-0.5">2</span>
+          <span class="text-slate-600">Telegram / Browser ሲጠይቅ <strong>"Allow" / "While using app"</strong> ይምረጡ።</span>
+        </div>
+        <div class="flex items-start gap-2">
+          <span class="w-5 h-5 rounded-full bg-emerald-100 text-emerald-800 font-bold flex items-center justify-center text-[10px] shrink-0 mt-0.5">3</span>
+          <span class="text-slate-600">አሁንም ካልሰራ ከታች ካሉት ክፍለ ከተሞች (Bole, Kirkos, Yeka...) አንዱን ይምረጡ።</span>
+        </div>
+      </div>
+
+      <div class="space-y-2 pt-1">
+        <button onclick="retryGpsLocation()" class="w-full bg-emerald-600 hover:bg-emerald-700 active:scale-95 text-white font-bold text-xs py-3 rounded-xl transition shadow flex items-center justify-center gap-1.5">
+          <i class="fa-solid fa-satellite-dish"></i>
+          <span>እንደገና ሞክር (Retry GPS)</span>
+        </button>
+        <button onclick="useFallbackSubCity('Bole')" class="w-full bg-slate-100 hover:bg-slate-200 text-slate-700 font-semibold text-xs py-2.5 rounded-xl transition">
+          በBole ክፍለ ከተማ ቀጥል (Use Bole)
+        </button>
+      </div>
+    </div>
+  </div>
+
   <!-- SCRIPT ENGINE -->
   <script>
     const tg = window.Telegram?.WebApp;
@@ -266,28 +316,94 @@
       executeSearch();
     }
 
-    // 3. Request Live Browser / Phone GPS
+    // 3. Request Live Browser / Phone GPS with User Guidance
     function requestGpsLocation() {
       if (tg?.HapticFeedback) tg.HapticFeedback.impactOccurred('medium');
 
-      if (navigator.geolocation) {
-        document.getElementById('activeLocationLabel').innerText = 'Locating...';
-        navigator.geolocation.getCurrentPosition(
-          (pos) => {
-            currentLat = pos.coords.latitude;
-            currentLng = pos.coords.longitude;
-            document.getElementById('activeLocationLabel').innerText = 'Live GPS 🟢';
-            executeSearch();
-          },
-          (err) => {
-            alert('Location access denied. Using Bole, Addis Ababa as default.');
-            setSubCity('Bole', 9.0015, 38.7845);
-          },
-          { timeout: 7000 }
-        );
-      } else {
-        alert('Geolocation not supported by device.');
+      const btn = document.getElementById('liveGpsBtn');
+      const btnText = document.getElementById('liveGpsBtnText');
+      const label = document.getElementById('activeLocationLabel');
+
+      if (!navigator.geolocation) {
+        showGpsGuideModal('Device Not Supported', 'ይህ ስልክ የጂፒኤስ አቀማመጥ (Geolocation) አይደግፍም። እባክዎ ከክፍለ ከተማ ዝርዝር ይምረጡ።');
+        return;
       }
+
+      btnText.innerText = 'Locating...';
+      label.innerText = 'Locating...';
+
+      navigator.geolocation.getCurrentPosition(
+        (pos) => {
+          currentLat = pos.coords.latitude;
+          currentLng = pos.coords.longitude;
+          currentSubCity = 'Live GPS';
+
+          btnText.innerText = 'GPS Locked 🟢';
+          label.innerText = 'Live GPS 🟢';
+
+          // Show GPS chip in sub-city list
+          const gpsChip = document.getElementById('gpsSubCityChip');
+          if (gpsChip) {
+            gpsChip.classList.remove('hidden');
+            document.getElementById('gpsChipLabel').innerText = `📍 Live GPS (${currentLat.toFixed(3)}, ${currentLng.toFixed(3)})`;
+          }
+
+          // Unhighlight other chips
+          document.querySelectorAll('.subcity-btn').forEach(b => {
+            if (b.id !== 'gpsSubCityChip') {
+              b.className = 'subcity-btn px-3 py-1.5 rounded-xl text-xs font-semibold bg-white text-slate-700 border border-slate-200 hover:border-slate-300 whitespace-nowrap shadow-2xs active:scale-95 transition';
+            }
+          });
+
+          closeGpsGuideModal();
+          executeSearch();
+        },
+        (err) => {
+          console.warn('[GPS] Error code:', err.code, err.message);
+          btnText.innerText = 'Enable Live GPS';
+
+          if (err.code === 1) {
+            // PERMISSION_DENIED
+            showGpsGuideModal(
+              'Location Access Blocked / ፍቃድ ተከልክሏል',
+              'የስልክዎ ወይም የTelegram የLocation ፍቃድ ጠፍቷል። በአቅራቢያዎ ያሉ ፋርማሲዎችን በትክክል ለማግኘት እባክዎ Location ፍቃድ ይስጡ ወይም ክፍለ ከተማ ይምረጡ።'
+            );
+          } else if (err.code === 2) {
+            // POSITION_UNAVAILABLE
+            showGpsGuideModal(
+              'GPS Signal Unavailable / ጂፒኤስ አልተገኘም',
+              'የስልክዎ Location (GPS) ማብሪያ መጥፋቱን ያሳያል። እባክዎ የስልክዎን Location ያብሩና እንደገና ይሞክሩ።'
+            );
+          } else {
+            // TIMEOUT or OTHER
+            showGpsGuideModal(
+              'GPS Request Timed Out',
+              'የጂፒኤስ መረጃ ለመቀበል ዘግይቷል። እባክዎ እንደገና ይሞክሩ ወይም ክፍለ ከተማ ይምረጡ።'
+            );
+          }
+        },
+        { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
+      );
+    }
+
+    function retryGpsLocation() {
+      closeGpsGuideModal();
+      requestGpsLocation();
+    }
+
+    function useFallbackSubCity(city) {
+      closeGpsGuideModal();
+      setSubCity(city || 'Bole', 9.0015, 38.7845);
+    }
+
+    function showGpsGuideModal(title, desc) {
+      if (title) document.getElementById('gpsGuideTitle').innerText = title;
+      if (desc) document.getElementById('gpsGuideDesc').innerText = desc;
+      document.getElementById('gpsGuideModal').classList.remove('hidden');
+    }
+
+    function closeGpsGuideModal() {
+      document.getElementById('gpsGuideModal').classList.add('hidden');
     }
 
     // 4. Quick Search Chip Click
