@@ -31,6 +31,117 @@
 </head>
 <body class="bg-slate-50 text-slate-800 min-h-screen">
 
+  <!-- ============================================================== -->
+  <!-- 1. FULL-PAGE GLOBAL PLATFORM AUTHENTICATION GATE (LOCKS ALL)   -->
+  <!-- ============================================================== -->
+  <div id="globalAuthGate" class="min-h-screen bg-gradient-to-br from-slate-950 via-slate-900 to-emerald-950 text-white flex flex-col justify-center items-center p-4 py-12 relative overflow-hidden">
+    <!-- Ambient backdrops -->
+    <div class="absolute top-1/4 left-1/4 w-96 h-96 bg-emerald-600/10 rounded-full blur-3xl pointer-events-none"></div>
+    <div class="absolute bottom-1/4 right-1/4 w-96 h-96 bg-teal-600/10 rounded-full blur-3xl pointer-events-none"></div>
+
+    <div class="w-full max-w-md bg-white text-slate-800 rounded-3xl shadow-2xl p-7 sm:p-9 space-y-6 border border-slate-100 relative z-10 animate-in fade-in zoom-in duration-200">
+      
+      <!-- BRANDING HEADER -->
+      <div class="text-center space-y-2.5">
+        <div class="w-16 h-16 rounded-2xl bg-gradient-to-tr from-emerald-600 to-teal-400 mx-auto flex items-center justify-center text-white text-3xl shadow-lg shadow-emerald-600/20">
+          <i class="fa-solid fa-prescription-bottle-medical"></i>
+        </div>
+        <div>
+          <div class="flex items-center justify-center gap-2">
+            <h1 class="text-xl font-black text-slate-900 tracking-tight">MedFinder Ethiopia</h1>
+            <span class="text-[11px] bg-emerald-100 text-emerald-800 font-bold px-2 py-0.5 rounded-full">የመድኃኒት አግኚ</span>
+          </div>
+          <p class="text-xs text-slate-500 mt-0.5">National Health Radar & Regulated Medicine Exchange</p>
+        </div>
+        <div class="inline-flex items-center gap-1.5 px-3 py-1 bg-amber-50 text-amber-800 border border-amber-200 rounded-full text-[11px] font-semibold">
+          <i class="fa-solid fa-lock text-[10px] text-amber-600"></i>
+          <span>Restricted Platform • Sign In Required</span>
+        </div>
+      </div>
+
+      <!-- ERROR ALERT -->
+      <div id="globalLoginError" class="hidden p-3.5 bg-rose-50 border border-rose-200 text-rose-800 rounded-2xl text-xs flex items-start gap-2.5">
+        <i class="fa-solid fa-circle-exclamation text-rose-500 text-sm mt-0.5 flex-shrink-0"></i>
+        <div class="flex-1">
+          <strong class="block font-bold">Authentication Failed</strong>
+          <span id="globalLoginErrorText" class="text-[11px]">Invalid username or password. Please verify credentials.</span>
+        </div>
+      </div>
+
+      <!-- LOGIN FORM -->
+      <form onsubmit="handleGlobalLoginSubmit(event)" class="space-y-4">
+        <div>
+          <label class="block text-xs font-bold text-slate-700 mb-1.5">Username or Phone</label>
+          <div class="relative">
+            <span class="absolute inset-y-0 left-0 pl-3.5 flex items-center text-slate-400">
+              <i class="fa-solid fa-user-shield text-xs"></i>
+            </span>
+            <input type="text" id="globalLoginUsername" placeholder="e.g. admin or pharmacy username" required autocomplete="username"
+              class="w-full text-xs pl-10 pr-3.5 py-3 border border-slate-300 rounded-xl focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 outline-none transition bg-slate-50 focus:bg-white font-mono">
+          </div>
+        </div>
+
+        <div>
+          <div class="flex items-center justify-between mb-1.5">
+            <label class="block text-xs font-bold text-slate-700">Password</label>
+            <button type="button" onclick="toggleGlobalPasswordVis()" class="text-[11px] text-emerald-700 hover:text-emerald-800 font-semibold">
+              <span id="globalPassVisText">Show</span>
+            </button>
+          </div>
+          <div class="relative">
+            <span class="absolute inset-y-0 left-0 pl-3.5 flex items-center text-slate-400">
+              <i class="fa-solid fa-lock text-xs"></i>
+            </span>
+            <input type="password" id="globalLoginPassword" placeholder="Enter your password" required autocomplete="current-password"
+              class="w-full text-xs pl-10 pr-3.5 py-3 border border-slate-300 rounded-xl focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 outline-none transition bg-slate-50 focus:bg-white">
+          </div>
+        </div>
+
+        <button type="submit" id="globalLoginBtn"
+          class="w-full bg-slate-900 hover:bg-black text-white font-bold text-xs py-3.5 rounded-xl shadow-lg shadow-slate-900/10 transition flex items-center justify-center space-x-2">
+          <i class="fa-solid fa-arrow-right-to-bracket text-emerald-400"></i>
+          <span>Sign In & Unlock Platform</span>
+        </button>
+      </form>
+
+      <!-- CREDENTIAL GUIDANCE BOX -->
+      <div class="p-4 bg-slate-50 rounded-2xl border border-slate-200 text-xs text-slate-600 space-y-2">
+        <div class="flex items-center justify-between">
+          <span class="font-bold text-slate-900 flex items-center gap-1.5 text-[11px]">
+            <i class="fa-solid fa-key text-amber-500"></i>
+            <span>System Master Credentials:</span>
+          </span>
+          <span class="text-[10px] bg-emerald-100 text-emerald-800 font-bold px-1.5 py-0.2 rounded">Pre-Seeded</span>
+        </div>
+        <div class="p-2.5 bg-white rounded-xl border border-slate-200 font-mono text-[11px] space-y-1">
+          <div class="flex justify-between">
+            <span class="text-slate-500">Username:</span>
+            <strong class="text-slate-900">admin</strong>
+          </div>
+          <div class="flex justify-between">
+            <span class="text-slate-500">Password:</span>
+            <strong class="text-emerald-700">Admin@MedFinder2026!</strong>
+          </div>
+        </div>
+        <p class="text-[10px] text-slate-400 leading-relaxed">
+          Authorized administrators and EFDA officers can sign in above to access all search tools, pharmacy check-in, policy tariffs, and create new staff accounts.
+        </p>
+      </div>
+
+    </div>
+
+    <!-- FOOTER COPYRIGHT -->
+    <div class="mt-8 text-center text-slate-400 text-xs space-y-1">
+      <p>Federal Democratic Republic of Ethiopia • Ethiopian Food and Drug Authority (EFDA)</p>
+      <p class="text-[11px] text-slate-500">© 2026 MedFinder Ethiopia. All rights reserved.</p>
+    </div>
+  </div>
+
+  <!-- ============================================================== -->
+  <!-- 2. MAIN APPLICATION CONTAINER (LOCKED UNTIL AUTHENTICATED)     -->
+  <!-- ============================================================== -->
+  <div id="appContainer" class="hidden">
+
   <!-- TOP NAVIGATION HEADER -->
   <header class="bg-white border-b border-slate-200 sticky top-0 z-50 shadow-sm">
     <div class="max-w-7xl mx-auto px-4 py-3 flex flex-wrap items-center justify-between gap-4">
@@ -1680,6 +1791,7 @@
 
     </div>
   </div>
+  </div> <!-- /#appContainer -->
 
   <script>
     let currentPolicy = null;
@@ -1688,11 +1800,164 @@
     let currentPharmacyInventory = [];
     let currentSearchPharmacies = [];
 
+    // --- GLOBAL PLATFORM AUTHENTICATION CONTROLLER ---
+    let currentAuthSession = null; // { userType: 'ADMIN' | 'PHARMACY', token: string, user: any }
+
+    function getAuthToken() {
+      return localStorage.getItem('medfinder_auth_token') || localStorage.getItem('medfinder_admin_token') || (currentAuthSession ? currentAuthSession.token : '');
+    }
+
+    async function initGlobalAuth() {
+      const token = getAuthToken();
+      if (!token) {
+        showGlobalAuthGate();
+        return;
+      }
+
+      try {
+        const res = await fetch('/api/auth/session', {
+          headers: { 'Authorization': `Bearer ${token}` }
+        });
+        const data = await res.json();
+        if (data.success && data.user) {
+          currentAuthSession = { token, userType: data.userType, user: data.user };
+          if (data.userType === 'ADMIN') {
+            currentAdminSession = { token, admin: data.user };
+          }
+          unlockAppContainer();
+        } else {
+          localStorage.removeItem('medfinder_auth_token');
+          localStorage.removeItem('medfinder_admin_token');
+          currentAuthSession = null;
+          showGlobalAuthGate();
+        }
+      } catch (err) {
+        console.warn('Session verification failed:', err);
+        showGlobalAuthGate();
+      }
+    }
+
+    function showGlobalAuthGate() {
+      const gate = document.getElementById('globalAuthGate');
+      const app = document.getElementById('appContainer');
+      if (gate) gate.classList.remove('hidden');
+      if (app) app.classList.add('hidden');
+    }
+
+    function unlockAppContainer() {
+      const gate = document.getElementById('globalAuthGate');
+      const app = document.getElementById('appContainer');
+      if (gate) gate.classList.add('hidden');
+      if (app) app.classList.remove('hidden');
+
+      // Update header profile badge
+      const headerUser = document.getElementById('adminHeaderUserText');
+      const headerRole = document.getElementById('adminHeaderRoleBadge');
+      if (currentAuthSession && currentAuthSession.user) {
+        const u = currentAuthSession.user;
+        if (headerUser) headerUser.textContent = `@${u.username}`;
+        if (headerRole) {
+          headerRole.textContent = u.role ? u.role.replace('_', ' ') : u.type;
+        }
+      }
+
+      // If user is Admin, render the Admin tab state
+      renderAdminAuthState();
+      if (currentAdminSession) {
+        reloadAdminPolicy();
+        if (currentAdminSession.admin?.role === 'SUPER_ADMIN' || currentAdminSession.admin?.privileges?.canManageAdmins) {
+          loadAdminUsers();
+        }
+      }
+    }
+
+    async function handleGlobalLoginSubmit(e) {
+      if (e) e.preventDefault();
+      const usernameInput = document.getElementById('globalLoginUsername');
+      const passwordInput = document.getElementById('globalLoginPassword');
+      const username = usernameInput ? usernameInput.value.trim() : '';
+      const password = passwordInput ? passwordInput.value : '';
+      const errBox = document.getElementById('globalLoginError');
+      const errText = document.getElementById('globalLoginErrorText');
+      const btn = document.getElementById('globalLoginBtn');
+
+      if (!username || !password) return;
+
+      if (btn) {
+        btn.disabled = true;
+        btn.innerHTML = `<i class="fa-solid fa-circle-notch fa-spin"></i> <span>Verifying credentials...</span>`;
+      }
+      if (errBox) errBox.classList.add('hidden');
+
+      try {
+        const res = await fetch('/api/auth/login', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ username, password })
+        });
+        const data = await res.json();
+        if (data.success && data.token) {
+          localStorage.setItem('medfinder_auth_token', data.token);
+          if (data.userType === 'ADMIN') {
+            localStorage.setItem('medfinder_admin_token', data.token);
+            currentAdminSession = { token: data.token, admin: data.user };
+          }
+          currentAuthSession = { token: data.token, userType: data.userType, user: data.user };
+          unlockAppContainer();
+        } else {
+          if (errBox && errText) {
+            errText.textContent = data.error || 'Invalid credentials. Please verify your username and password.';
+            errBox.classList.remove('hidden');
+          }
+        }
+      } catch (err) {
+        if (errBox && errText) {
+          errText.textContent = 'Connection error: ' + err.message;
+          errBox.classList.remove('hidden');
+        }
+      } finally {
+        if (btn) {
+          btn.disabled = false;
+          btn.innerHTML = `<i class="fa-solid fa-arrow-right-to-bracket text-emerald-400"></i> <span>Sign In & Unlock Platform</span>`;
+        }
+      }
+    }
+
+    function toggleGlobalPasswordVis() {
+      const p = document.getElementById('globalLoginPassword');
+      const t = document.getElementById('globalPassVisText');
+      if (!p || !t) return;
+      if (p.type === 'password') {
+        p.type = 'text';
+        t.textContent = 'Hide';
+      } else {
+        p.type = 'password';
+        t.textContent = 'Show';
+      }
+    }
+
+    async function globalLogout() {
+      const token = getAuthToken();
+      if (token) {
+        try {
+          await fetch('/api/auth/logout', {
+            method: 'POST',
+            headers: { 'Authorization': `Bearer ${token}` }
+          });
+        } catch (_) {}
+      }
+      localStorage.removeItem('medfinder_auth_token');
+      localStorage.removeItem('medfinder_admin_token');
+      currentAuthSession = null;
+      currentAdminSession = null;
+      showGlobalAuthGate();
+    }
+
     // --- TAB SWITCHING & ADMIN AUTH STATE ---
     let currentAdminSession = null; // { token: string, admin: AdminUser }
 
     function getAdminToken() {
-      return localStorage.getItem('medfinder_admin_token') || (currentAdminSession ? currentAdminSession.token : '');
+      return getAuthToken();
     }
 
     function getAdminAuthHeaders() {
@@ -1887,18 +2152,7 @@
     }
 
     async function logoutAdmin() {
-      const token = getAdminToken();
-      if (token) {
-        try {
-          await fetch('/api/admin/auth/logout', {
-            method: 'POST',
-            headers: getAdminAuthHeaders()
-          });
-        } catch (_) {}
-      }
-      localStorage.removeItem('medfinder_admin_token');
-      currentAdminSession = null;
-      renderAdminAuthState();
+      await globalLogout();
     }
 
     // --- ADMIN RBAC & CREDENTIAL MANAGEMENT ---
@@ -3954,7 +4208,7 @@
     fetchPolicy();
     loadAdminPharmacies();
     loadTelegramApplications();
-    initAdminAuth();
+    initGlobalAuth();
 
     // Check for direct tab navigation from Telegram Bot (e.g. ?tab=pharmacy&pharmId=pharm-bole-01)
     window.addEventListener('DOMContentLoaded', () => {

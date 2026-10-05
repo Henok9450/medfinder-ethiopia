@@ -556,6 +556,103 @@ const requirePrivilege = (privilegeKey: keyof AdminPrivileges) => {
   };
 };
 
+// ==========================================
+// UNIFIED PLATFORM AUTHENTICATION (ALL ROLES)
+// ==========================================
+app.post('/api/auth/login', (req: Request, res: Response) => {
+  const { username, password } = req.body;
+  if (!username || !password) {
+    return res.status(400).json({ success: false, error: 'Username and password are required' });
+  }
+
+  // 1. Check Administrator credentials
+  const adminAuth = db.authenticateAdmin(String(username), String(password));
+  if (adminAuth.success && adminAuth.admin) {
+    return res.json({
+      success: true,
+      userType: 'ADMIN',
+      token: adminAuth.token,
+      user: {
+        ...adminAuth.admin,
+        type: 'ADMIN'
+      }
+    });
+  }
+
+  // 2. Check Pharmacy credentials
+  const pharmAuth = db.authenticatePharmacy(String(username), String(password));
+  if (pharmAuth.success && pharmAuth.account) {
+    const pharmacy = db.pharmacies.find((p) => p.id === pharmAuth.account?.pharmacyId);
+    return res.json({
+      success: true,
+      userType: 'PHARMACY',
+      token: pharmAuth.token,
+      mustChangePassword: pharmAuth.account.mustChangePassword,
+      user: {
+        id: pharmAuth.account.id,
+        username: pharmAuth.account.username,
+        fullName: pharmAuth.account.pharmacyName,
+        pharmacyId: pharmAuth.account.pharmacyId,
+        type: 'PHARMACY'
+      },
+      pharmacy
+    });
+  }
+
+  return res.status(401).json({ success: false, error: 'Invalid username or password' });
+});
+
+app.get('/api/auth/session', (req: Request, res: Response) => {
+  const authHeader = req.headers.authorization || '';
+  const token = authHeader.replace(/^Bearer\s+/i, '') || String(req.query.token || '');
+  if (!token) return res.status(401).json({ success: false, error: 'No active session token' });
+
+  // 1. Check Admin Session
+  const admin = db.getAdminBySession(token);
+  if (admin) {
+    const { passwordHash, ...safeAdmin } = admin;
+    return res.json({
+      success: true,
+      userType: 'ADMIN',
+      user: { ...safeAdmin, type: 'ADMIN' }
+    });
+  }
+
+  // 2. Check Pharmacy Session
+  const pharmAccount = db.getAccountBySession(token);
+  if (pharmAccount) {
+    const pharmacy = db.pharmacies.find((p) => p.id === pharmAccount.pharmacyId);
+    return res.json({
+      success: true,
+      userType: 'PHARMACY',
+      mustChangePassword: pharmAccount.mustChangePassword,
+      user: {
+        id: pharmAccount.id,
+        username: pharmAccount.username,
+        fullName: pharmAccount.pharmacyName,
+        pharmacyId: pharmAccount.pharmacyId,
+        type: 'PHARMACY'
+      },
+      pharmacy
+    });
+  }
+
+  return res.status(401).json({ success: false, error: 'Session expired or invalid' });
+});
+
+app.post('/api/auth/logout', (req: Request, res: Response) => {
+  const authHeader = req.headers.authorization || '';
+  const token = authHeader.replace(/^Bearer\s+/i, '') || String(req.query.token || '');
+  if (token) {
+    const admin = db.getAdminBySession(token);
+    if (admin) admin.sessionToken = undefined;
+
+    const account = db.getAccountBySession(token);
+    if (account) account.sessionToken = undefined;
+  }
+  res.json({ success: true, message: 'Logged out successfully' });
+});
+
 // --- Admin Auth Endpoints ---
 app.post('/api/admin/auth/login', (req: Request, res: Response) => {
   const { username, password } = req.body;
