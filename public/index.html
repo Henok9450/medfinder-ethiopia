@@ -61,6 +61,18 @@
           <i class="fa-solid fa-robot text-sky-400"></i>
           <span>Bot Simulator</span>
         </button>
+        <div id="adminHeaderContainer" class="flex items-center">
+          <button id="adminHeaderLoginBtn" onclick="switchTab('admin')" class="bg-slate-100 hover:bg-slate-200 text-slate-700 font-semibold text-xs px-3 py-2 rounded-xl shadow-sm transition flex items-center space-x-1.5 border border-slate-200">
+            <i class="fa-solid fa-shield-halved text-emerald-600"></i>
+            <span>Admin Portal</span>
+          </button>
+          <div id="adminHeaderLoggedInBadge" class="hidden bg-slate-900 text-white text-xs px-3 py-1.5 rounded-xl shadow-sm flex items-center space-x-2">
+            <span class="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
+            <span id="adminHeaderUserText" class="font-mono text-emerald-300 font-bold">admin</span>
+            <span id="adminHeaderRoleBadge" class="text-[9px] uppercase px-1.5 py-0.5 bg-emerald-800 text-emerald-100 rounded font-bold">SUPER</span>
+            <button onclick="logoutAdmin()" class="text-rose-400 hover:text-rose-300 text-[11px] underline ml-1">Sign Out</button>
+          </div>
+        </div>
         <div id="statusBadge" class="bg-amber-50 border border-amber-200 text-amber-900 px-3 py-1.5 rounded-lg text-xs flex items-center space-x-2 shadow-sm">
           <span class="w-2 h-2 rounded-full bg-amber-500 animate-pulse"></span>
           <span id="policyStatusText">Loading dynamic system policy...</span>
@@ -79,8 +91,9 @@
         <span class="font-bold text-emerald-700">Tab 2: Pharmacy Studio (Inventory & Check-In)</span>
       </button>
       <button onclick="switchTab('admin')" id="tab-admin" class="tab-btn py-3 text-slate-500 hover:text-slate-800 flex items-center space-x-2">
-        <i class="fa-solid fa-sliders"></i>
-        <span>Dynamic Admin Policy & Pricing</span>
+        <i class="fa-solid fa-shield-halved text-emerald-600"></i>
+        <span>Tab 3: Admin & EFDA Regulatory Center</span>
+        <span id="adminTabLockBadge" class="text-[10px] text-amber-700 bg-amber-50 px-1.5 py-0.5 rounded border border-amber-200 font-normal">Auth Required</span>
       </button>
       <button onclick="switchTab('telebirr')" id="tab-telebirr" class="tab-btn py-3 text-slate-500 hover:text-slate-800 flex items-center space-x-2">
         <i class="fa-solid fa-credit-card"></i>
@@ -440,7 +453,153 @@
     <!-- TAB 3: DYNAMIC ADMIN POLICY & PRICING                          -->
     <!-- ============================================================== -->
     <section id="panel-admin" class="hidden space-y-6">
-      <div class="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm space-y-6">
+
+      <!-- 1. ADMIN AUTHENTICATION GATE CARD (Displayed when not logged in) -->
+      <div id="adminAuthGateCard" class="max-w-xl mx-auto bg-white p-8 rounded-3xl border border-slate-200 shadow-xl space-y-6 my-8">
+        <div class="text-center space-y-2">
+          <div class="w-16 h-16 bg-gradient-to-tr from-emerald-600 to-teal-500 rounded-2xl mx-auto flex items-center justify-center text-white text-2xl shadow-lg">
+            <i class="fa-solid fa-shield-halved"></i>
+          </div>
+          <div class="inline-block px-3 py-1 bg-emerald-50 text-emerald-800 text-xs font-bold rounded-full uppercase tracking-wider border border-emerald-200">
+            EFDA Regulatory Authority & Platform Administration
+          </div>
+          <h2 class="text-xl font-black text-slate-900 tracking-tight">Restricted Administrative Access</h2>
+          <p class="text-xs text-slate-500 max-w-sm mx-auto">
+            Sign in with your verified EFDA Officer or Administrator credentials to access regulatory vetting, tariff policies, and staff RBAC controls.
+          </p>
+        </div>
+
+        <!-- Error alert -->
+        <div id="adminAuthError" class="hidden p-3.5 bg-rose-50 border border-rose-200 text-rose-800 rounded-xl text-xs flex items-center gap-2">
+          <i class="fa-solid fa-circle-exclamation text-rose-500 text-sm"></i>
+          <span id="adminAuthErrorText">Invalid username or password</span>
+        </div>
+
+        <form onsubmit="handleAdminLoginSubmit(event)" class="space-y-4">
+          <div>
+            <label class="block text-xs font-semibold text-slate-700 mb-1.5">Admin Username</label>
+            <div class="relative">
+              <span class="absolute inset-y-0 left-0 pl-3 flex items-center text-slate-400">
+                <i class="fa-solid fa-user-shield text-xs"></i>
+              </span>
+              <input type="text" id="adminAuthUsername" placeholder="e.g. admin" required autocomplete="username"
+                class="w-full text-xs pl-9 pr-3 py-2.5 border border-slate-300 rounded-xl focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 outline-none transition bg-slate-50 focus:bg-white font-mono">
+            </div>
+          </div>
+
+          <div>
+            <div class="flex items-center justify-between mb-1.5">
+              <label class="block text-xs font-semibold text-slate-700">Password</label>
+              <button type="button" onclick="toggleAdminPasswordVis()" class="text-[11px] text-slate-400 hover:text-slate-600">
+                <span id="adminPassVisText">Show</span>
+              </button>
+            </div>
+            <div class="relative">
+              <span class="absolute inset-y-0 left-0 pl-3 flex items-center text-slate-400">
+                <i class="fa-solid fa-lock text-xs"></i>
+              </span>
+              <input type="password" id="adminAuthPassword" placeholder="Enter secure password" required autocomplete="current-password"
+                class="w-full text-xs pl-9 pr-3 py-2.5 border border-slate-300 rounded-xl focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 outline-none transition bg-slate-50 focus:bg-white">
+            </div>
+          </div>
+
+          <button type="submit" id="adminLoginBtn"
+            class="w-full bg-slate-900 hover:bg-black text-white font-bold text-xs py-3 rounded-xl shadow transition flex items-center justify-center space-x-2">
+            <i class="fa-solid fa-arrow-right-to-bracket"></i>
+            <span>Authenticate & Access Admin Portal</span>
+          </button>
+        </form>
+
+        <!-- Default Credentials Guidance -->
+        <div class="p-3.5 bg-slate-50 rounded-2xl border border-slate-200 text-slate-600 space-y-1.5 text-xs">
+          <div class="flex items-center space-x-1.5 font-bold text-slate-800 text-[11px]">
+            <i class="fa-solid fa-key text-amber-500"></i>
+            <span>Default Master Administrator Credentials:</span>
+          </div>
+          <div class="flex items-center justify-between font-mono bg-white p-2 rounded-lg border border-slate-200 text-[11px]">
+            <span>Username: <strong class="text-slate-900">admin</strong></span>
+            <span>Password: <strong class="text-emerald-700">Admin@MedFinder2026!</strong></span>
+          </div>
+          <p class="text-[10px] text-slate-400">
+            Once logged in, Super Admins can create individual officer accounts with granular permissions (EFDA CoC Review, Monetization, RBAC).
+          </p>
+        </div>
+      </div>
+
+      <!-- 2. AUTHENTICATED ADMIN DASHBOARD AREA -->
+      <div id="adminAuthenticatedArea" class="hidden space-y-6">
+
+        <!-- ACTIVE OFFICER BANNER -->
+        <div class="bg-gradient-to-r from-slate-900 via-slate-800 to-emerald-950 p-4 rounded-2xl text-white shadow-md flex flex-wrap items-center justify-between gap-3">
+          <div class="flex items-center space-x-3">
+            <div class="w-10 h-10 rounded-xl bg-emerald-500/20 border border-emerald-400/30 flex items-center justify-center text-emerald-400 text-lg shadow-inner">
+              <i class="fa-solid fa-id-badge"></i>
+            </div>
+            <div>
+              <div class="flex items-center gap-2">
+                <span class="text-sm font-bold" id="adminBannerName">Chief Regulatory Administrator</span>
+                <span id="adminBannerRole" class="text-[10px] font-mono font-bold bg-emerald-500/20 text-emerald-300 border border-emerald-400/40 px-2 py-0.5 rounded-full uppercase tracking-wider">SUPER_ADMIN</span>
+              </div>
+              <p class="text-xs text-slate-300 mt-0.5" id="adminBannerEmail">admin@efda.gov.et</p>
+            </div>
+          </div>
+
+          <div class="flex items-center gap-2">
+            <div id="adminBannerPrivileges" class="hidden sm:flex items-center gap-1.5 text-[10px]">
+              <!-- Dynamically populated privilege chips -->
+            </div>
+            <button onclick="logoutAdmin()" class="bg-white/10 hover:bg-white/20 text-white text-xs font-semibold px-3 py-1.5 rounded-xl border border-white/20 transition flex items-center space-x-1.5">
+              <i class="fa-solid fa-arrow-right-from-bracket text-rose-400"></i>
+              <span>Sign Out</span>
+            </button>
+          </div>
+        </div>
+
+        <!-- SECTION: ADMIN STAFF & PRIVILEGES MANAGEMENT (RBAC) -->
+        <div id="adminStaffManagementCard" class="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm space-y-4">
+          <div class="flex flex-wrap items-center justify-between gap-3 pb-3 border-b border-slate-100">
+            <div>
+              <div class="flex items-center space-x-2">
+                <i class="fa-solid fa-users-gear text-emerald-600 text-lg"></i>
+                <h3 class="font-bold text-base text-slate-900">Administrator Staff & Role-Based Access Control (RBAC)</h3>
+              </div>
+              <p class="text-xs text-slate-500 mt-0.5">
+                Create administrator credentials, assign EFDA regulatory roles, and configure granular permissions.
+              </p>
+            </div>
+            <div class="flex items-center gap-2">
+              <button onclick="loadAdminUsers()" class="text-xs bg-slate-100 hover:bg-slate-200 text-slate-700 font-semibold px-3 py-1.5 rounded-lg flex items-center space-x-1 transition">
+                <i class="fa-solid fa-arrows-rotate text-[10px]"></i>
+                <span>Refresh Staff</span>
+              </button>
+              <button onclick="openCreateAdminModal()" class="text-xs bg-emerald-600 hover:bg-emerald-700 text-white font-bold px-3.5 py-1.5 rounded-lg flex items-center space-x-1.5 shadow-sm transition">
+                <i class="fa-solid fa-user-plus text-xs"></i>
+                <span>+ Create New Admin Officer</span>
+              </button>
+            </div>
+          </div>
+
+          <!-- ADMIN USERS TABLE -->
+          <div class="overflow-x-auto rounded-xl border border-slate-200">
+            <table class="w-full text-left text-xs">
+              <thead class="bg-slate-50 text-slate-600 font-semibold border-b border-slate-200">
+                <tr>
+                  <th class="p-3">Officer Name & Username</th>
+                  <th class="p-3">Official Email</th>
+                  <th class="p-3">Assigned Role</th>
+                  <th class="p-3">Active Privileges</th>
+                  <th class="p-3">Created / Last Login</th>
+                  <th class="p-3 text-right">Actions</th>
+                </tr>
+              </thead>
+              <tbody id="adminUsersTbody" class="divide-y divide-slate-100 bg-white">
+                <tr><td colspan="6" class="p-4 text-center text-slate-400">Loading administrator accounts...</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <div class="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm space-y-6">
         <div class="flex items-center justify-between pb-4 border-b border-slate-100">
           <div>
             <h2 class="text-lg font-bold text-slate-900">Dynamic Policy & Monetization Controller</h2>
@@ -741,6 +900,7 @@
           </div>
         </div>
       </div>
+      </div>
     </section>
 
     <!-- ============================================================== -->
@@ -777,6 +937,203 @@
     </section>
 
   </main>
+
+  <!-- ============================================================== -->
+  <!-- MODAL: CREATE NEW ADMIN OFFICER                                -->
+  <!-- ============================================================== -->
+  <div id="createAdminModal" class="hidden fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4">
+    <div class="bg-white rounded-3xl max-w-xl w-full shadow-2xl overflow-hidden border border-slate-200 animate-in fade-in zoom-in duration-150">
+      <div class="p-5 border-b border-slate-100 flex items-center justify-between bg-slate-900 text-white">
+        <div class="flex items-center space-x-3">
+          <div class="w-9 h-9 rounded-xl bg-emerald-500/20 border border-emerald-400/40 flex items-center justify-center text-emerald-300 text-base">
+            <i class="fa-solid fa-user-plus"></i>
+          </div>
+          <div>
+            <h3 class="font-bold text-sm">Create Administrator / EFDA Officer Credential</h3>
+            <p class="text-[11px] text-slate-300">Grant authorized role and granular operational privileges</p>
+          </div>
+        </div>
+        <button onclick="closeModal('createAdminModal')" class="text-slate-400 hover:text-white text-lg">
+          <i class="fa-solid fa-xmark"></i>
+        </button>
+      </div>
+
+      <form onsubmit="handleCreateAdminSubmit(event)" class="p-6 space-y-4 max-h-[80vh] overflow-y-auto">
+        <div id="createAdminError" class="hidden p-3 bg-rose-50 border border-rose-200 text-rose-800 rounded-xl text-xs flex items-center gap-2">
+          <i class="fa-solid fa-circle-exclamation text-rose-500"></i>
+          <span id="createAdminErrorText">Error message</span>
+        </div>
+
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <div>
+            <label class="block text-xs font-semibold text-slate-700 mb-1">Full Legal Name *</label>
+            <input type="text" id="newAdminFullName" placeholder="e.g. Dr. Senait Bekele" required
+              class="w-full text-xs px-3 py-2 border border-slate-300 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none">
+          </div>
+          <div>
+            <label class="block text-xs font-semibold text-slate-700 mb-1">Username (Alphanumeric) *</label>
+            <input type="text" id="newAdminUsername" placeholder="e.g. senait_efda" required
+              class="w-full text-xs px-3 py-2 border border-slate-300 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none font-mono">
+          </div>
+        </div>
+
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <div>
+            <label class="block text-xs font-semibold text-slate-700 mb-1">Official Email *</label>
+            <input type="email" id="newAdminEmail" placeholder="e.g. senait.b@efda.gov.et" required
+              class="w-full text-xs px-3 py-2 border border-slate-300 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none">
+          </div>
+          <div>
+            <label class="block text-xs font-semibold text-slate-700 mb-1">Initial Password (min 8 chars) *</label>
+            <input type="password" id="newAdminPassword" placeholder="Min 8 characters" required minlength="8"
+              class="w-full text-xs px-3 py-2 border border-slate-300 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none font-mono">
+          </div>
+        </div>
+
+        <div>
+          <label class="block text-xs font-semibold text-slate-700 mb-1">Assigned Administrative Role *</label>
+          <select id="newAdminRole" onchange="handleNewAdminRoleChange()"
+            class="w-full text-xs px-3 py-2 border border-slate-300 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none bg-slate-50 font-medium">
+            <option value="EFDA_OFFICER">EFDA_OFFICER (Regulatory Verification Desk & CoC Inspector)</option>
+            <option value="SUPER_ADMIN">SUPER_ADMIN (Full Platform Authority & Policy Controller)</option>
+            <option value="SUPPORT_AUDITOR">SUPPORT_AUDITOR (Financial Logs & Telebirr Audit Only)</option>
+          </select>
+        </div>
+
+        <div class="space-y-2 pt-2 border-t border-slate-100">
+          <label class="block text-xs font-bold text-slate-800">Granular Operational Privileges:</label>
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs">
+            <label class="flex items-start space-x-2 p-2.5 rounded-xl border border-slate-200 bg-slate-50/50 hover:bg-emerald-50/40 cursor-pointer">
+              <input type="checkbox" id="newPrivReview" checked class="mt-0.5 rounded text-emerald-600 focus:ring-emerald-500">
+              <div>
+                <span class="font-bold text-slate-800 block">Review Applications</span>
+                <span class="text-[10px] text-slate-500">Approve/reject EFDA CoC & verify pharmacies</span>
+              </div>
+            </label>
+            <label class="flex items-start space-x-2 p-2.5 rounded-xl border border-slate-200 bg-slate-50/50 hover:bg-emerald-50/40 cursor-pointer">
+              <input type="checkbox" id="newPrivPolicies" class="mt-0.5 rounded text-emerald-600 focus:ring-emerald-500">
+              <div>
+                <span class="font-bold text-slate-800 block">Manage Policies</span>
+                <span class="text-[10px] text-slate-500">Dynamic pricing, free promo cutoff, geo radius</span>
+              </div>
+            </label>
+            <label class="flex items-start space-x-2 p-2.5 rounded-xl border border-slate-200 bg-slate-50/50 hover:bg-emerald-50/40 cursor-pointer">
+              <input type="checkbox" id="newPrivRBAC" class="mt-0.5 rounded text-emerald-600 focus:ring-emerald-500">
+              <div>
+                <span class="font-bold text-slate-800 block">Manage Admin Accounts</span>
+                <span class="text-[10px] text-slate-500">Create staff credentials, edit/revoke privileges</span>
+              </div>
+            </label>
+            <label class="flex items-start space-x-2 p-2.5 rounded-xl border border-slate-200 bg-slate-50/50 hover:bg-emerald-50/40 cursor-pointer">
+              <input type="checkbox" id="newPrivAudit" checked class="mt-0.5 rounded text-emerald-600 focus:ring-emerald-500">
+              <div>
+                <span class="font-bold text-slate-800 block">View Audit & Financials</span>
+                <span class="text-[10px] text-slate-500">Telebirr revenue logs and dispute reports</span>
+              </div>
+            </label>
+          </div>
+        </div>
+
+        <div class="pt-4 border-t border-slate-100 flex items-center justify-end space-x-2">
+          <button type="button" onclick="closeModal('createAdminModal')"
+            class="px-4 py-2 text-xs font-semibold text-slate-600 hover:text-slate-800 bg-slate-100 hover:bg-slate-200 rounded-xl transition">
+            Cancel
+          </button>
+          <button type="submit" id="saveNewAdminBtn"
+            class="px-5 py-2 text-xs font-bold text-white bg-emerald-600 hover:bg-emerald-700 rounded-xl shadow transition flex items-center space-x-1.5">
+            <i class="fa-solid fa-check"></i>
+            <span>Create Officer Credential</span>
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- ============================================================== -->
+  <!-- MODAL: EDIT ADMIN PRIVILEGES                                    -->
+  <!-- ============================================================== -->
+  <div id="editAdminPrivilegesModal" class="hidden fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4">
+    <div class="bg-white rounded-3xl max-w-lg w-full shadow-2xl overflow-hidden border border-slate-200 animate-in fade-in zoom-in duration-150">
+      <div class="p-5 border-b border-slate-100 flex items-center justify-between bg-slate-900 text-white">
+        <div class="flex items-center space-x-3">
+          <div class="w-9 h-9 rounded-xl bg-blue-500/20 border border-blue-400/40 flex items-center justify-center text-blue-300 text-base">
+            <i class="fa-solid fa-user-shield"></i>
+          </div>
+          <div>
+            <h3 class="font-bold text-sm">Edit Officer Privileges & Role</h3>
+            <p class="text-[11px] text-slate-300" id="editAdminModalSub">Officer: <span id="editAdminModalTargetName" class="font-bold text-white">admin</span></p>
+          </div>
+        </div>
+        <button onclick="closeModal('editAdminPrivilegesModal')" class="text-slate-400 hover:text-white text-lg">
+          <i class="fa-solid fa-xmark"></i>
+        </button>
+      </div>
+
+      <form onsubmit="handleEditAdminSubmit(event)" class="p-6 space-y-4">
+        <input type="hidden" id="editAdminTargetId">
+        <div id="editAdminError" class="hidden p-3 bg-rose-50 border border-rose-200 text-rose-800 rounded-xl text-xs flex items-center gap-2">
+          <i class="fa-solid fa-circle-exclamation text-rose-500"></i>
+          <span id="editAdminErrorText">Error message</span>
+        </div>
+
+        <div>
+          <label class="block text-xs font-semibold text-slate-700 mb-1">Assigned Role</label>
+          <select id="editAdminRoleSelect" onchange="handleEditAdminRoleChange()"
+            class="w-full text-xs px-3 py-2 border border-slate-300 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none bg-slate-50 font-medium">
+            <option value="EFDA_OFFICER">EFDA_OFFICER (Regulatory Verification Desk & CoC Inspector)</option>
+            <option value="SUPER_ADMIN">SUPER_ADMIN (Full Platform Authority & Policy Controller)</option>
+            <option value="SUPPORT_AUDITOR">SUPPORT_AUDITOR (Financial Logs & Telebirr Audit Only)</option>
+          </select>
+        </div>
+
+        <div class="space-y-2 pt-2 border-t border-slate-100">
+          <label class="block text-xs font-bold text-slate-800">Operational Privileges:</label>
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs">
+            <label class="flex items-start space-x-2 p-2.5 rounded-xl border border-slate-200 bg-slate-50/50 hover:bg-emerald-50/40 cursor-pointer">
+              <input type="checkbox" id="editPrivReview" class="mt-0.5 rounded text-emerald-600 focus:ring-emerald-500">
+              <div>
+                <span class="font-bold text-slate-800 block">Review Applications</span>
+                <span class="text-[10px] text-slate-500">CoC review & approvals</span>
+              </div>
+            </label>
+            <label class="flex items-start space-x-2 p-2.5 rounded-xl border border-slate-200 bg-slate-50/50 hover:bg-emerald-50/40 cursor-pointer">
+              <input type="checkbox" id="editPrivPolicies" class="mt-0.5 rounded text-emerald-600 focus:ring-emerald-500">
+              <div>
+                <span class="font-bold text-slate-800 block">Manage Policies</span>
+                <span class="text-[10px] text-slate-500">Monetization & Geo</span>
+              </div>
+            </label>
+            <label class="flex items-start space-x-2 p-2.5 rounded-xl border border-slate-200 bg-slate-50/50 hover:bg-emerald-50/40 cursor-pointer">
+              <input type="checkbox" id="editPrivRBAC" class="mt-0.5 rounded text-emerald-600 focus:ring-emerald-500">
+              <div>
+                <span class="font-bold text-slate-800 block">Manage Admin Accounts</span>
+                <span class="text-[10px] text-slate-500">Staff RBAC</span>
+              </div>
+            </label>
+            <label class="flex items-start space-x-2 p-2.5 rounded-xl border border-slate-200 bg-slate-50/50 hover:bg-emerald-50/40 cursor-pointer">
+              <input type="checkbox" id="editPrivAudit" class="mt-0.5 rounded text-emerald-600 focus:ring-emerald-500">
+              <div>
+                <span class="font-bold text-slate-800 block">View Audit & Financials</span>
+                <span class="text-[10px] text-slate-500">Invoices & logs</span>
+              </div>
+            </label>
+          </div>
+        </div>
+
+        <div class="pt-4 border-t border-slate-100 flex items-center justify-end space-x-2">
+          <button type="button" onclick="closeModal('editAdminPrivilegesModal')"
+            class="px-4 py-2 text-xs font-semibold text-slate-600 hover:text-slate-800 bg-slate-100 hover:bg-slate-200 rounded-xl transition">
+            Cancel
+          </button>
+          <button type="submit" id="saveEditAdminBtn"
+            class="px-5 py-2 text-xs font-bold text-white bg-blue-600 hover:bg-blue-700 rounded-xl shadow transition flex items-center space-x-1.5">
+            <i class="fa-solid fa-floppy-disk"></i>
+            <span>Save Privileges</span>
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
 
   <!-- ============================================================== -->
   <!-- MODAL 1: 1-CLICK MASTER ESSENTIAL DRUG CHECKLIST               -->
@@ -1331,7 +1688,20 @@
     let currentPharmacyInventory = [];
     let currentSearchPharmacies = [];
 
-    // --- TAB SWITCHING ---
+    // --- TAB SWITCHING & ADMIN AUTH STATE ---
+    let currentAdminSession = null; // { token: string, admin: AdminUser }
+
+    function getAdminToken() {
+      return localStorage.getItem('medfinder_admin_token') || (currentAdminSession ? currentAdminSession.token : '');
+    }
+
+    function getAdminAuthHeaders() {
+      const token = getAdminToken();
+      const headers = { 'Content-Type': 'application/json' };
+      if (token) headers['Authorization'] = `Bearer ${token}`;
+      return headers;
+    }
+
     function switchTab(tabId) {
       ['search', 'admin', 'pharmacy', 'telebirr'].forEach(t => {
         document.getElementById(`panel-${t}`).classList.add('hidden');
@@ -1342,9 +1712,444 @@
       document.getElementById(`tab-${tabId}`).classList.add('tab-active');
       document.getElementById(`tab-${tabId}`).classList.remove('text-slate-500');
 
-      if (tabId === 'admin') reloadAdminPolicy();
+      if (tabId === 'admin') {
+        renderAdminAuthState();
+        if (currentAdminSession) {
+          reloadAdminPolicy();
+          if (currentAdminSession.admin?.role === 'SUPER_ADMIN' || currentAdminSession.admin?.privileges?.canManageAdmins) {
+            loadAdminUsers();
+          }
+        }
+      }
       if (tabId === 'pharmacy') loadPharmacyInventory();
       if (tabId === 'telebirr') loadStats();
+    }
+
+    // --- ADMIN AUTHENTICATION CONTROLLER ---
+    async function initAdminAuth() {
+      const storedToken = localStorage.getItem('medfinder_admin_token');
+      if (!storedToken) {
+        renderAdminAuthState();
+        return;
+      }
+      try {
+        const res = await fetch('/api/admin/auth/session', {
+          headers: { 'Authorization': `Bearer ${storedToken}` }
+        });
+        const data = await res.json();
+        if (data.success && data.admin) {
+          currentAdminSession = { token: storedToken, admin: data.admin };
+        } else {
+          localStorage.removeItem('medfinder_admin_token');
+          currentAdminSession = null;
+        }
+      } catch (err) {
+        console.warn('Failed to verify admin session token:', err);
+      }
+      renderAdminAuthState();
+    }
+
+    function renderAdminAuthState() {
+      const gateCard = document.getElementById('adminAuthGateCard');
+      const authArea = document.getElementById('adminAuthenticatedArea');
+      const headerBtn = document.getElementById('adminHeaderLoginBtn');
+      const headerBadge = document.getElementById('adminHeaderLoggedInBadge');
+      const userText = document.getElementById('adminHeaderUserText');
+      const roleBadge = document.getElementById('adminHeaderRoleBadge');
+      const tabLockBadge = document.getElementById('adminTabLockBadge');
+
+      if (currentAdminSession && currentAdminSession.admin) {
+        const adm = currentAdminSession.admin;
+        if (gateCard) gateCard.classList.add('hidden');
+        if (authArea) authArea.classList.remove('hidden');
+
+        if (headerBtn) headerBtn.classList.add('hidden');
+        if (headerBadge) headerBadge.classList.remove('hidden');
+        if (userText) userText.textContent = `@${adm.username}`;
+        if (roleBadge) roleBadge.textContent = adm.role.replace('_', ' ');
+
+        if (tabLockBadge) {
+          tabLockBadge.className = 'text-[10px] text-emerald-700 bg-emerald-50 px-1.5 py-0.5 rounded border border-emerald-200 font-medium';
+          tabLockBadge.textContent = 'Verified Officer';
+        }
+
+        // Active Officer Banner
+        const bName = document.getElementById('adminBannerName');
+        const bEmail = document.getElementById('adminBannerEmail');
+        const bRole = document.getElementById('adminBannerRole');
+        const bPrivs = document.getElementById('adminBannerPrivileges');
+
+        if (bName) bName.textContent = adm.fullName || adm.username;
+        if (bEmail) bEmail.textContent = adm.email || `${adm.username}@efda.gov.et`;
+        if (bRole) {
+          bRole.textContent = adm.role;
+          bRole.className = adm.role === 'SUPER_ADMIN'
+            ? 'text-[10px] font-mono font-bold bg-purple-500/20 text-purple-300 border border-purple-400/40 px-2 py-0.5 rounded-full uppercase tracking-wider'
+            : 'text-[10px] font-mono font-bold bg-emerald-500/20 text-emerald-300 border border-emerald-400/40 px-2 py-0.5 rounded-full uppercase tracking-wider';
+        }
+
+        if (bPrivs) {
+          const p = adm.privileges || {};
+          const chips = [];
+          if (adm.role === 'SUPER_ADMIN' || p.canReviewApplications) chips.push('<span class="bg-emerald-900/60 border border-emerald-700/60 text-emerald-200 px-2 py-0.5 rounded-full font-medium">✓ CoC Review</span>');
+          if (adm.role === 'SUPER_ADMIN' || p.canManagePolicies) chips.push('<span class="bg-blue-900/60 border border-blue-700/60 text-blue-200 px-2 py-0.5 rounded-full font-medium">✓ Policies</span>');
+          if (adm.role === 'SUPER_ADMIN' || p.canManageAdmins) chips.push('<span class="bg-purple-900/60 border border-purple-700/60 text-purple-200 px-2 py-0.5 rounded-full font-medium">✓ RBAC Staff</span>');
+          if (adm.role === 'SUPER_ADMIN' || p.canViewAuditLogs) chips.push('<span class="bg-amber-900/60 border border-amber-700/60 text-amber-200 px-2 py-0.5 rounded-full font-medium">✓ Audit Logs</span>');
+          bPrivs.innerHTML = chips.join('');
+        }
+
+        // RBAC Card display gated by canManageAdmins
+        const rbacCard = document.getElementById('adminStaffManagementCard');
+        if (rbacCard) {
+          if (adm.role === 'SUPER_ADMIN' || adm.privileges?.canManageAdmins) {
+            rbacCard.classList.remove('hidden');
+          } else {
+            rbacCard.classList.add('hidden');
+          }
+        }
+      } else {
+        if (gateCard) gateCard.classList.remove('hidden');
+        if (authArea) authArea.classList.add('hidden');
+
+        if (headerBtn) headerBtn.classList.remove('hidden');
+        if (headerBadge) headerBadge.classList.add('hidden');
+
+        if (tabLockBadge) {
+          tabLockBadge.className = 'text-[10px] text-amber-700 bg-amber-50 px-1.5 py-0.5 rounded border border-amber-200 font-normal';
+          tabLockBadge.textContent = 'Auth Required';
+        }
+      }
+    }
+
+    async function handleAdminLoginSubmit(e) {
+      if (e) e.preventDefault();
+      const usernameInput = document.getElementById('adminAuthUsername');
+      const passwordInput = document.getElementById('adminAuthPassword');
+      const username = usernameInput ? usernameInput.value.trim() : '';
+      const password = passwordInput ? passwordInput.value : '';
+      const errBox = document.getElementById('adminAuthError');
+      const errText = document.getElementById('adminAuthErrorText');
+      const btn = document.getElementById('adminLoginBtn');
+
+      if (!username || !password) return;
+
+      if (btn) {
+        btn.disabled = true;
+        btn.innerHTML = `<i class="fa-solid fa-circle-notch fa-spin"></i> <span>Authenticating...</span>`;
+      }
+      if (errBox) errBox.classList.add('hidden');
+
+      try {
+        const res = await fetch('/api/admin/auth/login', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ username, password })
+        });
+        const data = await res.json();
+        if (data.success && data.token) {
+          localStorage.setItem('medfinder_admin_token', data.token);
+          currentAdminSession = { token: data.token, admin: data.admin };
+          renderAdminAuthState();
+          await reloadAdminPolicy();
+          if (data.admin?.role === 'SUPER_ADMIN' || data.admin?.privileges?.canManageAdmins) {
+            loadAdminUsers();
+          }
+        } else {
+          if (errBox && errText) {
+            errText.textContent = data.error || 'Invalid administrator credentials';
+            errBox.classList.remove('hidden');
+          }
+        }
+      } catch (err) {
+        if (errBox && errText) {
+          errText.textContent = 'Connection error: ' + err.message;
+          errBox.classList.remove('hidden');
+        }
+      } finally {
+        if (btn) {
+          btn.disabled = false;
+          btn.innerHTML = `<i class="fa-solid fa-arrow-right-to-bracket"></i> <span>Authenticate & Access Admin Portal</span>`;
+        }
+      }
+    }
+
+    function toggleAdminPasswordVis() {
+      const p = document.getElementById('adminAuthPassword');
+      const t = document.getElementById('adminPassVisText');
+      if (!p || !t) return;
+      if (p.type === 'password') {
+        p.type = 'text';
+        t.textContent = 'Hide';
+      } else {
+        p.type = 'password';
+        t.textContent = 'Show';
+      }
+    }
+
+    async function logoutAdmin() {
+      const token = getAdminToken();
+      if (token) {
+        try {
+          await fetch('/api/admin/auth/logout', {
+            method: 'POST',
+            headers: getAdminAuthHeaders()
+          });
+        } catch (_) {}
+      }
+      localStorage.removeItem('medfinder_admin_token');
+      currentAdminSession = null;
+      renderAdminAuthState();
+    }
+
+    // --- ADMIN RBAC & CREDENTIAL MANAGEMENT ---
+    async function loadAdminUsers() {
+      const tbody = document.getElementById('adminUsersTbody');
+      if (!tbody) return;
+      tbody.innerHTML = `<tr><td colspan="6" class="p-4 text-center text-slate-400">Loading administrator accounts...</td></tr>`;
+
+      try {
+        const res = await fetch('/api/admin/users', {
+          headers: getAdminAuthHeaders()
+        });
+        const data = await res.json();
+        if (data.success && data.admins) {
+          const admins = data.admins;
+          tbody.innerHTML = admins.map(adm => {
+            const isSelf = currentAdminSession?.admin?.id === adm.id;
+            const roleColor = adm.role === 'SUPER_ADMIN'
+              ? 'bg-purple-100 text-purple-800 border-purple-200'
+              : (adm.role === 'EFDA_OFFICER' ? 'bg-blue-100 text-blue-800 border-blue-200' : 'bg-slate-100 text-slate-700 border-slate-200');
+
+            const privChips = [];
+            if (adm.privileges?.canReviewApplications) privChips.push('<span class="bg-emerald-50 text-emerald-700 px-1.5 py-0.5 rounded text-[10px] border border-emerald-200">Review CoC</span>');
+            if (adm.privileges?.canManagePolicies) privChips.push('<span class="bg-blue-50 text-blue-700 px-1.5 py-0.5 rounded text-[10px] border border-blue-200">Policies</span>');
+            if (adm.privileges?.canManageAdmins) privChips.push('<span class="bg-purple-50 text-purple-700 px-1.5 py-0.5 rounded text-[10px] border border-purple-200">RBAC</span>');
+            if (adm.privileges?.canViewAuditLogs) privChips.push('<span class="bg-amber-50 text-amber-700 px-1.5 py-0.5 rounded text-[10px] border border-amber-200">Audit</span>');
+
+            const createdDate = adm.createdAt ? new Date(adm.createdAt).toLocaleDateString() : 'N/A';
+            const lastLogin = adm.lastLoginAt ? new Date(adm.lastLoginAt).toLocaleDateString() : 'Never';
+
+            return `
+              <tr class="hover:bg-slate-50 transition">
+                <td class="p-3">
+                  <strong class="text-slate-900 block">${adm.fullName || adm.username} ${isSelf ? '<span class="text-[10px] text-emerald-600 font-bold bg-emerald-50 px-1.5 py-0.2 rounded border border-emerald-200">(You)</span>' : ''}</strong>
+                  <span class="text-[11px] font-mono text-slate-500">@${adm.username}</span>
+                </td>
+                <td class="p-3 font-mono text-[11px] text-slate-600">${adm.email}</td>
+                <td class="p-3">
+                  <span class="text-[10px] font-mono font-bold px-2 py-0.5 rounded-full border ${roleColor}">${adm.role}</span>
+                </td>
+                <td class="p-3">
+                  <div class="flex flex-wrap gap-1">${privChips.join('')}</div>
+                </td>
+                <td class="p-3 text-[11px] text-slate-500">
+                  <div>Created: ${createdDate}</div>
+                  <div class="text-[10px] text-slate-400">Login: ${lastLogin}</div>
+                </td>
+                <td class="p-3 text-right space-x-1">
+                  <button onclick="openEditAdminModal('${adm.id}')" class="text-xs bg-slate-100 hover:bg-blue-50 text-slate-700 hover:text-blue-700 font-medium px-2 py-1 rounded transition" title="Edit Role & Privileges">
+                    <i class="fa-solid fa-pen-to-square"></i> Privileges
+                  </button>
+                  ${!isSelf ? `
+                    <button onclick="deleteAdminUser('${adm.id}', '${adm.username}')" class="text-xs bg-slate-100 hover:bg-rose-50 text-slate-500 hover:text-rose-700 px-2 py-1 rounded transition" title="Delete User">
+                      <i class="fa-solid fa-trash-can"></i>
+                    </button>
+                  ` : ''}
+                </td>
+              </tr>
+            `;
+          }).join('');
+        } else {
+          tbody.innerHTML = `<tr><td colspan="6" class="p-4 text-center text-rose-500 text-xs">${data.error || 'Failed to load admin accounts.'}</td></tr>`;
+        }
+      } catch (err) {
+        tbody.innerHTML = `<tr><td colspan="6" class="p-4 text-center text-rose-500 text-xs">Error: ${err.message}</td></tr>`;
+      }
+    }
+
+    function openCreateAdminModal() {
+      document.getElementById('newAdminFullName').value = '';
+      document.getElementById('newAdminUsername').value = '';
+      document.getElementById('newAdminEmail').value = '';
+      document.getElementById('newAdminPassword').value = '';
+      document.getElementById('newAdminRole').value = 'EFDA_OFFICER';
+      handleNewAdminRoleChange();
+      const err = document.getElementById('createAdminError');
+      if (err) err.classList.add('hidden');
+      document.getElementById('createAdminModal').classList.remove('hidden');
+    }
+
+    function handleNewAdminRoleChange() {
+      const role = document.getElementById('newAdminRole').value;
+      const pReview = document.getElementById('newPrivReview');
+      const pPolicies = document.getElementById('newPrivPolicies');
+      const pRBAC = document.getElementById('newPrivRBAC');
+      const pAudit = document.getElementById('newPrivAudit');
+
+      if (role === 'SUPER_ADMIN') {
+        pReview.checked = true;
+        pPolicies.checked = true;
+        pRBAC.checked = true;
+        pAudit.checked = true;
+      } else if (role === 'EFDA_OFFICER') {
+        pReview.checked = true;
+        pPolicies.checked = false;
+        pRBAC.checked = false;
+        pAudit.checked = true;
+      } else if (role === 'SUPPORT_AUDITOR') {
+        pReview.checked = false;
+        pPolicies.checked = false;
+        pRBAC.checked = false;
+        pAudit.checked = true;
+      }
+    }
+
+    async function handleCreateAdminSubmit(e) {
+      if (e) e.preventDefault();
+      const fullName = document.getElementById('newAdminFullName').value.trim();
+      const username = document.getElementById('newAdminUsername').value.trim();
+      const email = document.getElementById('newAdminEmail').value.trim();
+      const password = document.getElementById('newAdminPassword').value;
+      const role = document.getElementById('newAdminRole').value;
+      const privileges = {
+        canReviewApplications: document.getElementById('newPrivReview').checked,
+        canManagePolicies: document.getElementById('newPrivPolicies').checked,
+        canManageAdmins: document.getElementById('newPrivRBAC').checked,
+        canViewAuditLogs: document.getElementById('newPrivAudit').checked,
+      };
+
+      const errBox = document.getElementById('createAdminError');
+      const errText = document.getElementById('createAdminErrorText');
+      const btn = document.getElementById('saveNewAdminBtn');
+
+      btn.disabled = true;
+      btn.innerHTML = `<i class="fa-solid fa-circle-notch fa-spin"></i> Creating...`;
+
+      try {
+        const res = await fetch('/api/admin/users', {
+          method: 'POST',
+          headers: getAdminAuthHeaders(),
+          body: JSON.stringify({ fullName, username, email, password, role, privileges })
+        });
+        const data = await res.json();
+        if (data.success) {
+          alert(`Administrator credential for @${data.admin.username} (${data.admin.fullName}) created successfully!`);
+          closeModal('createAdminModal');
+          loadAdminUsers();
+        } else {
+          if (errBox && errText) {
+            errText.textContent = data.error || 'Failed to create admin user';
+            errBox.classList.remove('hidden');
+          }
+        }
+      } catch (err) {
+        if (errBox && errText) {
+          errText.textContent = err.message;
+          errBox.classList.remove('hidden');
+        }
+      } finally {
+        btn.disabled = false;
+        btn.innerHTML = `<i class="fa-solid fa-check"></i> <span>Create Officer Credential</span>`;
+      }
+    }
+
+    async function openEditAdminModal(adminId) {
+      try {
+        const res = await fetch('/api/admin/users', { headers: getAdminAuthHeaders() });
+        const data = await res.json();
+        if (!data.success) return alert(data.error || 'Failed to fetch user data');
+        const target = data.admins.find(a => a.id === adminId);
+        if (!target) return alert('Admin user not found');
+
+        document.getElementById('editAdminTargetId').value = target.id;
+        document.getElementById('editAdminModalTargetName').textContent = `${target.fullName} (@${target.username})`;
+        document.getElementById('editAdminRoleSelect').value = target.role;
+
+        document.getElementById('editPrivReview').checked = Boolean(target.privileges?.canReviewApplications);
+        document.getElementById('editPrivPolicies').checked = Boolean(target.privileges?.canManagePolicies);
+        document.getElementById('editPrivRBAC').checked = Boolean(target.privileges?.canManageAdmins);
+        document.getElementById('editPrivAudit').checked = Boolean(target.privileges?.canViewAuditLogs);
+
+        const err = document.getElementById('editAdminError');
+        if (err) err.classList.add('hidden');
+
+        document.getElementById('editAdminPrivilegesModal').classList.remove('hidden');
+      } catch (err) {
+        alert('Error: ' + err.message);
+      }
+    }
+
+    function handleEditAdminRoleChange() {
+      const role = document.getElementById('editAdminRoleSelect').value;
+      if (role === 'SUPER_ADMIN') {
+        document.getElementById('editPrivReview').checked = true;
+        document.getElementById('editPrivPolicies').checked = true;
+        document.getElementById('editPrivRBAC').checked = true;
+        document.getElementById('editPrivAudit').checked = true;
+      }
+    }
+
+    async function handleEditAdminSubmit(e) {
+      if (e) e.preventDefault();
+      const adminId = document.getElementById('editAdminTargetId').value;
+      const role = document.getElementById('editAdminRoleSelect').value;
+      const privileges = {
+        canReviewApplications: document.getElementById('editPrivReview').checked,
+        canManagePolicies: document.getElementById('editPrivPolicies').checked,
+        canManageAdmins: document.getElementById('editPrivRBAC').checked,
+        canViewAuditLogs: document.getElementById('editPrivAudit').checked,
+      };
+
+      const btn = document.getElementById('saveEditAdminBtn');
+      btn.disabled = true;
+      btn.innerHTML = `<i class="fa-solid fa-circle-notch fa-spin"></i> Saving...`;
+
+      try {
+        const res = await fetch(`/api/admin/users/${adminId}/privileges`, {
+          method: 'PUT',
+          headers: getAdminAuthHeaders(),
+          body: JSON.stringify({ role, privileges })
+        });
+        const data = await res.json();
+        if (data.success) {
+          alert(`Privileges updated for @${data.admin.username}!`);
+          closeModal('editAdminPrivilegesModal');
+          loadAdminUsers();
+          if (currentAdminSession?.admin?.id === adminId) {
+            currentAdminSession.admin = data.admin;
+            renderAdminAuthState();
+          }
+        } else {
+          alert(data.error || 'Failed to update privileges');
+        }
+      } catch (err) {
+        alert('Error: ' + err.message);
+      } finally {
+        btn.disabled = false;
+        btn.innerHTML = `<i class="fa-solid fa-floppy-disk"></i> <span>Save Privileges</span>`;
+      }
+    }
+
+    async function deleteAdminUser(adminId, username) {
+      if (!confirm(`Are you sure you want to permanently delete administrator account @${username}? This action cannot be undone.`)) {
+        return;
+      }
+
+      try {
+        const res = await fetch(`/api/admin/users/${adminId}`, {
+          method: 'DELETE',
+          headers: getAdminAuthHeaders()
+        });
+        const data = await res.json();
+        if (data.success) {
+          alert(`Administrator @${username} deleted.`);
+          loadAdminUsers();
+        } else {
+          alert(data.error || 'Failed to delete user');
+        }
+      } catch (err) {
+        alert('Error: ' + err.message);
+      }
     }
 
     function setDrug(name) {
@@ -2653,9 +3458,21 @@
 
         const res = await fetch(`/api/telegram/applications/${id}/review`, {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          headers: getAdminAuthHeaders(),
           body: JSON.stringify(payload)
         });
+
+        if (res.status === 401) {
+          alert('Administrator authentication required. Please sign in as an Admin.');
+          switchTab('admin');
+          return;
+        }
+        if (res.status === 403) {
+          const errData = await res.json().catch(() => ({}));
+          alert(errData.error || 'Access denied: Your admin role lacks permission to review applications.');
+          return;
+        }
+
         const data = await res.json();
         if (data.success) {
           const pharmName = (data.pharmacy && data.pharmacy.name) ? ` "${data.pharmacy.name}"` : '';
@@ -2752,9 +3569,19 @@
       try {
         const res = await fetch('/api/admin/pharmacy/toggle-verification', {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          headers: getAdminAuthHeaders(),
           body: JSON.stringify({ pharmacyId })
         });
+        if (res.status === 401) {
+          alert('Administrator authentication required.');
+          switchTab('admin');
+          return;
+        }
+        if (res.status === 403) {
+          const err = await res.json().catch(() => ({}));
+          alert(err.error || 'Access denied: Insufficient privileges.');
+          return;
+        }
         const data = await res.json();
         if (data.success) {
           loadAdminPharmacies();
@@ -2830,9 +3657,19 @@
       try {
         const res = await fetch('/api/telegram/connect', {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          headers: getAdminAuthHeaders(),
           body: JSON.stringify({ botToken: token, botType: type })
         });
+        if (res.status === 401) {
+          alert('Administrator authentication required.');
+          switchTab('admin');
+          return;
+        }
+        if (res.status === 403) {
+          const err = await res.json().catch(() => ({}));
+          alert(err.error || 'Access denied: Insufficient privileges.');
+          return;
+        }
         const data = await res.json();
         if (data.success && data.botInfo) {
           alert(`🎉 Successfully connected ${type.toUpperCase()} Bot: @${data.botInfo.username} (${data.botInfo.first_name})!\n\nBoth Pharmacy and Patient bots now communicate with the live system!`);
@@ -2848,11 +3685,21 @@
 
     async function disconnectBotWithType(type) {
       if (confirm(`Disconnect live ${type.toUpperCase()} Telegram bot?`)) {
-        await fetch('/api/telegram/disconnect', {
+        const res = await fetch('/api/telegram/disconnect', {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          headers: getAdminAuthHeaders(),
           body: JSON.stringify({ botType: type })
         });
+        if (res.status === 401) {
+          alert('Administrator authentication required.');
+          switchTab('admin');
+          return;
+        }
+        if (res.status === 403) {
+          const err = await res.json().catch(() => ({}));
+          alert(err.error || 'Access denied: Insufficient privileges.');
+          return;
+        }
         checkRealBotStatus();
         alert(`${type.toUpperCase()} Bot disconnected.`);
       }
@@ -2873,13 +3720,25 @@
       const iso = new Date(val).toISOString();
       const res = await fetch('/api/admin/config/set-free-period', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: getAdminAuthHeaders(),
         body: JSON.stringify({ freePromotionUntil: iso })
       });
+      if (res.status === 401) {
+        alert('Administrator authentication required.');
+        switchTab('admin');
+        return;
+      }
+      if (res.status === 403) {
+        const err = await res.json().catch(() => ({}));
+        alert(err.error || 'Access denied: Insufficient privileges to update policies.');
+        return;
+      }
       const data = await res.json();
       if (data.success) {
         alert(`Cutoff date updated to: ${data.freePromotionUntil}`);
         fetchPolicy();
+      } else {
+        alert(data.error || 'Failed to update cutoff date');
       }
     }
 
@@ -2890,7 +3749,7 @@
 
       const res = await fetch('/api/admin/config', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: getAdminAuthHeaders(),
         body: JSON.stringify({
           monetization: {
             ...currentPolicy.monetization,
@@ -2903,10 +3762,22 @@
           }
         })
       });
+      if (res.status === 401) {
+        alert('Administrator authentication required.');
+        switchTab('admin');
+        return;
+      }
+      if (res.status === 403) {
+        const err = await res.json().catch(() => ({}));
+        alert(err.error || 'Access denied: Insufficient privileges to update pricing.');
+        return;
+      }
       const data = await res.json();
       if (data.success) {
         alert('Dynamic pricing updated successfully!');
         fetchPolicy();
+      } else {
+        alert(data.error || 'Failed to update pricing');
       }
     }
 
@@ -2917,7 +3788,7 @@
 
       const res = await fetch('/api/admin/config', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: getAdminAuthHeaders(),
         body: JSON.stringify({
           geoMatching: {
             ...currentPolicy.geoMatching,
@@ -2927,10 +3798,22 @@
           }
         })
       });
+      if (res.status === 401) {
+        alert('Administrator authentication required.');
+        switchTab('admin');
+        return;
+      }
+      if (res.status === 403) {
+        const err = await res.json().catch(() => ({}));
+        alert(err.error || 'Access denied: Insufficient privileges to update geo rules.');
+        return;
+      }
       const data = await res.json();
       if (data.success) {
         alert('Geo-broadcast rules updated!');
         fetchPolicy();
+      } else {
+        alert(data.error || 'Failed to update geo settings');
       }
     }
 
@@ -3071,6 +3954,7 @@
     fetchPolicy();
     loadAdminPharmacies();
     loadTelegramApplications();
+    initAdminAuth();
 
     // Check for direct tab navigation from Telegram Bot (e.g. ?tab=pharmacy&pharmId=pharm-bole-01)
     window.addEventListener('DOMContentLoaded', () => {

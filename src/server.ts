@@ -8,7 +8,7 @@ import { MonetizationService } from './monetization/monetization.service';
 import { BroadcastMatchingService } from './matching/broadcast-matching.service';
 import { TemplateService } from './localization/template.service';
 import { AdminConfigController } from './admin/admin-config.controller';
-import { InMemoryDatabase, MASTER_MEDICINE_CATALOG } from './database/in-memory-db';
+import { InMemoryDatabase, MASTER_MEDICINE_CATALOG, AdminRole, AdminPrivileges } from './database/in-memory-db';
 import { TelegramVerificationBotService } from './verification/telegram-verification-bot.service';
 
 dotenv.config();
@@ -519,11 +519,132 @@ app.post('/api/payment/webhook', (req: Request, res: Response) => {
 });
 
 // ==========================================
-// 5. ADMIN CONFIGURATION API (DYNAMIC SYSTEM CONTROL)
+// 5. ADMIN AUTHENTICATION, RBAC & POLICY CONTROL
 // ==========================================
+
+// Middleware for Admin Authentication
+const requireAdminAuth = (req: Request, res: Response, next: any) => {
+  const authHeader = req.headers.authorization || '';
+  const token = authHeader.replace(/^Bearer\s+/i, '') || String(req.query.adminToken || '');
+  if (!token) {
+    return res.status(401).json({ success: false, error: 'Administrator authentication required.' });
+  }
+
+  const admin = db.getAdminBySession(token);
+  if (!admin) {
+    return res.status(401).json({ success: false, error: 'Session expired or invalid credentials.' });
+  }
+
+  (req as any).adminUser = admin;
+  next();
+};
+
+// Middleware for Role/Privilege Enforcement
+const requirePrivilege = (privilegeKey: keyof AdminPrivileges) => {
+  return (req: Request, res: Response, next: any) => {
+    const admin = (req as any).adminUser;
+    if (!admin) {
+      return res.status(401).json({ success: false, error: 'Administrator authentication required.' });
+    }
+    if (admin.role === 'SUPER_ADMIN' || admin.privileges?.[privilegeKey]) {
+      return next();
+    }
+    return res.status(403).json({
+      success: false,
+      error: `Access denied. Your role (${admin.role}) lacks the required '${privilegeKey}' privilege.`,
+    });
+  };
+};
+
+// --- Admin Auth Endpoints ---
+app.post('/api/admin/auth/login', (req: Request, res: Response) => {
+  const { username, password } = req.body;
+  if (!username || !password) {
+    return res.status(400).json({ success: false, error: 'Username and password are required' });
+  }
+
+  const result = db.authenticateAdmin(String(username), String(password));
+  if (!result.success) {
+    return res.status(401).json({ success: false, error: result.error || 'Invalid administrator credentials' });
+  }
+
+  return res.json({
+    success: true,
+    token: result.token,
+    admin: result.admin,
+  });
+});
+
+app.get('/api/admin/auth/session', requireAdminAuth, (req: Request, res: Response) => {
+  const admin = (req as any).adminUser;
+  const { passwordHash, ...safeAdmin } = admin;
+  res.json({
+    success: true,
+    admin: safeAdmin,
+  });
+});
+
+app.post('/api/admin/auth/logout', requireAdminAuth, (req: Request, res: Response) => {
+  const admin = (req as any).adminUser;
+  if (admin) {
+    admin.sessionToken = undefined;
+  }
+  res.json({ success: true, message: 'Logged out successfully' });
+});
+
+// --- Admin Credential & RBAC Privileges Management ---
+app.get('/api/admin/users', requireAdminAuth, requirePrivilege('canManageAdmins'), (_req: Request, res: Response) => {
+  const admins = db.listAdmins();
+  res.json({ success: true, admins });
+});
+
+app.post('/api/admin/users', requireAdminAuth, requirePrivilege('canManageAdmins'), (req: Request, res: Response) => {
+  const { username, fullName, email, password, role, privileges } = req.body;
+  if (!username || !password || !role) {
+    return res.status(400).json({ success: false, error: 'Username, password, and role are required' });
+  }
+
+  const result = db.createAdmin({
+    username: String(username),
+    fullName: String(fullName || username),
+    email: String(email || `${username}@efda.gov.et`),
+    password: String(password),
+    role: role as AdminRole,
+    privileges,
+  });
+
+  if (!result.success) {
+    return res.status(400).json({ success: false, error: result.error });
+  }
+
+  res.json({ success: true, admin: result.admin });
+});
+
+app.put('/api/admin/users/:id/privileges', requireAdminAuth, requirePrivilege('canManageAdmins'), (req: Request, res: Response) => {
+  const adminId = String(req.params.id);
+  const { role, privileges } = req.body;
+
+  const result = db.updateAdminPrivileges(adminId, { role, privileges });
+  if (!result.success) {
+    return res.status(400).json({ success: false, error: result.error });
+  }
+
+  res.json({ success: true, admin: result.admin });
+});
+
+app.delete('/api/admin/users/:id', requireAdminAuth, requirePrivilege('canManageAdmins'), (req: Request, res: Response) => {
+  const adminId = String(req.params.id);
+  const result = db.deleteAdmin(adminId);
+  if (!result.success) {
+    return res.status(400).json({ success: false, error: result.error });
+  }
+  res.json({ success: true, message: 'Administrator user deleted successfully' });
+});
+
+// --- Dynamic Admin Configuration & Stats ---
 app.get('/api/admin/config', adminController.getConfig);
-app.post('/api/admin/config', adminController.updateConfig);
-app.post('/api/admin/config/set-free-period', adminController.setFreePeriod);
+app.post('/api/admin/config', requireAdminAuth, requirePrivilege('canManagePolicies'), adminController.updateConfig);
+app.post('/api/admin/config/set-free-period', requireAdminAuth, requirePrivilege('canManagePolicies'), adminController.setFreePeriod);
 app.get('/api/admin/stats', adminController.getStats);
 
 // 6. REGULATORY COMPLIANCE & PHARMACY VERIFICATION DESK
@@ -563,7 +684,7 @@ app.get('/api/pharmacies', (_req: Request, res: Response) => {
   });
 });
 
-app.post('/api/admin/pharmacy/toggle-verification', (req: Request, res: Response) => {
+app.post('/api/admin/pharmacy/toggle-verification', requireAdminAuth, requirePrivilege('canReviewApplications'), (req: Request, res: Response) => {
   const { pharmacyId } = req.body;
   const pharm = db.pharmacies.find((p) => p.id === pharmacyId);
   if (!pharm) return res.status(404).json({ success: false, error: 'Pharmacy not found' });
@@ -626,7 +747,7 @@ app.get('/api/telegram/applications', (_req: Request, res: Response) => {
 });
 
 // Admin Review Decision (Approve / Reject / Request More Info)
-app.post('/api/telegram/applications/:id/review', async (req: Request, res: Response) => {
+app.post('/api/telegram/applications/:id/review', requireAdminAuth, requirePrivilege('canReviewApplications'), async (req: Request, res: Response) => {
   const id = String(req.params.id);
   const { status, adminNotes, efdaLicenseNumber } = req.body;
 
@@ -789,7 +910,7 @@ app.get('/api/telegram/status', (_req: Request, res: Response) => {
   });
 });
 
-app.post('/api/telegram/connect', async (req: Request, res: Response) => {
+app.post('/api/telegram/connect', requireAdminAuth, requirePrivilege('canManagePolicies'), async (req: Request, res: Response) => {
   const { botToken, botType = 'pharmacy' } = req.body;
   if (!botToken) {
     return res.status(400).json({ success: false, error: 'botToken is required' });
@@ -800,7 +921,7 @@ app.post('/api/telegram/connect', async (req: Request, res: Response) => {
   res.json({ ...result, botType: normalizedType });
 });
 
-app.post('/api/telegram/disconnect', (req: Request, res: Response) => {
+app.post('/api/telegram/disconnect', requireAdminAuth, requirePrivilege('canManagePolicies'), (req: Request, res: Response) => {
   const { botType = 'ALL' } = req.body || {};
   let target: 'PHARMACY' | 'PATIENT' | 'ALL' = 'ALL';
   if (String(botType).toUpperCase() === 'PATIENT') target = 'PATIENT';

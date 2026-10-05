@@ -1,6 +1,6 @@
 {
   "version": "1.0.0",
-  "updatedAt": "2026-09-29T12:00:00.000Z",
+  "updatedAt": "2026-10-05T08:47:02.951Z",
   "monetization": {
     "globalMode": "HYBRID",
     "freePromotionUntil": "2026-12-31T23:59:59.000Z",
@@ -41,7 +41,7 @@
   "geoMatching": {
     "initialRadiusKm": 3.5,
     "autoExpandOnTimeout": true,
-    "expandedRadiusKm": 8.0,
+    "expandedRadiusKm": 8,
     "timeoutSecondsBeforeExpand": 90,
     "maxPharmaciesPinged": 15,
     "requestTtlMinutes": 60,

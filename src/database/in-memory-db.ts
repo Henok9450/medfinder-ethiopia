@@ -1,6 +1,28 @@
 import crypto from 'crypto';
 import { UserSubscription, PaymentInvoice } from '../monetization/subscription.types';
 
+export type AdminRole = 'SUPER_ADMIN' | 'EFDA_OFFICER' | 'SUPPORT_AUDITOR';
+
+export interface AdminPrivileges {
+  canReviewApplications: boolean; // Review EFDA CoC, approve, reject, request info
+  canManagePolicies: boolean;     // Adjust pricing, monetization, geo radius
+  canManageAdmins: boolean;       // Create/delete admin accounts and adjust privileges
+  canViewAuditLogs: boolean;      // Financial invoices, fraud reports
+}
+
+export interface AdminUser {
+  id: string;
+  username: string;
+  fullName: string;
+  email: string;
+  role: AdminRole;
+  privileges: AdminPrivileges;
+  passwordHash: string;
+  createdAt: string;
+  lastLoginAt?: string;
+  sessionToken?: string;
+}
+
 export interface PharmacyPortalAccount {
   id: string;
   pharmacyId: string;
@@ -169,10 +191,12 @@ export class InMemoryDatabase {
   public verificationApplications: PharmacyVerificationApplication[] = [];
   public botSessions: Map<string, TelegramBotSession> = new Map(); // Keyed by telegramChatId
   public pharmacyAccounts: Map<string, PharmacyPortalAccount> = new Map(); // Keyed by username
+  public adminUsers: Map<string, AdminUser> = new Map(); // Keyed by username
 
   private constructor() {
     this.seedPharmacies();
     this.seedVerificationApplications();
+    this.seedDefaultAdmin();
   }
 
   public static getInstance(): InMemoryDatabase {
@@ -784,5 +808,154 @@ export class InMemoryDatabase {
       if (acc.setupToken === setupToken) return acc;
     }
     return undefined;
+  }
+
+  private seedDefaultAdmin() {
+    const defaultUsername = 'admin';
+    const defaultPassword = process.env.ADMIN_DEFAULT_PASSWORD || 'Admin@MedFinder2026!';
+    const passwordHash = InMemoryDatabase.hashPassword(defaultPassword);
+
+    const masterAdmin: AdminUser = {
+      id: 'adm-super-01',
+      username: defaultUsername,
+      fullName: 'Chief Regulatory Administrator',
+      email: 'admin@efda.gov.et',
+      role: 'SUPER_ADMIN',
+      privileges: {
+        canReviewApplications: true,
+        canManagePolicies: true,
+        canManageAdmins: true,
+        canViewAuditLogs: true,
+      },
+      passwordHash,
+      createdAt: new Date().toISOString(),
+    };
+
+    this.adminUsers.set(defaultUsername, masterAdmin);
+  }
+
+  public authenticateAdmin(username: string, password: string): { success: boolean; admin?: Omit<AdminUser, 'passwordHash'>; token?: string; error?: string } {
+    const user = this.adminUsers.get(username.trim().toLowerCase());
+    if (!user) {
+      return { success: false, error: 'Invalid administrator credentials' };
+    }
+
+    const hash = InMemoryDatabase.hashPassword(password);
+    if (user.passwordHash !== hash) {
+      return { success: false, error: 'Invalid administrator credentials' };
+    }
+
+    user.sessionToken = 'adm_sess_' + crypto.randomBytes(16).toString('hex');
+    user.lastLoginAt = new Date().toISOString();
+
+    const { passwordHash, ...safeAdmin } = user;
+    return {
+      success: true,
+      admin: safeAdmin,
+      token: user.sessionToken,
+    };
+  }
+
+  public getAdminBySession(token: string): AdminUser | undefined {
+    if (!token) return undefined;
+    for (const adm of this.adminUsers.values()) {
+      if (adm.sessionToken === token) return adm;
+    }
+    return undefined;
+  }
+
+  public listAdmins(): Array<Omit<AdminUser, 'passwordHash'>> {
+    return Array.from(this.adminUsers.values()).map(({ passwordHash, ...rest }) => rest);
+  }
+
+  public createAdmin(data: {
+    username: string;
+    fullName: string;
+    email: string;
+    password: string;
+    role: AdminRole;
+    privileges?: Partial<AdminPrivileges>;
+  }): { success: boolean; admin?: Omit<AdminUser, 'passwordHash'>; error?: string } {
+    const cleanUsername = data.username.trim().toLowerCase().replace(/[^a-z0-9_]/g, '');
+    if (!cleanUsername || cleanUsername.length < 3) {
+      return { success: false, error: 'Username must be at least 3 alphanumeric characters' };
+    }
+
+    if (this.adminUsers.has(cleanUsername)) {
+      return { success: false, error: 'An administrator with this username already exists' };
+    }
+
+    if (!data.password || data.password.length < 8) {
+      return { success: false, error: 'Password must be at least 8 characters long' };
+    }
+
+    const defaultPrivileges: AdminPrivileges = data.role === 'SUPER_ADMIN'
+      ? { canReviewApplications: true, canManagePolicies: true, canManageAdmins: true, canViewAuditLogs: true }
+      : data.role === 'EFDA_OFFICER'
+        ? { canReviewApplications: true, canManagePolicies: false, canManageAdmins: false, canViewAuditLogs: true }
+        : { canReviewApplications: false, canManagePolicies: false, canManageAdmins: false, canViewAuditLogs: true };
+
+    const finalPrivileges: AdminPrivileges = {
+      ...defaultPrivileges,
+      ...(data.privileges || {}),
+    };
+
+    const newAdmin: AdminUser = {
+      id: `adm-${crypto.randomBytes(4).toString('hex')}`,
+      username: cleanUsername,
+      fullName: data.fullName || cleanUsername,
+      email: data.email || `${cleanUsername}@efda.gov.et`,
+      role: data.role,
+      privileges: finalPrivileges,
+      passwordHash: InMemoryDatabase.hashPassword(data.password),
+      createdAt: new Date().toISOString(),
+    };
+
+    this.adminUsers.set(cleanUsername, newAdmin);
+    const { passwordHash, ...safeUser } = newAdmin;
+    return { success: true, admin: safeUser };
+  }
+
+  public updateAdminPrivileges(adminId: string, updates: { role?: AdminRole; privileges?: Partial<AdminPrivileges> }): { success: boolean; admin?: Omit<AdminUser, 'passwordHash'>; error?: string } {
+    let target: AdminUser | undefined;
+    for (const adm of this.adminUsers.values()) {
+      if (adm.id === adminId) {
+        target = adm;
+        break;
+      }
+    }
+
+    if (!target) return { success: false, error: 'Administrator user not found' };
+
+    if (updates.role) target.role = updates.role;
+    if (updates.privileges) {
+      target.privileges = {
+        ...target.privileges,
+        ...updates.privileges,
+      };
+    }
+
+    const { passwordHash, ...safeUser } = target;
+    return { success: true, admin: safeUser };
+  }
+
+  public deleteAdmin(adminId: string): { success: boolean; error?: string } {
+    let targetKey: string | undefined;
+    let superAdminCount = 0;
+
+    for (const [key, adm] of this.adminUsers.entries()) {
+      if (adm.role === 'SUPER_ADMIN') superAdminCount++;
+      if (adm.id === adminId) targetKey = key;
+    }
+
+    if (!targetKey) return { success: false, error: 'Administrator user not found' };
+
+    const targetUser = this.adminUsers.get(targetKey);
+    if (targetUser?.role === 'SUPER_ADMIN' && superAdminCount <= 1) {
+      return { success: false, error: 'Security constraint: Cannot delete the only remaining Super Admin account' };
+    }
+
+    this.adminUsers.delete(targetKey);
+    return { success: true };
   }
 }
