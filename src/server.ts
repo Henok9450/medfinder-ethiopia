@@ -1045,6 +1045,11 @@ app.get('/miniapp', (_req: Request, res: Response) => {
   res.sendFile(path.join(__dirname, '../public/miniapp.html'));
 });
 
+// Dedicated Patient Medicine Finder PWA Routes
+app.get(['/find', '/find/index.html', '/search', '/search/index.html'], (_req: Request, res: Response) => {
+  res.sendFile(path.join(__dirname, '../public/find/index.html'));
+});
+
 app.get('/', (req: Request, res: Response) => {
   res.sendFile(path.join(__dirname, '../public/index.html'));
 });

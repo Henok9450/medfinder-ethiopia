@@ -502,6 +502,14 @@ export class TelegramVerificationBotService {
   }
 
   /**
+   * Get Dedicated Patient Medicine Finder PWA Web App URL
+   */
+  public getPatientPwaUrl(): string {
+    const host = process.env.BASE_URL || process.env.APP_BASE_URL || 'https://medfinder-ethiopia.onrender.com';
+    return `${host.replace(/\/$/, '')}/find`;
+  }
+
+  /**
    * Get Web Pharmacy Studio URL for direct browser access (Dedicated PWA)
    */
   public getWebStudioUrl(_pharmacyId?: string): string {
@@ -897,6 +905,11 @@ export class TelegramVerificationBotService {
       replyText += `\n👇 **Tap a button below to lock the counter price:**`;
     }
 
+    const patientPwaUrl = this.getPatientPwaUrl();
+    inlineKeyboard.push([
+      { text: '📱 Open Medicine Radar (Web / PWA)', url: patientPwaUrl },
+    ]);
+
     inlineKeyboard.push([
       { text: '🔄 ሌላ መድኃኒት ፈልግ (New Search)', callback_data: 'search_new' },
       { text: '📍 ክፍለ ከተማ ቀይር (Change City)', callback_data: 'subcity_menu' },
@@ -1009,6 +1022,7 @@ export class TelegramVerificationBotService {
       if (cleanText === '/start' || cleanText.toLowerCase() === 'reset') {
         session.mode = 'PATIENT';
         session.step = 'PATIENT_SEARCH';
+        const patientPwaUrl = this.getPatientPwaUrl();
         const miniAppUrl = this.getMiniAppUrl();
         return {
           chatId,
@@ -1022,6 +1036,10 @@ export class TelegramVerificationBotService {
 1️⃣ የሚፈልጉትን መድኃኒት ስም እዚህ ይጻፉ (ምሳሌ፦ *Insulin*, *Ventolin*, *Augmentin*...)
 2️⃣ ወይም ከታች ካሉት ፈጣን ቁልፎች አንዱን ይጫኑ
 3️⃣ የተገኘውን መድኃኒት ዋጋ ለ60 ደቂቃ በካውንተር ለማስያዝ **[🔒 ዋጋ አስይዝ]** ቁልፍን ይጫኑ!
+
+🌐 **ልዩ የታካሚ ድረ-ገጽ እና PWA መተግበሪያ (Dedicated Web App):**
+የቀጥታ ካርታ ራዳርን እና ፈጣን ፍለጋን በብሮውዘርዎ ያለ ምንም ምዝገባ ለመጠቀም፦
+👉 **${patientPwaUrl}** (በስልክዎ ላይ በቀጥታ Install ማድረግ ይችላሉ!)
 ━━━━━━━━━━━━━━━━━━━━━━━━━━
 👇 **ፈጣን ፍለጋ ለመጀመር ከታች ይምረጡ፦**`,
           quickReplies: [
@@ -1031,9 +1049,14 @@ export class TelegramVerificationBotService {
             '💊 Metformin',
             '📍 አቅራቢያዬን ፈልግ (Share GPS)',
             '📍 ክፍለ ከተማ ምረጥ (Sub-City)',
+            '🌐 Web App (/find)',
             '/start',
           ],
           inlineKeyboard: [
+            [
+              { text: '📱 Open Medicine Finder (Web / PWA)', url: patientPwaUrl },
+              { text: '🚀 Telegram Mini App', web_app: { url: miniAppUrl } },
+            ],
             [
               { text: '💊 Insulin (ኢንሱሊን)', callback_data: 'search_Insulin' },
               { text: '💊 Ventolin (ቬንቶሊን)', callback_data: 'search_Ventolin' },

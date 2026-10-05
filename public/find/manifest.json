@@ -1,0 +1,25 @@
+{
+  "name": "MedFinder Ethiopia - Medicine Finder",
+  "short_name": "MedFinder",
+  "description": "Find verified medicine stock, compare prices, and lock reservations across Ethiopian pharmacies",
+  "start_url": "/find/",
+  "scope": "/find/",
+  "display": "standalone",
+  "background_color": "#064e3b",
+  "theme_color": "#047857",
+  "orientation": "portrait-primary",
+  "icons": [
+    {
+      "src": "data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 192 192'><rect width='192' height='192' rx='40' fill='%23047857'/><path d='M96 36 v120 M36 96 h120' stroke='%23fef3c7' stroke-width='22' stroke-linecap='round'/><circle cx='96' cy='96' r='18' fill='%2310b981'/></svg>",
+      "sizes": "192x192",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 512 512'><rect width='512' height='512' rx='100' fill='%23047857'/><path d='M256 90 v332 M90 256 h332' stroke='%23fef3c7' stroke-width='56' stroke-linecap='round'/><circle cx='256' cy='256' r='48' fill='%2310b981'/></svg>",
+      "sizes": "512x512",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}

@@ -1,0 +1,548 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+  <title>MedFinder Ethiopia (የመድኃኒት አግኚ) - Patient Medicine Radar</title>
+
+  <!-- PWA Metadata -->
+  <link rel="manifest" href="/find/manifest.json">
+  <meta name="theme-color" content="#047857">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="MedFinder">
+
+  <!-- Telegram WebApp SDK -->
+  <script src="https://telegram.org/js/telegram-web-app.js"></script>
+
+  <!-- Tailwind CSS & Icons -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+
+  <style>
+    body {
+      font-family: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      -webkit-tap-highlight-color: transparent;
+    }
+  </style>
+</head>
+<body class="bg-slate-50 text-slate-800 min-h-screen flex flex-col">
+
+  <!-- TOP APP BAR -->
+  <header class="sticky top-0 z-40 bg-white/95 backdrop-blur-md border-b border-slate-200 px-4 py-3 shadow-xs">
+    <div class="max-w-xl mx-auto flex items-center justify-between gap-2">
+      <div class="flex items-center space-x-2.5">
+        <div class="w-10 h-10 rounded-2xl bg-gradient-to-tr from-emerald-600 to-teal-500 text-white flex items-center justify-center text-lg shadow-sm shadow-emerald-600/30">
+          <i class="fa-solid fa-prescription-bottle-medical"></i>
+        </div>
+        <div>
+          <div class="flex items-center gap-1.5">
+            <h1 class="font-extrabold text-sm text-slate-900 tracking-tight">MedFinder Ethiopia</h1>
+            <span class="text-[10px] bg-emerald-100 text-emerald-800 font-bold px-1.5 py-0.2 rounded-full">የመድኃኒት አግኚ</span>
+          </div>
+          <p class="text-[11px] text-slate-500">Addis Ababa Verified Medicine Radar</p>
+        </div>
+      </div>
+
+      <!-- Action Chips -->
+      <div class="flex items-center gap-2">
+        <!-- Install PWA Button (Hidden until install prompt available) -->
+        <button id="pwaInstallBtn" onclick="installPatientPwa()" class="hidden px-2.5 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-[11px] font-bold shadow-xs flex items-center gap-1 transition animate-bounce">
+          <i class="fa-solid fa-download text-[10px]"></i>
+          <span>Install App</span>
+        </button>
+
+        <!-- Telegram Bot Handoff -->
+        <a href="https://t.me/MedFinder_ET_bot" target="_blank" class="px-2.5 py-1.5 rounded-xl bg-sky-50 hover:bg-sky-100 border border-sky-200 text-sky-800 text-[11px] font-bold flex items-center gap-1 transition">
+          <i class="fa-brands fa-telegram text-sky-600 text-xs"></i>
+          <span class="hidden sm:inline">Bot Alert</span>
+        </a>
+      </div>
+    </div>
+  </header>
+
+  <!-- PWA INSTALL BANNER (Visible on mobile web) -->
+  <div id="pwaInstallBanner" class="hidden bg-gradient-to-r from-emerald-700 to-teal-800 text-white px-4 py-2.5 text-xs shadow-md">
+    <div class="max-w-xl mx-auto flex items-center justify-between gap-3">
+      <div class="flex items-center space-x-2">
+        <i class="fa-solid fa-mobile-screen-button text-base text-emerald-200"></i>
+        <div>
+          <strong class="block text-[11px]">Install MedFinder on your phone</strong>
+          <span class="text-[10px] text-emerald-100">1-tap emergency medicine search from your home screen</span>
+        </div>
+      </div>
+      <button onclick="installPatientPwa()" class="bg-white text-emerald-900 font-bold px-3 py-1 rounded-lg text-[11px] shadow hover:bg-emerald-50 transition whitespace-nowrap">
+        Install Free
+      </button>
+    </div>
+  </div>
+
+  <!-- MAIN PATIENT RADAR CONTAINER -->
+  <main class="max-w-xl mx-auto w-full px-4 py-4 space-y-4 flex-1">
+
+    <!-- SEARCH HERO CARD -->
+    <section class="bg-gradient-to-br from-slate-900 via-slate-800 to-emerald-950 rounded-3xl p-5 text-white shadow-xl relative overflow-hidden space-y-3.5">
+      <div class="space-y-1">
+        <span class="text-[10px] font-bold uppercase tracking-wider text-emerald-300 bg-emerald-900/60 border border-emerald-700/50 px-2.5 py-0.5 rounded-full inline-block">
+          EFDA Verified Pharmacy Radar
+        </span>
+        <h2 class="text-base sm:text-lg font-black leading-snug">
+          የሚፈልጉትን መድኃኒት ይፈልጉ
+          <span class="text-emerald-300 block text-xs font-normal mt-0.5">Find genuine medicine stock & lock prices across Addis Ababa</span>
+        </h2>
+      </div>
+
+      <!-- SEARCH INPUT BAR -->
+      <div class="space-y-2">
+        <div class="relative flex items-center">
+          <i class="fa-solid fa-magnifying-glass absolute left-3.5 text-slate-400 text-sm"></i>
+          <input 
+            type="text" 
+            id="medicineInput"
+            placeholder="Type medicine name (e.g. Insulin, Ventolin, Augmentin)..." 
+            onkeydown="if(event.key==='Enter') executeMedicineSearch()"
+            class="w-full bg-white/10 backdrop-blur-md text-white placeholder-slate-400 text-xs font-medium pl-10 pr-24 py-3 rounded-2xl border border-white/20 outline-none focus:ring-2 focus:ring-emerald-400 focus:bg-white/15 transition shadow-inner"
+          >
+          <button 
+            onclick="executeMedicineSearch()"
+            id="searchBtn"
+            class="absolute right-1.5 bg-emerald-500 hover:bg-emerald-400 active:bg-emerald-600 text-slate-950 text-xs font-bold px-4 py-2 rounded-xl transition flex items-center space-x-1 shadow-sm"
+          >
+            <span>Search</span>
+            <i class="fa-solid fa-arrow-right text-[10px]"></i>
+          </button>
+        </div>
+
+        <!-- LOCATION SELECTOR & GPS -->
+        <div class="flex items-center justify-between gap-2 text-xs">
+          <div class="flex-1 relative">
+            <select id="subCitySelect" onchange="handleSubCityChange()" class="w-full bg-slate-800/90 text-white border border-white/10 text-[11px] rounded-xl px-3 py-2 outline-none focus:ring-1 focus:ring-emerald-400">
+              <option value="Bole" data-lat="8.9950" data-lng="38.7880">📍 Bole / ቦሌ (Airport, Edna Mall, CMC)</option>
+              <option value="Kirkos" data-lat="9.0110" data-lng="38.7520">📍 Kirkos / ቂርቆስ (Mexico, Kazanchis, Meskel Sq)</option>
+              <option value="Yeka" data-lat="9.0300" data-lng="38.8100">📍 Yeka / የካ (Megenagna, Shola, Signal)</option>
+              <option value="Arada" data-lat="9.0350" data-lng="38.7520">📍 Arada / አራዳ (Piazza, Churchill, 4 Kilo)</option>
+              <option value="Nifas Silk" data-lat="8.9567" data-lng="38.7450">📍 Nifas Silk / ንፋስ ስልክ (Saris, Gotera, Jomo)</option>
+              <option value="Lideta" data-lat="9.0100" data-lng="38.7300">📍 Lideta / ልደታ (Balcha, Mexico, Tor Hailoch)</option>
+              <option value="Addis Ketema" data-lat="9.0320" data-lng="38.7350">📍 Addis Ketema / አዲስ ከተማ (Merkato, Autobis Tera)</option>
+              <option value="Gullele" data-lat="9.0600" data-lng="38.7400">📍 Gullele / ጉለሌ (Shiro Meda, Semien Mazegaja)</option>
+              <option value="Kolfe Keranio" data-lat="9.0200" data-lng="38.7000">📍 Kolfe Keranio / ኮልፌ (Ayer Tena, Total)</option>
+              <option value="Akaki Kaliti" data-lat="8.8800" data-lng="38.7600">📍 Akaki Kaliti / አቃቂ (Kality, Crown)</option>
+              <option value="Lemi Kura" data-lat="9.0150" data-lng="38.8400">📍 Lemi Kura / ለሚ ኩራ (Ayat, Summit, Koye Feche)</option>
+            </select>
+          </div>
+          <button type="button" onclick="detectGpsLocation()" class="bg-white/10 hover:bg-white/20 active:bg-white/30 text-emerald-300 border border-white/15 px-3 py-2 rounded-xl text-[11px] font-bold flex items-center gap-1.5 transition whitespace-nowrap">
+            <i class="fa-solid fa-location-crosshairs text-emerald-400"></i>
+            <span>Use GPS</span>
+          </button>
+        </div>
+      </div>
+
+      <!-- POPULAR SEARCH CHIPS -->
+      <div class="space-y-1.5 pt-1 border-t border-white/10">
+        <span class="text-[10px] text-slate-400 font-medium">Quick Searches:</span>
+        <div class="flex flex-wrap gap-1.5 text-[11px]">
+          <button onclick="quickSearch('Insulin')" class="px-2.5 py-1 rounded-lg bg-white/10 hover:bg-emerald-500 hover:text-slate-950 text-slate-200 transition">Insulin</button>
+          <button onclick="quickSearch('Ventolin')" class="px-2.5 py-1 rounded-lg bg-white/10 hover:bg-emerald-500 hover:text-slate-950 text-slate-200 transition">Ventolin</button>
+          <button onclick="quickSearch('Augmentin')" class="px-2.5 py-1 rounded-lg bg-white/10 hover:bg-emerald-500 hover:text-slate-950 text-slate-200 transition">Augmentin</button>
+          <button onclick="quickSearch('Metformin')" class="px-2.5 py-1 rounded-lg bg-white/10 hover:bg-emerald-500 hover:text-slate-950 text-slate-200 transition">Metformin</button>
+          <button onclick="quickSearch('Amoxicillin')" class="px-2.5 py-1 rounded-lg bg-white/10 hover:bg-emerald-500 hover:text-slate-950 text-slate-200 transition">Amoxicillin</button>
+          <button onclick="quickSearch('Paracetamol')" class="px-2.5 py-1 rounded-lg bg-white/10 hover:bg-emerald-500 hover:text-slate-950 text-slate-200 transition">Paracetamol</button>
+        </div>
+      </div>
+    </section>
+
+    <!-- SEARCH STATUS OR RESULTS HEADER -->
+    <div id="resultsHeader" class="hidden flex items-center justify-between px-1 text-xs">
+      <div class="flex items-center space-x-1.5 text-slate-600">
+        <span class="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
+        <span id="resultsCountText" class="font-bold text-slate-900">Found 3 pharmacies</span>
+      </div>
+      <span id="searchRadiusText" class="text-[11px] text-slate-500">Radius: 3.5 km</span>
+    </div>
+
+    <!-- SEARCH RESULTS LIST -->
+    <div id="resultsContainer" class="space-y-3">
+      <!-- Default Prompt -->
+      <div id="emptySearchPrompt" class="text-center py-10 px-4 bg-white rounded-3xl border border-slate-200 shadow-xs space-y-3">
+        <div class="w-14 h-14 rounded-2xl bg-emerald-50 border border-emerald-100 text-emerald-600 mx-auto flex items-center justify-center text-2xl shadow-inner">
+          <i class="fa-solid fa-radar text-emerald-600"></i>
+        </div>
+        <div>
+          <h3 class="font-bold text-slate-900 text-sm">Addis Ababa Real-Time Medicine Radar</h3>
+          <p class="text-xs text-slate-500 max-w-xs mx-auto mt-1">
+            Search for your prescription medication to check live stock, view verified retail prices, and generate anti-scam reservation holds.
+          </p>
+        </div>
+        <div class="inline-flex items-center gap-1.5 text-[11px] text-emerald-700 bg-emerald-50 px-3 py-1 rounded-full font-semibold">
+          <i class="fa-solid fa-shield-halved"></i>
+          <span>100% EFDA Licensed & Regulated Pharmacies</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- BENEFIT CARDS (ANTI-SCAM PRICE LOCK) -->
+    <section class="grid grid-cols-2 gap-3 text-xs">
+      <div class="p-3.5 bg-white rounded-2xl border border-slate-200 shadow-xs space-y-1">
+        <div class="w-7 h-7 rounded-lg bg-emerald-100 text-emerald-700 flex items-center justify-center text-xs font-bold mb-1">
+          <i class="fa-solid fa-clock"></i>
+        </div>
+        <strong class="text-slate-900 block text-[11px]">60-Min Counter Price Lock</strong>
+        <p class="text-[10px] text-slate-500">Lock the shelf price before traveling so pharmacies cannot raise rates upon arrival.</p>
+      </div>
+
+      <div class="p-3.5 bg-white rounded-2xl border border-slate-200 shadow-xs space-y-1">
+        <div class="w-7 h-7 rounded-lg bg-sky-100 text-sky-700 flex items-center justify-center text-xs font-bold mb-1">
+          <i class="fa-brands fa-telegram"></i>
+        </div>
+        <strong class="text-slate-900 block text-[11px]">Telegram Restock Alerts</strong>
+        <p class="text-[10px] text-slate-500">If a rare chronic medicine is out of stock, get an automated ping when restocked.</p>
+      </div>
+    </section>
+
+  </main>
+
+  <!-- 60-MINUTE PRICE LOCK RESERVATION MODAL -->
+  <div id="reservationModal" class="hidden fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4">
+    <div class="bg-white rounded-3xl max-w-sm w-full p-6 shadow-2xl space-y-5 border border-slate-100 text-center animate-in fade-in zoom-in duration-150">
+      <div class="w-14 h-14 bg-gradient-to-tr from-emerald-600 to-teal-500 text-white rounded-2xl mx-auto flex items-center justify-center text-2xl shadow-lg shadow-emerald-600/30">
+        <i class="fa-solid fa-shield-halved"></i>
+      </div>
+
+      <div>
+        <span class="text-[10px] font-bold uppercase tracking-wider text-emerald-700 bg-emerald-50 px-2.5 py-0.5 rounded-full border border-emerald-200">
+          Official Price-Lock Voucher
+        </span>
+        <h3 class="text-lg font-black text-slate-900 mt-1">Medicine Held for 60 Minutes</h3>
+        <p class="text-xs text-slate-500 mt-0.5">Show this code at the pharmacy counter to claim your locked price.</p>
+      </div>
+
+      <!-- VOUCHER CODE BOX -->
+      <div class="bg-slate-900 text-white p-4 rounded-2xl space-y-1.5 shadow-inner">
+        <span class="text-[10px] text-slate-400 font-medium">RESERVATION HOLD CODE</span>
+        <div id="voucherCodeDisplay" class="text-2xl font-mono font-black tracking-widest text-emerald-400">#HLD-0000</div>
+        <div class="text-[10px] text-slate-400 flex items-center justify-center gap-1 font-mono">
+          <i class="fa-regular fa-clock text-amber-400"></i>
+          <span>Expires in: <strong id="voucherCountdown" class="text-amber-300">59:59</strong></span>
+        </div>
+      </div>
+
+      <!-- RESERVATION DETAILS -->
+      <div class="bg-slate-50 p-3.5 rounded-xl text-left text-xs space-y-2 border border-slate-200">
+        <div class="flex justify-between">
+          <span class="text-slate-500">Medicine:</span>
+          <strong id="voucherMedicineName" class="text-slate-900">Insulin</strong>
+        </div>
+        <div class="flex justify-between">
+          <span class="text-slate-500">Locked Price:</span>
+          <strong id="voucherPrice" class="text-emerald-700 text-sm">380 ETB</strong>
+        </div>
+        <div class="flex justify-between">
+          <span class="text-slate-500">Pharmacy:</span>
+          <strong id="voucherPharmacyName" class="text-slate-900 truncate max-w-[160px]">Bole Med</strong>
+        </div>
+        <div class="flex justify-between">
+          <span class="text-slate-500">Counter Phone:</span>
+          <a id="voucherPhoneLink" href="tel:" class="font-mono text-emerald-700 font-bold hover:underline">+251...</a>
+        </div>
+      </div>
+
+      <div class="flex gap-2">
+        <button onclick="closeReservationModal()" class="w-full bg-slate-900 hover:bg-black text-white text-xs font-bold py-2.5 rounded-xl transition">
+          Done / Close Voucher
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- BOTTOM FOOTER -->
+  <footer class="bg-white border-t border-slate-200 px-4 py-3 text-center text-xs text-slate-500">
+    <div class="max-w-xl mx-auto flex items-center justify-between text-[11px]">
+      <span>Federal Democratic Republic of Ethiopia (EFDA)</span>
+      <a href="https://t.me/MedFinder_ET_bot" target="_blank" class="text-emerald-700 font-bold hover:underline">@MedFinder_ET_bot</a>
+    </div>
+  </footer>
+
+  <!-- PATIENT APP JAVASCRIPT -->
+  <script>
+    let deferredPrompt = null;
+    let countdownInterval = null;
+
+    // 1. PWA Service Worker Registration
+    if ('serviceWorker' in navigator) {
+      window.addEventListener('load', () => {
+        navigator.serviceWorker.register('/find/sw.js')
+          .then(reg => console.log('[PWA] Service Worker registered in scope:', reg.scope))
+          .catch(err => console.warn('[PWA] Service Worker registration failed:', err));
+      });
+    }
+
+    // 2. PWA Installation Handler
+    window.addEventListener('beforeinstallprompt', (e) => {
+      e.preventDefault();
+      deferredPrompt = e;
+      const installBtn = document.getElementById('pwaInstallBtn');
+      const installBanner = document.getElementById('pwaInstallBanner');
+      if (installBtn) installBtn.classList.remove('hidden');
+      if (installBanner) installBanner.classList.remove('hidden');
+    });
+
+    async function installPatientPwa() {
+      if (!deferredPrompt) {
+        alert('To install on iOS Safari: tap "Share" (📤) and select "Add to Home Screen". On Chrome/Android: open menu (⋮) > "Install App".');
+        return;
+      }
+      deferredPrompt.prompt();
+      const { outcome } = await deferredPrompt.userChoice;
+      console.log('[PWA] Install prompt outcome:', outcome);
+      deferredPrompt = null;
+      document.getElementById('pwaInstallBtn')?.classList.add('hidden');
+      document.getElementById('pwaInstallBanner')?.classList.add('hidden');
+    }
+
+    // 3. Telegram WebApp Integration
+    if (window.Telegram && window.Telegram.WebApp) {
+      const tg = window.Telegram.WebApp;
+      tg.ready();
+      tg.expand();
+      if (tg.initDataUnsafe && tg.initDataUnsafe.user) {
+        console.log('[Telegram WebApp] User loaded:', tg.initDataUnsafe.user.first_name);
+      }
+    }
+
+    // 4. Geolocation Detection
+    function detectGpsLocation() {
+      if (!navigator.geolocation) {
+        alert('Geolocation is not supported on this browser.');
+        return;
+      }
+      navigator.geolocation.getCurrentPosition(
+        (pos) => {
+          const lat = pos.coords.latitude;
+          const lng = pos.coords.longitude;
+          const select = document.getElementById('subCitySelect');
+          let gpsOpt = select.querySelector('option[value="GPS"]');
+          if (!gpsOpt) {
+            gpsOpt = document.createElement('option');
+            gpsOpt.value = 'GPS';
+            select.insertBefore(gpsOpt, select.firstChild);
+          }
+          gpsOpt.setAttribute('data-lat', lat);
+          gpsOpt.setAttribute('data-lng', lng);
+          gpsOpt.textContent = `📍 My Live GPS (${lat.toFixed(4)}, ${lng.toFixed(4)})`;
+          select.value = 'GPS';
+          alert('GPS location acquired! Ready to radar nearby stock.');
+        },
+        (err) => {
+          alert('Could not retrieve GPS: ' + err.message);
+        }
+      );
+    }
+
+    function handleSubCityChange() {
+      // Re-run search if query exists
+      const input = document.getElementById('medicineInput').value.trim();
+      if (input) executeMedicineSearch();
+    }
+
+    function quickSearch(drugName) {
+      document.getElementById('medicineInput').value = drugName;
+      executeMedicineSearch();
+    }
+
+    // 5. Execute Live Medicine Radar Search
+    async function executeMedicineSearch() {
+      const medicineName = document.getElementById('medicineInput').value.trim();
+      if (!medicineName) {
+        alert('Please enter a medicine name to search.');
+        document.getElementById('medicineInput').focus();
+        return;
+      }
+
+      const select = document.getElementById('subCitySelect');
+      const selectedOption = select.options[select.selectedIndex];
+      const subCity = select.value;
+      const userLat = parseFloat(selectedOption.getAttribute('data-lat') || '8.9950');
+      const userLng = parseFloat(selectedOption.getAttribute('data-lng') || '38.7880');
+
+      const container = document.getElementById('resultsContainer');
+      const resultsHeader = document.getElementById('resultsHeader');
+      const emptyPrompt = document.getElementById('emptySearchPrompt');
+      const searchBtn = document.getElementById('searchBtn');
+
+      if (emptyPrompt) emptyPrompt.classList.add('hidden');
+      if (resultsHeader) resultsHeader.classList.remove('hidden');
+
+      searchBtn.disabled = true;
+      searchBtn.innerHTML = `<i class="fa-solid fa-circle-notch fa-spin"></i>`;
+
+      container.innerHTML = `
+        <div class="text-center py-8">
+          <div class="inline-block animate-spin text-emerald-600 text-2xl mb-2">
+            <i class="fa-solid fa-circle-notch"></i>
+          </div>
+          <p class="text-xs text-slate-500">Pinging verified pharmacies near ${subCity}...</p>
+        </div>
+      `;
+
+      try {
+        const userId = 'patient_web_' + Math.floor(100000 + Math.random() * 900000);
+        const res = await fetch('/api/search', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            userId,
+            medicineName,
+            userLat,
+            userLng,
+            subCity,
+            lang: 'am'
+          })
+        });
+
+        const data = await res.json();
+        searchBtn.disabled = false;
+        searchBtn.innerHTML = `<span>Search</span> <i class="fa-solid fa-arrow-right text-[10px]"></i>`;
+
+        if (data.success && data.pharmacies && data.pharmacies.length > 0) {
+          document.getElementById('resultsCountText').innerText = `Found ${data.pharmacies.length} pharmacies with stock`;
+          renderPharmacies(data.pharmacies, medicineName);
+        } else if (data.mode === 'BROADCAST_PING_INITIATED') {
+          document.getElementById('resultsCountText').innerText = `Broadcasting query live...`;
+          container.innerHTML = `
+            <div class="bg-white p-5 rounded-3xl border border-sky-200 shadow-sm space-y-3 text-center">
+              <div class="w-12 h-12 bg-sky-50 text-sky-600 rounded-2xl mx-auto flex items-center justify-center text-xl">
+                <i class="fa-solid fa-tower-broadcast animate-pulse"></i>
+              </div>
+              <div>
+                <h4 class="font-bold text-sm text-slate-900">Broadcast Ping Sent to ${data.pingedCount || 10} Nearby Pharmacies</h4>
+                <p class="text-xs text-slate-500 mt-0.5">"${medicineName}" was pinged to pharmacists in ${subCity}. As they confirm stock, your radar updates.</p>
+              </div>
+              <a href="https://t.me/MedFinder_ET_bot" target="_blank" class="inline-flex items-center gap-1.5 bg-sky-600 text-white font-bold text-xs px-4 py-2 rounded-xl shadow-xs">
+                <i class="fa-brands fa-telegram"></i>
+                <span>Get Notification on Telegram Bot</span>
+              </a>
+            </div>
+          `;
+        } else {
+          document.getElementById('resultsCountText').innerText = `No pharmacies found`;
+          container.innerHTML = `
+            <div class="bg-white p-6 rounded-3xl border border-slate-200 text-center space-y-2">
+              <i class="fa-solid fa-prescription-bottle text-2xl text-slate-400"></i>
+              <h4 class="font-bold text-sm text-slate-900">No Direct Matches in ${subCity}</h4>
+              <p class="text-xs text-slate-500">Try selecting a neighboring sub-city or search by generic ingredient name.</p>
+            </div>
+          `;
+        }
+      } catch (err) {
+        searchBtn.disabled = false;
+        searchBtn.innerHTML = `<span>Search</span>`;
+        container.innerHTML = `
+          <div class="bg-rose-50 border border-rose-200 p-4 rounded-2xl text-xs text-rose-800 text-center">
+            Connection error: ${err.message}. Please retry.
+          </div>
+        `;
+      }
+    }
+
+    function renderPharmacies(pharmacies, drugName) {
+      const container = document.getElementById('resultsContainer');
+      container.innerHTML = pharmacies.map((p, idx) => `
+        <div class="bg-white p-4 rounded-3xl border border-slate-200 shadow-xs space-y-3 hover:border-emerald-400 transition">
+          <div class="flex items-start justify-between gap-2">
+            <div>
+              <div class="flex items-center gap-1.5">
+                <h3 class="font-black text-sm text-slate-900">${p.name}</h3>
+                ${p.isVerified ? '<span class="text-[10px] bg-emerald-100 text-emerald-800 font-bold px-1.5 py-0.2 rounded" title="EFDA Licensed"><i class="fa-solid fa-check"></i> Verified</span>' : ''}
+              </div>
+              <p class="text-xs text-slate-500 mt-0.5">
+                📍 ${p.subCity}, Addis Ababa • <strong class="text-emerald-700">${p.distanceKm || 1.2} km away</strong>
+              </p>
+            </div>
+            <div class="text-right">
+              <span class="text-[10px] text-slate-400 uppercase font-bold">Locked Price</span>
+              <div class="text-base font-black text-emerald-700">${p.priceETB || 380} ETB</div>
+            </div>
+          </div>
+
+          <!-- TRUST METRICS -->
+          <div class="flex items-center justify-between text-[11px] bg-slate-50 p-2.5 rounded-xl border border-slate-100">
+            <span class="text-slate-600">🛡️ Trust Score: <strong>${p.trustScore || 98}%</strong></span>
+            <span class="text-slate-500 font-mono text-[10px]">${p.efdaLicenseNumber || 'EFDA/PH/2026'}</span>
+          </div>
+
+          <!-- ACTIONS: CALL & LOCK PRICE -->
+          <div class="grid grid-cols-2 gap-2 pt-1">
+            <a href="tel:${p.phone || '+251911223344'}" class="bg-slate-100 hover:bg-slate-200 text-slate-800 text-xs font-bold py-2 px-3 rounded-xl flex items-center justify-center space-x-1.5 transition">
+              <i class="fa-solid fa-phone text-emerald-600 text-[11px]"></i>
+              <span>Call Counter</span>
+            </a>
+            <button onclick="createPriceLockHold('${p.id}', '${p.name.replace(/'/g, "\\'")}', '${drugName}', ${p.priceETB || 380}, '${p.phone || '+251911223344'}')" class="bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold py-2 px-3 rounded-xl flex items-center justify-center space-x-1.5 shadow-xs transition">
+              <i class="fa-solid fa-lock text-[11px]"></i>
+              <span>Lock Price</span>
+            </button>
+          </div>
+        </div>
+      `).join('');
+    }
+
+    // 6. Anti-Gouging 60-Minute Price Lock Reservation
+    async function createPriceLockHold(pharmacyId, pharmacyName, medicineName, lockedPriceETB, phone) {
+      try {
+        const patientUserId = 'patient_' + Math.floor(100000 + Math.random() * 900000);
+        const res = await fetch('/api/reservation/create', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            patientUserId,
+            pharmacyId,
+            medicineName,
+            lockedPriceETB
+          })
+        });
+
+        const data = await res.json();
+        if (data.success && data.reservation) {
+          const r = data.reservation;
+          document.getElementById('voucherCodeDisplay').innerText = `#${r.reservationCode}`;
+          document.getElementById('voucherMedicineName').innerText = r.medicineName;
+          document.getElementById('voucherPrice').innerText = `${r.lockedPriceETB} ETB`;
+          document.getElementById('voucherPharmacyName').innerText = r.pharmacyName || pharmacyName;
+          const phoneEl = document.getElementById('voucherPhoneLink');
+          phoneEl.innerText = phone;
+          phoneEl.href = `tel:${phone}`;
+
+          // Start 60-min countdown
+          startCountdown(60 * 60);
+
+          document.getElementById('reservationModal').classList.remove('hidden');
+        } else {
+          alert('Could not lock price: ' + (data.error || 'Unknown issue'));
+        }
+      } catch (err) {
+        alert('Reservation hold failed: ' + err.message);
+      }
+    }
+
+    function startCountdown(durationSeconds) {
+      if (countdownInterval) clearInterval(countdownInterval);
+      let timer = durationSeconds;
+      const display = document.getElementById('voucherCountdown');
+      countdownInterval = setInterval(() => {
+        const minutes = parseInt(timer / 60, 10);
+        const seconds = parseInt(timer % 60, 10);
+        display.textContent = `${minutes < 10 ? '0' + minutes : minutes}:${seconds < 10 ? '0' + seconds : seconds}`;
+        if (--timer < 0) {
+          clearInterval(countdownInterval);
+          display.textContent = 'EXPIRED';
+        }
+      }, 1000);
+    }
+
+    function closeReservationModal() {
+      document.getElementById('reservationModal').classList.add('hidden');
+      if (countdownInterval) clearInterval(countdownInterval);
+    }
+  </script>
+</body>
+</html>
