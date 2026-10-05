@@ -1,4 +1,22 @@
+import crypto from 'crypto';
 import { UserSubscription, PaymentInvoice } from '../monetization/subscription.types';
+
+export interface PharmacyPortalAccount {
+  id: string;
+  pharmacyId: string;
+  pharmacyName: string;
+  subCity: string;
+  phone: string;
+  username: string;
+  passwordHash: string;
+  tempPassword?: string;
+  setupToken?: string;
+  setupTokenExpiresAt?: string;
+  mustChangePassword: boolean;
+  createdAt: string;
+  lastLoginAt?: string;
+  sessionToken?: string;
+}
 
 export interface PharmacyMedicineItem {
   name: string;
@@ -69,6 +87,9 @@ export interface PharmacyVerificationApplication {
   submittedAt: string;
   reviewedAt?: string;
   approvedPharmacyId?: string;
+  portalUsername?: string;
+  portalTempPassword?: string;
+  portalSetupToken?: string;
 }
 
 export interface TelegramBotSession {
@@ -147,6 +168,7 @@ export class InMemoryDatabase {
   public violationReports: PharmacyViolationReport[] = [];
   public verificationApplications: PharmacyVerificationApplication[] = [];
   public botSessions: Map<string, TelegramBotSession> = new Map(); // Keyed by telegramChatId
+  public pharmacyAccounts: Map<string, PharmacyPortalAccount> = new Map(); // Keyed by username
 
   private constructor() {
     this.seedPharmacies();
@@ -560,6 +582,13 @@ export class InMemoryDatabase {
       }
     }
 
+    if (status === 'APPROVED' && pharmacy) {
+      const portalAcc = this.createOrGetPharmacyAccount(pharmacy);
+      app.portalUsername = portalAcc.username;
+      app.portalTempPassword = portalAcc.tempPassword;
+      app.portalSetupToken = portalAcc.setupToken;
+    }
+
     return { success: true, application: app, pharmacy };
   }
 
@@ -601,5 +630,159 @@ export class InMemoryDatabase {
     app.adminNotes = `[Resubmission Received]: ${app.pharmacistUpdateNote}${prevReason}`;
 
     return app;
+  }
+
+  public static hashPassword(password: string): string {
+    return crypto.createHash('sha256').update(password + '_medfinder_ethiopia_salt').digest('hex');
+  }
+
+  public createOrGetPharmacyAccount(pharmacy: Pharmacy): PharmacyPortalAccount {
+    // Check if account already exists for this pharmacy
+    for (const acc of this.pharmacyAccounts.values()) {
+      if (acc.pharmacyId === pharmacy.id) return acc;
+    }
+
+    // Generate clean base username
+    const cleanName = pharmacy.name
+      .toLowerCase()
+      .replace(/[^a-z0-9]/g, '_')
+      .replace(/_+/g, '_')
+      .replace(/^_|_$/g, '');
+    const randNum = Math.floor(100 + Math.random() * 900);
+    const baseUsername = cleanName ? `${cleanName.substring(0, 15)}_${randNum}` : `pharm_${randNum}`;
+    let finalUsername = baseUsername;
+    let counter = 1;
+    while (this.pharmacyAccounts.has(finalUsername)) {
+      finalUsername = `${baseUsername}_${counter++}`;
+    }
+
+    // Generate initial temporary password (e.g. Med#8492!ET)
+    const tempCode = Math.floor(1000 + Math.random() * 9000);
+    const tempPassword = `Med#${tempCode}!ET`;
+    const passwordHash = InMemoryDatabase.hashPassword(tempPassword);
+
+    // Generate 24-hour setup token
+    const setupToken = crypto.randomBytes(16).toString('hex');
+    const expiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString();
+
+    const account: PharmacyPortalAccount = {
+      id: `acc-${crypto.randomBytes(4).toString('hex')}`,
+      pharmacyId: pharmacy.id,
+      pharmacyName: pharmacy.name,
+      subCity: pharmacy.subCity,
+      phone: pharmacy.phone,
+      username: finalUsername,
+      passwordHash,
+      tempPassword,
+      setupToken,
+      setupTokenExpiresAt: expiresAt,
+      mustChangePassword: true,
+      createdAt: new Date().toISOString(),
+    };
+
+    this.pharmacyAccounts.set(finalUsername, account);
+    return account;
+  }
+
+  public authenticatePharmacy(username: string, password: string): { success: boolean; account?: PharmacyPortalAccount; token?: string; error?: string } {
+    const acc = this.pharmacyAccounts.get(username.trim().toLowerCase());
+    if (!acc) {
+      return { success: false, error: 'Invalid username or password' };
+    }
+
+    const hash = InMemoryDatabase.hashPassword(password);
+    if (acc.passwordHash !== hash) {
+      return { success: false, error: 'Invalid username or password' };
+    }
+
+    // Generate active session token
+    acc.sessionToken = 'sess_' + crypto.randomBytes(16).toString('hex');
+    acc.lastLoginAt = new Date().toISOString();
+
+    return {
+      success: true,
+      account: acc,
+      token: acc.sessionToken,
+    };
+  }
+
+  public changePharmacyPassword(username: string, currentPassword: string, newPassword: string): { success: boolean; account?: PharmacyPortalAccount; error?: string } {
+    const acc = this.pharmacyAccounts.get(username.trim().toLowerCase());
+    if (!acc) return { success: false, error: 'Account not found' };
+
+    const currentHash = InMemoryDatabase.hashPassword(currentPassword);
+    if (acc.passwordHash !== currentHash) {
+      return { success: false, error: 'Current password incorrect' };
+    }
+
+    if (!newPassword || newPassword.length < 8) {
+      return { success: false, error: 'New password must be at least 8 characters long' };
+    }
+
+    acc.passwordHash = InMemoryDatabase.hashPassword(newPassword);
+    acc.mustChangePassword = false;
+    delete acc.tempPassword;
+    delete acc.setupToken;
+    delete acc.setupTokenExpiresAt;
+
+    return { success: true, account: acc };
+  }
+
+  public activateAccountWithToken(setupToken: string, newPassword: string, customUsername?: string): { success: boolean; account?: PharmacyPortalAccount; token?: string; error?: string } {
+    let targetAcc: PharmacyPortalAccount | undefined;
+    for (const acc of this.pharmacyAccounts.values()) {
+      if (acc.setupToken === setupToken) {
+        targetAcc = acc;
+        break;
+      }
+    }
+
+    if (!targetAcc) return { success: false, error: 'Invalid or expired setup token' };
+
+    if (targetAcc.setupTokenExpiresAt && new Date(targetAcc.setupTokenExpiresAt).getTime() < Date.now()) {
+      return { success: false, error: 'Setup link has expired. Please contact EFDA support or request a new link.' };
+    }
+
+    if (!newPassword || newPassword.length < 8) {
+      return { success: false, error: 'Password must be at least 8 characters long' };
+    }
+
+    if (customUsername && customUsername.trim().length >= 3) {
+      const cleanCustom = customUsername.trim().toLowerCase().replace(/[^a-z0-9_]/g, '');
+      if (cleanCustom !== targetAcc.username) {
+        if (this.pharmacyAccounts.has(cleanCustom)) {
+          return { success: false, error: 'Chosen username is already taken. Please choose another.' };
+        }
+        this.pharmacyAccounts.delete(targetAcc.username);
+        targetAcc.username = cleanCustom;
+        this.pharmacyAccounts.set(cleanCustom, targetAcc);
+      }
+    }
+
+    targetAcc.passwordHash = InMemoryDatabase.hashPassword(newPassword);
+    targetAcc.mustChangePassword = false;
+    delete targetAcc.tempPassword;
+    delete targetAcc.setupToken;
+    delete targetAcc.setupTokenExpiresAt;
+    targetAcc.sessionToken = 'sess_' + crypto.randomBytes(16).toString('hex');
+    targetAcc.lastLoginAt = new Date().toISOString();
+
+    return { success: true, account: targetAcc, token: targetAcc.sessionToken };
+  }
+
+  public getAccountBySession(token: string): PharmacyPortalAccount | undefined {
+    if (!token) return undefined;
+    for (const acc of this.pharmacyAccounts.values()) {
+      if (acc.sessionToken === token) return acc;
+    }
+    return undefined;
+  }
+
+  public getAccountBySetupToken(setupToken: string): PharmacyPortalAccount | undefined {
+    if (!setupToken) return undefined;
+    for (const acc of this.pharmacyAccounts.values()) {
+      if (acc.setupToken === setupToken) return acc;
+    }
+    return undefined;
   }
 }

@@ -185,6 +185,159 @@ app.post('/api/pharmacy/respond', (req: Request, res: Response) => {
 });
 
 // ==========================================
+// 3A. PHARMACY PORTAL AUTHENTICATION & SETUP
+// ==========================================
+app.post('/api/pharmacy/auth/login', (req: Request, res: Response) => {
+  const { username, password } = req.body;
+  if (!username || !password) {
+    return res.status(400).json({ success: false, error: 'Username and password are required' });
+  }
+
+  const auth = db.authenticatePharmacy(String(username), String(password));
+  if (!auth.success || !auth.account) {
+    return res.status(401).json({ success: false, error: auth.error || 'Invalid credentials' });
+  }
+
+  const pharmacy = db.pharmacies.find((p) => p.id === auth.account?.pharmacyId);
+
+  res.json({
+    success: true,
+    token: auth.token,
+    mustChangePassword: auth.account.mustChangePassword,
+    account: {
+      username: auth.account.username,
+      pharmacyId: auth.account.pharmacyId,
+      pharmacyName: auth.account.pharmacyName,
+      subCity: auth.account.subCity,
+      phone: auth.account.phone,
+    },
+    pharmacy: pharmacy ? {
+      id: pharmacy.id,
+      name: pharmacy.name,
+      subCity: pharmacy.subCity,
+      phone: pharmacy.phone,
+      efdaLicenseNumber: pharmacy.efdaLicenseNumber,
+      tinNumber: pharmacy.tinNumber,
+      isVerified: pharmacy.isVerified,
+      trustScore: pharmacy.trustScore,
+      strikeCount: pharmacy.strikeCount,
+    } : null,
+  });
+});
+
+app.post('/api/pharmacy/auth/change-password', (req: Request, res: Response) => {
+  const { username, currentPassword, newPassword } = req.body;
+  if (!username || !currentPassword || !newPassword) {
+    return res.status(400).json({ success: false, error: 'username, currentPassword, and newPassword are required' });
+  }
+
+  const result = db.changePharmacyPassword(String(username), String(currentPassword), String(newPassword));
+  if (!result.success) {
+    return res.status(400).json({ success: false, error: result.error });
+  }
+
+  res.json({ success: true, message: 'Password updated successfully. You can now access your studio.' });
+});
+
+app.get('/api/pharmacy/auth/verify-token', (req: Request, res: Response) => {
+  const token = String(req.query.token || '');
+  if (!token) return res.status(400).json({ success: false, error: 'Token is required' });
+
+  const account = db.getAccountBySetupToken(token);
+  if (!account) return res.status(404).json({ success: false, error: 'Invalid or expired setup token' });
+
+  if (account.setupTokenExpiresAt && new Date(account.setupTokenExpiresAt).getTime() < Date.now()) {
+    return res.status(410).json({ success: false, error: 'Setup link has expired (24h limit). Please request a new link from EFDA support or via Telegram bot.' });
+  }
+
+  res.json({
+    success: true,
+    pharmacyName: account.pharmacyName,
+    subCity: account.subCity,
+    username: account.username,
+    expiresAt: account.setupTokenExpiresAt,
+  });
+});
+
+app.post('/api/pharmacy/auth/activate-setup', (req: Request, res: Response) => {
+  const { setupToken, newPassword, customUsername } = req.body;
+  if (!setupToken || !newPassword) {
+    return res.status(400).json({ success: false, error: 'setupToken and newPassword are required' });
+  }
+
+  const result = db.activateAccountWithToken(String(setupToken), String(newPassword), customUsername ? String(customUsername) : undefined);
+  if (!result.success || !result.account) {
+    return res.status(400).json({ success: false, error: result.error });
+  }
+
+  const pharmacy = db.pharmacies.find((p) => p.id === result.account?.pharmacyId);
+
+  res.json({
+    success: true,
+    token: result.token,
+    mustChangePassword: false,
+    message: 'Portal account successfully activated!',
+    account: {
+      username: result.account.username,
+      pharmacyId: result.account.pharmacyId,
+      pharmacyName: result.account.pharmacyName,
+      subCity: result.account.subCity,
+      phone: result.account.phone,
+    },
+    pharmacy: pharmacy ? {
+      id: pharmacy.id,
+      name: pharmacy.name,
+      subCity: pharmacy.subCity,
+      phone: pharmacy.phone,
+      efdaLicenseNumber: pharmacy.efdaLicenseNumber,
+      tinNumber: pharmacy.tinNumber,
+      isVerified: pharmacy.isVerified,
+      trustScore: pharmacy.trustScore,
+      strikeCount: pharmacy.strikeCount,
+    } : null,
+  });
+});
+
+app.get('/api/pharmacy/auth/session', (req: Request, res: Response) => {
+  const authHeader = req.headers.authorization || '';
+  const token = authHeader.replace(/^Bearer\s+/i, '') || String(req.query.token || '');
+  if (!token) return res.status(401).json({ success: false, error: 'Not authenticated' });
+
+  const account = db.getAccountBySession(token);
+  if (!account) return res.status(401).json({ success: false, error: 'Session expired or invalid' });
+
+  const pharmacy = db.pharmacies.find((p) => p.id === account.pharmacyId);
+
+  res.json({
+    success: true,
+    mustChangePassword: account.mustChangePassword,
+    account: {
+      username: account.username,
+      pharmacyId: account.pharmacyId,
+      pharmacyName: account.pharmacyName,
+      subCity: account.subCity,
+      phone: account.phone,
+    },
+    pharmacy: pharmacy ? {
+      id: pharmacy.id,
+      name: pharmacy.name,
+      subCity: pharmacy.subCity,
+      phone: pharmacy.phone,
+      efdaLicenseNumber: pharmacy.efdaLicenseNumber,
+      tinNumber: pharmacy.tinNumber,
+      isVerified: pharmacy.isVerified,
+      trustScore: pharmacy.trustScore,
+      strikeCount: pharmacy.strikeCount,
+    } : null,
+  });
+});
+
+// Dedicated Pharmacy PWA direct route
+app.get(['/pharmacy', '/pharmacy/setup', '/pharmacy/index.html'], (_req: Request, res: Response) => {
+  res.sendFile(path.join(__dirname, '../public/pharmacy/index.html'));
+});
+
+// ==========================================
 // 3B. PHARMACY INVENTORY & STOCK MANAGEMENT
 // ==========================================
 // 1. Get Ethiopia's Master Drug Catalog for quick checklist

@@ -502,12 +502,19 @@ export class TelegramVerificationBotService {
   }
 
   /**
-   * Get Web Pharmacy Studio URL for direct browser access
+   * Get Web Pharmacy Studio URL for direct browser access (Dedicated PWA)
    */
-  public getWebStudioUrl(pharmacyId?: string): string {
+  public getWebStudioUrl(_pharmacyId?: string): string {
     const host = process.env.BASE_URL || process.env.APP_BASE_URL || 'https://medfinder-ethiopia.onrender.com';
-    const cleanHost = host.replace(/\/$/, '');
-    return pharmacyId ? `${cleanHost}/?tab=pharmacy&pharmId=${pharmacyId}` : `${cleanHost}/?tab=pharmacy`;
+    return `${host.replace(/\/$/, '')}/pharmacy`;
+  }
+
+  /**
+   * Get 1-Click Secure Account Setup Link for newly verified pharmacy
+   */
+  public getPharmacyPortalSetupUrl(setupToken: string): string {
+    const host = process.env.BASE_URL || process.env.APP_BASE_URL || 'https://medfinder-ethiopia.onrender.com';
+    return `${host.replace(/\/$/, '')}/pharmacy?setupToken=${encodeURIComponent(setupToken)}`;
   }
 
   /**
@@ -2491,28 +2498,39 @@ Send **"Confirm"** to submit to the EFDA Compliance Desk.`;
   public async notifyReviewDecision(chatId: string, status: 'APPROVED' | 'REJECTED' | 'INFO_REQUESTED', adminNotes?: string): Promise<boolean> {
     let message = '';
     const app = this.db.verificationApplications.find((a) => a.telegramChatId === chatId);
-    const pharmId = app?.approvedPharmacyId || 'pharm-bole-01';
-    const webStudioUrl = this.getWebStudioUrl(pharmId);
+    const portalUrl = this.getWebStudioUrl();
+    const setupToken = app?.portalSetupToken;
+    const setupUrl = setupToken ? this.getPharmacyPortalSetupUrl(setupToken) : portalUrl;
+    const username = app?.portalUsername || 'pharmacist';
+    const tempPassword = app?.portalTempPassword || 'Med#8492!ET';
 
     if (status === 'APPROVED') {
       message = `
 🎉 **እንኳን ደስ አለዎት! ማረጋገጫዎ ጸድቋል!**
-**CONGRATULATIONS! Your Pharmacy is Verified!**
+**CONGRATULATIONS! Your Pharmacy is EFDA Verified!**
 
 የኢትዮጵያ ምግብና መድኃኒት ባለስልጣን (EFDA) የብቃት ማረጋገጫዎ በተሳካ ሁኔታ ተረጋግጧል። 
 
 ✅ **የተሰጡ ጥቅሞች፦**
 • **EFDA Verified Shield (የታመነ አረንጓዴ ባጅ)** በመገለጫዎ ላይ ነቅቷል።
 • የፋርማሲዎ ትክክለኛ ጂፒኤስ እና የመድኃኒት ክምችት በታካሚዎች የፍለጋ ራዳር ላይ በቅድሚያ ይታያል።
-• አጣዳፊ የሆኑ የመድኃኒት ጥያቄዎችን በቅጽበት መመለስ ይችላሉ።
 
 ━━━━━━━━━━━━━━━━━━━━━━
-📦 **ቀጣዩ ደረጃ፦ የመድኃኒት መደርደሪያዎን ይመዝግቡ (Manage Shelf Inventory)**
-በአቅራቢያዎ ያሉ ታካሚዎች መድኃኒቶችዎን በቀጥታ እንዲያገኙ የመድኃኒት ዝርዝርዎን ያስገቡ፦
-1️⃣ 15ቱን ዋና ዋና መድኃኒቶች በቅጽበት ለመጫን 👉 **/import_checklist**
+🔐 **የፋርማሲ ፖርታል መግቢያ (Pharmacy PWA Portal Access):**
+የመድኃኒት መደርደሪያዎን፣ ዋጋዎችን እና የታካሚዎችን ጥያቄዎች ለመቆጣጠር በፖርታሉ ይግቡ፦
+
+🌐 **ፖርታል ሊንክ (Portal URL):** ${portalUrl}
+👤 **የመግቢያ ስም (Username):** \`${username}\`
+🔑 **ጊዜያዊ የይለፍ ቃል (Initial Password):** \`${tempPassword}\`
+⚠️ *ማሳሰቢያ፦ ለመጀመሪያ ጊዜ ሲገቡ አዲስ ቋሚ የይለፍ ቃል እንዲመርጡ ይጠየቃሉ።*
+
+ወይም በ 1-ክሊክ ያለምንም የይለፍ ቃል በቀጥታ ለማስተካከል፦
+👉 ${setupUrl}
+━━━━━━━━━━━━━━━━━━━━━━
+📦 **በቴሌግራም ቦት ለመቆጣጠር (Telegram Quick Commands):**
+1️⃣ 15ቱን ዋና ዋና መድኃኒቶች ለመጫን 👉 **/import_checklist**
 2️⃣ መደርደሪያዎን ለማየትና ለመቆጣጠር 👉 **/inventory**
 3️⃣ አዲስ መድኃኒት ለመጨመር 👉 **/add <ስም> <ዋጋ>** (ምሳሌ፦ \`/add Amoxicillin 85\`)
-4️⃣ ወይም የExcel ፋይልዎን ለመጫን ከታች ያለውን የWeb Studio ሊንክ ይጠቀሙ 👇
 ━━━━━━━━━━━━━━━━━━━━━━
 ማስታወሻ፦ ${adminNotes || 'CoC verified against EFDA iRIS registry.'}
 `;
@@ -2558,22 +2576,12 @@ Send **"Confirm"** to submit to the EFDA Compliance Desk.`;
         };
 
         if (status === 'APPROVED') {
-          if (webStudioUrl.startsWith('https://') || (webStudioUrl.startsWith('http://') && !webStudioUrl.includes('localhost'))) {
-            payload.reply_markup = {
-              inline_keyboard: [
-                [{ text: '🖥️ Open Web Pharmacy Studio (Excel & Bulk)', url: webStudioUrl }]
-              ]
-            };
-          } else {
-            payload.reply_markup = {
-              keyboard: [
-                [{ text: '/inventory' }, { text: '/import_checklist' }],
-                [{ text: '➕ /add Amoxicillin 85' }],
-                [{ text: '/start' }]
-              ],
-              resize_keyboard: true,
-            };
-          }
+          payload.reply_markup = {
+            inline_keyboard: [
+              [{ text: '🏥 Open Pharmacy Studio PWA', url: setupUrl }],
+              [{ text: '🌐 Direct Portal URL (/pharmacy)', url: portalUrl }]
+            ]
+          };
         } else if (status === 'INFO_REQUESTED') {
           payload.reply_markup = {
             keyboard: [

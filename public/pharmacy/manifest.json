@@ -1,0 +1,25 @@
+{
+  "name": "MedFinder Ethiopia - Pharmacy Studio",
+  "short_name": "MedFinder Studio",
+  "description": "Professional Pharmacy Inventory, Voucher Verification & EFDA Compliance PWA for Ethiopian Pharmacies",
+  "start_url": "/pharmacy/",
+  "scope": "/pharmacy/",
+  "display": "standalone",
+  "background_color": "#0f172a",
+  "theme_color": "#059669",
+  "orientation": "portrait-primary",
+  "icons": [
+    {
+      "src": "data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 192 192'><rect width='192' height='192' rx='40' fill='%23059669'/><path d='M96 40 v112 M40 96 h112' stroke='white' stroke-width='24' stroke-linecap='round'/></svg>",
+      "sizes": "192x192",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 512 512'><rect width='512' height='512' rx='100' fill='%23059669'/><path d='M256 100 v312 M100 256 h312' stroke='white' stroke-width='60' stroke-linecap='round'/></svg>",
+      "sizes": "512x512",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}

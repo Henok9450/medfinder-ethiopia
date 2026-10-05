@@ -1,0 +1,1323 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>MedFinder Ethiopia - Pharmacy Studio (PWA)</title>
+
+  <!-- PWA & Mobile Meta Tags -->
+  <link rel="manifest" href="/pharmacy/manifest.json">
+  <meta name="theme-color" content="#059669">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="MedFinder Studio">
+  <link rel="apple-touch-icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 192 192'><rect width='192' height='192' rx='40' fill='%23059669'/><path d='M96 40 v112 M40 96 h112' stroke='white' stroke-width='24' stroke-linecap='round'/></svg>">
+
+  <!-- CDNs: Tailwind, SheetJS, FontAwesome -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://cdn.sheetjs.com/xlsx-0.20.2/package/dist/xlsx.full.min.js"></script>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          colors: {
+            brand: {
+              50: '#ecfdf5',
+              100: '#d1fae5',
+              500: '#10b981',
+              600: '#059669',
+              700: '#047857',
+              800: '#065f46',
+            }
+          }
+        }
+      }
+    }
+  </script>
+
+  <style>
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+      -webkit-tap-highlight-color: transparent;
+    }
+    .hide-scrollbar::-webkit-scrollbar { display: none; }
+    .hide-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+  </style>
+</head>
+<body class="bg-slate-50 text-slate-800 antialiased min-h-screen flex flex-col">
+
+  <!-- ============================================================== -->
+  <!-- TOP NAVIGATION & STATUS BAR                                    -->
+  <!-- ============================================================== -->
+  <header class="bg-slate-900 text-white sticky top-0 z-40 shadow-md">
+    <div class="max-w-7xl mx-auto px-4 py-3 flex items-center justify-between">
+      
+      <!-- Logo & PWA Badge -->
+      <div class="flex items-center space-x-3">
+        <a href="/pharmacy" class="flex items-center space-x-2.5">
+          <div class="w-10 h-10 rounded-xl bg-gradient-to-tr from-emerald-600 to-teal-500 flex items-center justify-center text-white shadow-md">
+            <i class="fa-solid fa-mortar-pestle text-lg"></i>
+          </div>
+          <div>
+            <div class="flex items-center gap-1.5">
+              <span class="font-extrabold text-base tracking-tight text-white">MedFinder</span>
+              <span class="text-[10px] font-bold bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 px-2 py-0.5 rounded-full uppercase tracking-wider">Studio PWA</span>
+            </div>
+            <p class="text-[11px] text-slate-400">Ethiopia Pharmacy Counter Portal</p>
+          </div>
+        </a>
+      </div>
+
+      <!-- Right Header Actions (Online Status, Install PWA, Auth Info) -->
+      <div class="flex items-center space-x-2">
+        <!-- Online/Offline Indicator -->
+        <span id="connectionBadge" class="hidden sm:inline-flex items-center gap-1 text-[11px] font-medium px-2 py-0.5 rounded-full bg-emerald-950 text-emerald-400 border border-emerald-800">
+          <span class="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span>
+          <span>Online</span>
+        </span>
+
+        <!-- PWA Install Button (Prompted if available) -->
+        <button id="pwaInstallBtn" onclick="installPWA()" class="hidden bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold px-3 py-1.5 rounded-lg shadow transition items-center gap-1.5">
+          <i class="fa-solid fa-download text-[11px]"></i>
+          <span>Install App</span>
+        </button>
+
+        <!-- Authenticated User Profile Dropdown / Logout -->
+        <div id="authHeaderControls" class="hidden items-center space-x-2">
+          <div class="text-right hidden md:block">
+            <span id="headerPharmName" class="text-xs font-bold text-white block">Pharmacy Partner</span>
+            <span id="headerSubCity" class="text-[10px] text-emerald-400">Addis Ababa</span>
+          </div>
+          <button onclick="logoutPharmacy()" title="Sign Out" class="text-xs text-slate-300 hover:text-white bg-slate-800 hover:bg-slate-700 p-2 rounded-lg transition">
+            <i class="fa-solid fa-arrow-right-from-bracket"></i>
+          </button>
+        </div>
+
+        <!-- Back to Public Medicine Locator link -->
+        <a href="/" target="_blank" title="Open Patient Search Locator" class="text-xs text-slate-400 hover:text-slate-200 px-2.5 py-1.5 rounded-lg border border-slate-800 hover:bg-slate-800 transition flex items-center gap-1">
+          <i class="fa-solid fa-magnifying-glass text-[10px]"></i>
+          <span class="hidden sm:inline">Patient Search</span>
+        </a>
+      </div>
+    </div>
+  </header>
+
+  <!-- OFFLINE FLOATING WARNING BANNER (Shows when network drops) -->
+  <div id="offlineNotice" class="hidden bg-amber-500 text-slate-950 text-xs font-bold py-1.5 px-4 text-center sticky top-[57px] z-30 shadow-sm flex items-center justify-center gap-2">
+    <i class="fa-solid fa-wifi"></i>
+    <span>Working Offline: Local shelf cache active. Changes will synchronize when connection restores.</span>
+  </div>
+
+  <!-- MAIN CONTAINER -->
+  <main class="flex-1 max-w-7xl w-full mx-auto p-4 md:p-6 space-y-6">
+
+    <!-- ============================================================== -->
+    <!-- VIEW 1: AUTHENTICATION CONTAINER (LOGIN & 1-CLICK SETUP)       -->
+    <!-- ============================================================== -->
+    <section id="authSection" class="max-w-md mx-auto my-8 space-y-6">
+      
+      <!-- Card Container -->
+      <div class="bg-white p-6 sm:p-8 rounded-3xl border border-slate-200 shadow-xl space-y-6">
+        
+        <div class="text-center space-y-2">
+          <div class="w-14 h-14 rounded-2xl bg-emerald-50 text-emerald-700 flex items-center justify-center text-2xl mx-auto shadow-inner border border-emerald-100">
+            <i class="fa-solid fa-shield-halved"></i>
+          </div>
+          <h2 id="authHeading" class="text-xl font-extrabold text-slate-900 tracking-tight">Pharmacy Studio Login</h2>
+          <p id="authSubheading" class="text-xs text-slate-500">Sign in with your verified credentials or 1-click Telegram setup token.</p>
+        </div>
+
+        <!-- AUTH TABS: Sign In vs 1-Click Setup -->
+        <div class="flex p-1 bg-slate-100 rounded-xl text-xs font-semibold">
+          <button id="tabBtnLogin" onclick="switchAuthMode('login')" class="flex-1 py-2 rounded-lg bg-white shadow-sm text-slate-900 transition">
+            Password Login
+          </button>
+          <button id="tabBtnSetup" onclick="switchAuthMode('setup')" class="flex-1 py-2 rounded-lg text-slate-500 hover:text-slate-800 transition">
+            1-Click Setup Token
+          </button>
+        </div>
+
+        <!-- FORM A: STANDARD USERNAME & PASSWORD -->
+        <form id="loginForm" onsubmit="handleLoginSubmit(event)" class="space-y-4">
+          <div>
+            <label class="block text-xs font-medium text-slate-600 mb-1">Username / የስራ መታወቂያ ስም</label>
+            <div class="relative">
+              <i class="fa-solid fa-user absolute left-3.5 top-3 text-slate-400 text-xs"></i>
+              <input type="text" id="loginUsername" required placeholder="e.g. kenema_bole_412" class="w-full text-xs pl-9 pr-3 py-2.5 rounded-xl border border-slate-300 focus:ring-2 focus:ring-emerald-500 outline-none">
+            </div>
+          </div>
+
+          <div>
+            <label class="block text-xs font-medium text-slate-600 mb-1">Password / የይለፍ ቃል</label>
+            <div class="relative">
+              <i class="fa-solid fa-lock absolute left-3.5 top-3 text-slate-400 text-xs"></i>
+              <input type="password" id="loginPassword" required placeholder="Initial password from Telegram" class="w-full text-xs pl-9 pr-10 py-2.5 rounded-xl border border-slate-300 focus:ring-2 focus:ring-emerald-500 outline-none">
+              <button type="button" onclick="togglePasswordVisibility('loginPassword', 'eyeIcon1')" class="absolute right-3 top-3 text-slate-400 hover:text-slate-600 text-xs">
+                <i id="eyeIcon1" class="fa-solid fa-eye"></i>
+              </button>
+            </div>
+          </div>
+
+          <div id="loginAlertBox" class="hidden p-3 rounded-xl text-xs"></div>
+
+          <button type="submit" id="loginSubmitBtn" class="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs py-3 rounded-xl shadow-md transition flex items-center justify-center space-x-2">
+            <i class="fa-solid fa-arrow-right-to-bracket"></i>
+            <span>Sign In to Studio</span>
+          </button>
+        </form>
+
+        <!-- FORM B: 1-CLICK ACTIVATION VIA SETUP TOKEN -->
+        <form id="setupForm" onsubmit="handleSetupSubmit(event)" class="hidden space-y-4">
+          <div class="p-3 bg-sky-50 border border-sky-200 rounded-xl text-sky-900 text-xs flex items-start space-x-2">
+            <i class="fa-solid fa-circle-info text-sky-600 mt-0.5"></i>
+            <span>Enter the 24-hour setup token sent by <strong>@MedFinder_Verifier_bot</strong> upon EFDA approval.</span>
+          </div>
+
+          <div>
+            <label class="block text-xs font-medium text-slate-600 mb-1">Setup Token / የማግበሪያ ቁጥር</label>
+            <input type="text" id="setupTokenInput" required placeholder="Paste token from Telegram link" class="w-full text-xs px-3 py-2.5 rounded-xl border border-slate-300 font-mono focus:ring-2 focus:ring-emerald-500 outline-none">
+          </div>
+
+          <div>
+            <label class="block text-xs font-medium text-slate-600 mb-1">Choose Permanent Password / ቋሚ የይለፍ ቃል</label>
+            <input type="password" id="setupNewPassword" required minlength="8" placeholder="Minimum 8 characters" class="w-full text-xs px-3 py-2.5 rounded-xl border border-slate-300 focus:ring-2 focus:ring-emerald-500 outline-none">
+          </div>
+
+          <div>
+            <label class="block text-xs font-medium text-slate-600 mb-1">Optional: Custom Username</label>
+            <input type="text" id="setupCustomUsername" placeholder="e.g. aster_pharmacy" class="w-full text-xs px-3 py-2.5 rounded-xl border border-slate-300 focus:ring-2 focus:ring-emerald-500 outline-none">
+          </div>
+
+          <div id="setupAlertBox" class="hidden p-3 rounded-xl text-xs"></div>
+
+          <button type="submit" id="setupSubmitBtn" class="w-full bg-slate-900 hover:bg-black text-white font-bold text-xs py-3 rounded-xl shadow-md transition flex items-center justify-center space-x-2">
+            <i class="fa-solid fa-key text-emerald-400"></i>
+            <span>Set Password & Activate Portal</span>
+          </button>
+        </form>
+
+        <!-- Bottom Assistance Callout -->
+        <div class="pt-4 border-t border-slate-100 text-center space-y-2">
+          <p class="text-[11px] text-slate-500">
+            Need an account? Only verified Ethiopian pharmacies can access this Studio.
+          </p>
+          <a href="https://t.me/MedFinder_Verifier_bot?start=verify" target="_blank" class="inline-flex items-center space-x-1.5 text-xs font-bold text-sky-700 hover:underline">
+            <i class="fa-brands fa-telegram"></i>
+            <span>Register & Verify on @MedFinder_Verifier_bot</span>
+          </a>
+        </div>
+      </div>
+    </section>
+
+    <!-- ============================================================== -->
+    <!-- VIEW 2: AUTHENTICATED PHARMACY STUDIO DASHBOARD                -->
+    <!-- ============================================================== -->
+    <section id="studioDashboard" class="hidden space-y-6">
+
+      <!-- TOP PHARMACY HERO CARD -->
+      <div class="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm flex flex-wrap items-center justify-between gap-4">
+        <div class="flex items-center space-x-4">
+          <div class="w-14 h-14 rounded-2xl bg-emerald-100 text-emerald-700 flex items-center justify-center text-2xl shadow-inner">
+            <i class="fa-solid fa-clinic-medical"></i>
+          </div>
+          <div>
+            <div class="flex flex-wrap items-center gap-2">
+              <h1 id="dashPharmName" class="text-lg md:text-xl font-extrabold text-slate-900 tracking-tight">Active Pharmacy</h1>
+              <span id="dashEfdaBadge" class="text-xs bg-emerald-100 text-emerald-800 font-bold px-2.5 py-0.5 rounded-full flex items-center gap-1">
+                <i class="fa-solid fa-shield-halved text-[10px]"></i> EFDA Verified
+              </span>
+              <span id="dashTrustBadge" class="text-xs bg-amber-50 text-amber-800 border border-amber-200 font-bold px-2.5 py-0.5 rounded-full">
+                ★ 98% Trust Score
+              </span>
+            </div>
+            <p class="text-xs text-slate-500 mt-1">
+              📍 <span id="dashSubCity">Addis Ababa</span> • License: <strong id="dashLicenseTxt" class="font-mono text-slate-700">EFDA-AA-2025</strong> • TIN: <span id="dashTinTxt" class="font-mono text-slate-700">—</span>
+            </p>
+          </div>
+        </div>
+
+        <!-- Quick Summary Metrics -->
+        <div class="flex items-center space-x-3">
+          <div class="bg-slate-50 px-3.5 py-2 rounded-xl border border-slate-200 text-right">
+            <span class="text-[10px] text-slate-400 uppercase font-semibold block">Total Catalog</span>
+            <strong id="dashShelfCount" class="text-base font-extrabold text-slate-900">0 Items</strong>
+          </div>
+          <div class="bg-slate-50 px-3.5 py-2 rounded-xl border border-slate-200 text-right">
+            <span class="text-[10px] text-slate-400 uppercase font-semibold block">Compliance</span>
+            <strong id="dashStrikesTxt" class="text-base font-extrabold text-emerald-600">0 / 3 Strikes</strong>
+          </div>
+        </div>
+      </div>
+
+      <!-- STUDIO TABS NAVIGATION -->
+      <div class="flex space-x-2 border-b border-slate-200 overflow-x-auto hide-scrollbar">
+        <button onclick="switchStudioTab('inventory')" id="tabNavInventory" class="px-4 py-2.5 text-xs font-bold border-b-2 border-emerald-600 text-emerald-700 whitespace-nowrap transition flex items-center gap-1.5">
+          <i class="fa-solid fa-boxes-stacked"></i>
+          <span>Shelf Inventory & Pricing</span>
+        </button>
+        <button onclick="switchStudioTab('vouchers')" id="tabNavVouchers" class="px-4 py-2.5 text-xs font-semibold border-b-2 border-transparent text-slate-500 hover:text-slate-900 whitespace-nowrap transition flex items-center gap-1.5">
+          <i class="fa-solid fa-ticket"></i>
+          <span>Hold Vouchers Verification</span>
+        </button>
+        <button onclick="switchStudioTab('broadcasts')" id="tabNavBroadcasts" class="px-4 py-2.5 text-xs font-semibold border-b-2 border-transparent text-slate-500 hover:text-slate-900 whitespace-nowrap transition flex items-center gap-1.5">
+          <i class="fa-solid fa-tower-broadcast text-amber-500"></i>
+          <span>Patient Broadcast Inquiries</span>
+        </button>
+        <button onclick="switchStudioTab('regulatory')" id="tabNavRegulatory" class="px-4 py-2.5 text-xs font-semibold border-b-2 border-transparent text-slate-500 hover:text-slate-900 whitespace-nowrap transition flex items-center gap-1.5">
+          <i class="fa-solid fa-scale-balanced"></i>
+          <span>EFDA & Telegram Alerts</span>
+        </button>
+      </div>
+
+      <!-- ============================================================ -->
+      <!-- TAB 1: SHELF INVENTORY & PRICING LEDGER                      -->
+      <!-- ============================================================ -->
+      <div id="panelInventory" class="space-y-6">
+
+        <!-- 3 REGISTRATION METHODS CARDS -->
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+          
+          <!-- Method 1: 1-Click Master Checklist -->
+          <div class="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm flex flex-col justify-between space-y-4">
+            <div>
+              <div class="w-10 h-10 rounded-xl bg-emerald-50 text-emerald-700 flex items-center justify-center text-lg mb-3">
+                <i class="fa-solid fa-list-check"></i>
+              </div>
+              <h3 class="font-bold text-sm text-slate-900">1-Click Master Catalog</h3>
+              <p class="text-xs text-slate-500 mt-1">
+                Select from Ethiopia's top 15 essential medicines (Amoxicillin, Insulin, Paracetamol, etc.) and save immediately.
+              </p>
+            </div>
+            <button onclick="openMasterChecklistModal()" class="w-full bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold py-2.5 rounded-xl transition shadow-sm flex items-center justify-center space-x-1.5">
+              <i class="fa-solid fa-wand-magic-sparkles"></i>
+              <span>Select from Catalog</span>
+            </button>
+          </div>
+
+          <!-- Method 2: Single Medicine Direct Add -->
+          <div class="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm flex flex-col justify-between space-y-4">
+            <div>
+              <div class="w-10 h-10 rounded-xl bg-sky-50 text-sky-700 flex items-center justify-center text-lg mb-3">
+                <i class="fa-solid fa-circle-plus"></i>
+              </div>
+              <h3 class="font-bold text-sm text-slate-900">Add Single Medicine</h3>
+              <p class="text-xs text-slate-500 mt-1">
+                Manually enter a specialty brand, dosage, generic classification, and your locked retail price in ETB.
+              </p>
+            </div>
+            <button onclick="openSingleAddModal()" class="w-full bg-sky-600 hover:bg-sky-700 text-white text-xs font-bold py-2.5 rounded-xl transition shadow-sm flex items-center justify-center space-x-1.5">
+              <i class="fa-solid fa-plus"></i>
+              <span>Add Single Medicine</span>
+            </button>
+          </div>
+
+          <!-- Method 3: Bulk Spreadsheet / CSV Upload -->
+          <div class="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm flex flex-col justify-between space-y-4">
+            <div>
+              <div class="w-10 h-10 rounded-xl bg-amber-50 text-amber-700 flex items-center justify-center text-lg mb-3">
+                <i class="fa-solid fa-file-excel"></i>
+              </div>
+              <h3 class="font-bold text-sm text-slate-900">Spreadsheet / CSV Batch</h3>
+              <p class="text-xs text-slate-500 mt-1">
+                Upload your POS export or Excel spreadsheet (.xlsx, .csv) with automatic column auto-mapping.
+              </p>
+            </div>
+            <button onclick="openCsvModal()" class="w-full bg-slate-900 hover:bg-black text-white text-xs font-bold py-2.5 rounded-xl transition shadow-sm flex items-center justify-center space-x-1.5">
+              <i class="fa-solid fa-upload"></i>
+              <span>Import Excel / CSV</span>
+            </button>
+          </div>
+        </div>
+
+        <!-- LIVE SHELF TABLE -->
+        <div class="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+          <div class="p-4 bg-slate-50 border-b border-slate-200 flex flex-wrap items-center justify-between gap-3">
+            <div class="flex items-center space-x-2">
+              <i class="fa-solid fa-pills text-emerald-600"></i>
+              <h3 class="font-bold text-sm text-slate-900">Live Shelf Inventory Ledger</h3>
+              <span id="shelfLedgerBadge" class="text-[10px] font-bold bg-emerald-100 text-emerald-800 px-2 py-0.5 rounded-full">0 Items</span>
+            </div>
+            <div class="flex items-center space-x-2">
+              <input type="text" id="filterInventoryInput" onkeyup="filterInventoryTable()" placeholder="Search registered shelf..." class="text-xs px-3 py-1.5 border border-slate-300 rounded-lg outline-none w-48 sm:w-64 bg-white">
+              <button onclick="loadPharmacyInventory()" class="text-xs bg-white hover:bg-slate-100 text-slate-700 font-semibold px-3 py-1.5 border border-slate-300 rounded-lg transition">
+                <i class="fa-solid fa-rotate-right"></i>
+              </button>
+            </div>
+          </div>
+
+          <div class="overflow-x-auto">
+            <table class="w-full text-left text-xs">
+              <thead class="bg-slate-100 text-slate-600 font-semibold border-b border-slate-200">
+                <tr>
+                  <th class="p-3.5">Medicine Name</th>
+                  <th class="p-3.5">Generic / Category</th>
+                  <th class="p-3.5">Retail Price (ETB)</th>
+                  <th class="p-3.5">Counter Status</th>
+                  <th class="p-3.5 text-right">Actions</th>
+                </tr>
+              </thead>
+              <tbody id="inventoryTableBody" class="divide-y divide-slate-100 bg-white">
+                <tr>
+                  <td colspan="5" class="p-8 text-center text-slate-400">Loading shelf inventory...</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <!-- ============================================================ -->
+      <!-- TAB 2: PATIENT HOLD VOUCHERS VERIFICATION DESK               -->
+      <!-- ============================================================ -->
+      <div id="panelVouchers" class="hidden space-y-6">
+        <div class="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm space-y-6 max-w-2xl mx-auto">
+          
+          <div class="text-center space-y-2">
+            <div class="w-12 h-12 rounded-xl bg-gradient-to-tr from-emerald-500 to-teal-600 text-white flex items-center justify-center text-xl mx-auto shadow-md">
+              <i class="fa-solid fa-qrcode"></i>
+            </div>
+            <h3 class="text-base font-bold text-slate-900">Verify Patient 60-Minute Price-Lock Voucher</h3>
+            <p class="text-xs text-slate-500">When a customer arrives at the counter with a hold code from Telegram, verify and mark it fulfilled here.</p>
+          </div>
+
+          <form onsubmit="handleVoucherVerify(event)" class="space-y-4">
+            <div>
+              <label class="block text-xs font-semibold text-slate-700 mb-1">Enter 4-Digit Voucher Hold Code (e.g. 7482)</label>
+              <div class="flex gap-2">
+                <input type="text" id="voucherCodeInput" required placeholder="#7482" maxlength="6" class="flex-1 text-center font-mono text-xl font-extrabold tracking-widest px-4 py-3 rounded-xl border border-slate-300 uppercase focus:ring-2 focus:ring-emerald-500 outline-none">
+                <button type="submit" class="bg-slate-900 hover:bg-black text-white text-xs font-bold px-6 py-3 rounded-xl shadow-md transition flex items-center gap-1.5">
+                  <i class="fa-solid fa-circle-check text-emerald-400"></i>
+                  <span>Verify Voucher</span>
+                </button>
+              </div>
+            </div>
+          </form>
+
+          <div id="voucherResultBox" class="hidden p-4 rounded-xl text-xs space-y-2 border"></div>
+        </div>
+      </div>
+
+      <!-- ============================================================ -->
+      <!-- TAB 3: PATIENT BROADCAST INQUIRIES RADAR                     -->
+      <!-- ============================================================ -->
+      <div id="panelBroadcasts" class="hidden space-y-6">
+        <div class="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm space-y-4">
+          <div class="flex items-center justify-between pb-3 border-b border-slate-100">
+            <div class="flex items-center space-x-2">
+              <i class="fa-solid fa-tower-broadcast text-amber-500 text-base"></i>
+              <h3 class="font-bold text-sm text-slate-900">Live Patient Broadcast Pings (Rare / Elusive Drugs)</h3>
+            </div>
+            <button onclick="loadActiveBroadcasts()" class="text-xs text-emerald-700 font-semibold hover:underline">
+              <i class="fa-solid fa-rotate-right mr-1"></i> Refresh Radar
+            </button>
+          </div>
+          <p class="text-xs text-slate-500">
+            Patients who cannot find rare medications in their sub-city trigger an immediate alert to nearby pharmacies. Quote your price to capture the customer immediately.
+          </p>
+
+          <div id="broadcastsContainer" class="space-y-3">
+            <div class="text-center py-8 text-slate-400 text-xs">
+              No pending broadcast inquiries in your sub-city right now.
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ============================================================ -->
+      <!-- TAB 4: EFDA REGULATORY COMPLIANCE & TELEGRAM ALERTS         -->
+      <!-- ============================================================ -->
+      <div id="panelRegulatory" class="hidden space-y-6">
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+
+          <!-- EFDA Compliance Dossier -->
+          <div class="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm space-y-4">
+            <h3 class="font-bold text-sm text-slate-900 flex items-center space-x-2">
+              <i class="fa-solid fa-scale-balanced text-emerald-600"></i>
+              <span>EFDA Regulatory Credential Dossier</span>
+            </h3>
+            
+            <div class="space-y-3 text-xs">
+              <div class="flex justify-between py-2 border-b border-slate-100">
+                <span class="text-slate-500">EFDA License Number:</span>
+                <strong id="regEfdaLicense" class="font-mono text-slate-800">EFDA-AA-2025</strong>
+              </div>
+              <div class="flex justify-between py-2 border-b border-slate-100">
+                <span class="text-slate-500">Ethiopian TIN Number:</span>
+                <strong id="regTinNumber" class="font-mono text-slate-800">—</strong>
+              </div>
+              <div class="flex justify-between py-2 border-b border-slate-100">
+                <span class="text-slate-500">Platform Trust Score:</span>
+                <strong id="regTrustScore" class="text-emerald-700 font-bold">★ 98% (High Trust)</strong>
+              </div>
+              <div class="flex justify-between py-2 border-b border-slate-100">
+                <span class="text-slate-500">Regulatory Strikes (3-Strike Rule):</span>
+                <strong id="regStrikes" class="text-emerald-700 font-bold">0 / 3 Strikes (Clean)</strong>
+              </div>
+            </div>
+
+            <div class="p-3 bg-emerald-50 border border-emerald-200 rounded-xl text-emerald-900 text-[11px] flex items-center space-x-2">
+              <i class="fa-solid fa-circle-check text-base text-emerald-600"></i>
+              <span>Your pharmacy is verified in the national registry and elevated in nearby patient search queries.</span>
+            </div>
+          </div>
+
+          <!-- Telegram Verification Bot Alerts Link -->
+          <div class="bg-gradient-to-br from-sky-600 to-indigo-800 text-white p-6 rounded-2xl shadow-md flex flex-col justify-between space-y-4">
+            <div class="space-y-2">
+              <div class="flex items-center space-x-2">
+                <i class="fa-brands fa-telegram text-2xl text-sky-200"></i>
+                <h3 class="font-bold text-base">Dedicated Telegram Bot Channel</h3>
+              </div>
+              <p class="text-xs text-sky-100 leading-relaxed">
+                Connect directly with <strong>@MedFinder_Verifier_bot</strong> to receive instant mobile push alerts when customers reserve medicines at your counter.
+              </p>
+            </div>
+
+            <div class="space-y-2 pt-2">
+              <a href="https://t.me/MedFinder_Verifier_bot?start=inventory" target="_blank" class="w-full bg-white text-sky-900 hover:bg-sky-50 text-xs font-bold py-2.5 rounded-xl transition shadow flex items-center justify-center space-x-2">
+                <i class="fa-brands fa-telegram text-sky-600"></i>
+                <span>Open @MedFinder_Verifier_bot</span>
+              </a>
+              <button onclick="openChangePasswordModal()" class="w-full bg-sky-500/30 hover:bg-sky-500/40 text-white text-xs font-semibold py-2 rounded-xl border border-white/20 transition flex items-center justify-center space-x-1.5">
+                <i class="fa-solid fa-key text-xs"></i>
+                <span>Update Portal Password</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+    </section>
+
+  </main>
+
+  <!-- ============================================================== -->
+  <!-- MODAL 1: 1-CLICK MASTER ESSENTIAL DRUG CHECKLIST               -->
+  <!-- ============================================================== -->
+  <div id="masterChecklistModal" class="hidden fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4">
+    <div class="bg-white rounded-3xl max-w-2xl w-full max-h-[90vh] flex flex-col shadow-2xl overflow-hidden border border-slate-200">
+      <div class="p-5 border-b border-slate-100 flex items-center justify-between bg-slate-50">
+        <div>
+          <h3 class="font-extrabold text-sm text-slate-900">Select Essential Medicines to Register</h3>
+          <p class="text-xs text-slate-500">Ethiopian standard essential medicine catalog</p>
+        </div>
+        <button onclick="closeModal('masterChecklistModal')" class="text-slate-400 hover:text-slate-700 text-lg px-2">
+          <i class="fa-solid fa-xmark"></i>
+        </button>
+      </div>
+
+      <div class="p-3 bg-slate-100 border-b border-slate-200 flex justify-between items-center text-xs px-5">
+        <span class="text-slate-600 font-medium">Tick medicines available in your shelf today:</span>
+        <div class="space-x-2">
+          <button onclick="toggleSelectAllChecklist(true)" class="text-emerald-700 hover:underline font-semibold">Select All</button>
+          <span>•</span>
+          <button onclick="toggleSelectAllChecklist(false)" class="text-slate-500 hover:underline">Clear All</button>
+        </div>
+      </div>
+
+      <div class="p-5 overflow-y-auto space-y-2 flex-1" id="masterChecklistItemsContainer">
+        <!-- Rendered dynamically -->
+      </div>
+
+      <div class="p-4 border-t border-slate-100 bg-slate-50 flex items-center justify-between">
+        <span class="text-xs text-slate-500">Prices are pre-filled with standard Addis Ababa ranges</span>
+        <div class="space-x-2">
+          <button onclick="closeModal('masterChecklistModal')" class="px-4 py-2 text-xs font-semibold text-slate-600 hover:bg-slate-200 rounded-lg">Cancel</button>
+          <button onclick="submitChecklistImport()" class="px-5 py-2 text-xs font-bold bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl shadow transition">Save to Shelf</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ============================================================== -->
+  <!-- MODAL 2: ADD SINGLE MEDICINE                                   -->
+  <!-- ============================================================== -->
+  <div id="singleAddModal" class="hidden fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4">
+    <div class="bg-white rounded-3xl max-w-md w-full p-6 shadow-2xl border border-slate-200 space-y-4">
+      <div class="flex items-center justify-between pb-3 border-b border-slate-100">
+        <h3 class="font-extrabold text-sm text-slate-900">Add Medicine to Counter Shelf</h3>
+        <button onclick="closeModal('singleAddModal')" class="text-slate-400 hover:text-slate-700 text-lg">
+          <i class="fa-solid fa-xmark"></i>
+        </button>
+      </div>
+
+      <form onsubmit="handleSingleAddSubmit(event)" class="space-y-3 text-xs">
+        <div>
+          <label class="block font-medium text-slate-600 mb-1">Brand or Trade Name</label>
+          <input type="text" id="singleMedName" required placeholder="e.g. Ventolin Inhaler 100mcg" class="w-full text-xs px-3 py-2 border border-slate-300 rounded-xl outline-none focus:ring-2 focus:ring-emerald-500">
+        </div>
+        <div>
+          <label class="block font-medium text-slate-600 mb-1">Generic Name (INN)</label>
+          <input type="text" id="singleGenericName" placeholder="e.g. Salbutamol" class="w-full text-xs px-3 py-2 border border-slate-300 rounded-xl outline-none focus:ring-2 focus:ring-emerald-500">
+        </div>
+        <div class="grid grid-cols-2 gap-2">
+          <div>
+            <label class="block font-medium text-slate-600 mb-1">Category</label>
+            <select id="singleCategory" class="w-full text-xs px-3 py-2 border border-slate-300 rounded-xl outline-none">
+              <option value="General">General</option>
+              <option value="Antibiotics">Antibiotics</option>
+              <option value="Diabetes">Diabetes</option>
+              <option value="Cardiovascular">Cardiovascular</option>
+              <option value="Respiratory">Respiratory</option>
+              <option value="Pain Management">Pain Management</option>
+            </select>
+          </div>
+          <div>
+            <label class="block font-medium text-slate-600 mb-1">Price (ETB)</label>
+            <input type="number" id="singlePriceETB" required min="1" step="0.5" placeholder="e.g. 250" class="w-full text-xs px-3 py-2 border border-slate-300 rounded-xl outline-none focus:ring-2 focus:ring-emerald-500 font-bold">
+          </div>
+        </div>
+
+        <div class="pt-3 flex justify-end space-x-2">
+          <button type="button" onclick="closeModal('singleAddModal')" class="px-4 py-2 text-xs font-semibold text-slate-600 hover:bg-slate-100 rounded-lg">Cancel</button>
+          <button type="submit" class="px-5 py-2 text-xs font-bold bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl shadow transition">Save Item</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- ============================================================== -->
+  <!-- MODAL 3: EXCEL / CSV BATCH SPREADSHEET IMPORT                  -->
+  <!-- ============================================================== -->
+  <div id="csvModal" class="hidden fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4">
+    <div class="bg-white rounded-3xl max-w-xl w-full p-6 shadow-2xl border border-slate-200 space-y-4">
+      <div class="flex items-center justify-between pb-3 border-b border-slate-100">
+        <h3 class="font-extrabold text-sm text-slate-900">Upload Inventory Spreadsheet (.xlsx / .csv)</h3>
+        <button onclick="closeModal('csvModal')" class="text-slate-400 hover:text-slate-700 text-lg">
+          <i class="fa-solid fa-xmark"></i>
+        </button>
+      </div>
+
+      <div class="space-y-3 text-xs">
+        <p class="text-slate-500">File should have columns: <code>Name</code>, <code>Price</code> (and optionally <code>Category</code>).</p>
+        <div class="border-2 border-dashed border-slate-300 hover:border-emerald-500 rounded-2xl p-6 text-center cursor-pointer transition" onclick="document.getElementById('csvFileInput').click()">
+          <input type="file" id="csvFileInput" accept=".csv, .xlsx, .xls" class="hidden" onchange="handleSpreadsheetSelected(event)">
+          <i class="fa-solid fa-file-excel text-3xl text-emerald-600 mb-2"></i>
+          <p class="font-semibold text-slate-700">Click to choose Excel or CSV spreadsheet</p>
+          <p class="text-[11px] text-slate-400 mt-1">Supports drag & drop from computer or phone</p>
+        </div>
+
+        <div id="csvPreviewBox" class="hidden max-h-48 overflow-y-auto border border-slate-200 rounded-xl p-2 bg-slate-50">
+          <table class="w-full text-left text-[11px]">
+            <thead class="text-slate-500 border-b">
+              <tr><th class="p-1">Name</th><th class="p-1">Category</th><th class="p-1">Price (ETB)</th></tr>
+            </thead>
+            <tbody id="csvPreviewTbody"></tbody>
+          </table>
+        </div>
+      </div>
+
+      <div class="pt-3 border-t border-slate-100 flex justify-end space-x-2">
+        <button onclick="closeModal('csvModal')" class="px-4 py-2 text-xs font-semibold text-slate-600 hover:bg-slate-100 rounded-lg">Cancel</button>
+        <button id="commitImportBtn" disabled onclick="submitDirectFileImport()" class="px-5 py-2 text-xs font-bold bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 text-white rounded-xl shadow transition">
+          Import Medicines
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ============================================================== -->
+  <!-- MODAL 4: FORCED / OPTIONAL PASSWORD CHANGE                     -->
+  <!-- ============================================================== -->
+  <div id="changePasswordModal" class="hidden fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4">
+    <div class="bg-white rounded-3xl max-w-md w-full p-6 shadow-2xl border border-slate-200 space-y-4">
+      <div class="flex items-center justify-between pb-3 border-b border-slate-100">
+        <div>
+          <h3 id="pwdModalTitle" class="font-extrabold text-sm text-slate-900">Set Permanent Secure Password</h3>
+          <p class="text-[11px] text-slate-500">First-time login requires changing your temporary password.</p>
+        </div>
+      </div>
+
+      <form onsubmit="handleChangePasswordSubmit(event)" class="space-y-3 text-xs">
+        <div>
+          <label class="block font-medium text-slate-600 mb-1">Current Password (or Initial Temp Password)</label>
+          <input type="password" id="pwdCurrent" required placeholder="Enter current password" class="w-full text-xs px-3 py-2 border border-slate-300 rounded-xl outline-none focus:ring-2 focus:ring-emerald-500">
+        </div>
+        <div>
+          <label class="block font-medium text-slate-600 mb-1">New Permanent Password (min 8 chars)</label>
+          <input type="password" id="pwdNew" required minlength="8" placeholder="Create strong password" class="w-full text-xs px-3 py-2 border border-slate-300 rounded-xl outline-none focus:ring-2 focus:ring-emerald-500">
+        </div>
+        <div>
+          <label class="block font-medium text-slate-600 mb-1">Confirm New Password</label>
+          <input type="password" id="pwdConfirm" required minlength="8" placeholder="Re-type new password" class="w-full text-xs px-3 py-2 border border-slate-300 rounded-xl outline-none focus:ring-2 focus:ring-emerald-500">
+        </div>
+
+        <div id="pwdAlertBox" class="hidden p-3 rounded-xl text-xs"></div>
+
+        <div class="pt-3 flex justify-end space-x-2">
+          <button type="button" id="pwdCancelBtn" onclick="closeModal('changePasswordModal')" class="px-4 py-2 text-xs font-semibold text-slate-600 hover:bg-slate-100 rounded-lg">Cancel</button>
+          <button type="submit" class="px-5 py-2 text-xs font-bold bg-slate-900 hover:bg-black text-white rounded-xl shadow transition">Save Password</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- ============================================================== -->
+  <!-- JAVASCRIPT: PWA SERVICE WORKER, AUTH & STUDIO CONTROLLER       -->
+  <!-- ============================================================== -->
+  <script>
+    // --- STATE MANAGEMENT ---
+    let currentAuthSession = null; // { token, account, pharmacy, mustChangePassword }
+    let currentPharmacyInventory = [];
+    let masterCatalog = [];
+    let parsedFileItems = [];
+    let deferredPwaPrompt = null;
+
+    // --- PWA SERVICE WORKER REGISTRATION ---
+    if ('serviceWorker' in navigator) {
+      window.addEventListener('load', () => {
+        navigator.serviceWorker.register('/pharmacy/sw.js')
+          .then(reg => console.log('[PWA SW] Registered successfully:', reg.scope))
+          .catch(err => console.warn('[PWA SW] Registration failed:', err));
+      });
+    }
+
+    // Capture PWA Install Prompt
+    window.addEventListener('beforeinstallprompt', (e) => {
+      e.preventDefault();
+      deferredPwaPrompt = e;
+      const installBtn = document.getElementById('pwaInstallBtn');
+      if (installBtn) installBtn.classList.remove('hidden');
+    });
+
+    function installPWA() {
+      if (deferredPwaPrompt) {
+        deferredPwaPrompt.prompt();
+        deferredPwaPrompt.userChoice.then((choiceResult) => {
+          if (choiceResult.outcome === 'accepted') {
+            console.log('[PWA] User accepted install prompt');
+          }
+          deferredPwaPrompt = null;
+          document.getElementById('pwaInstallBtn').classList.add('hidden');
+        });
+      }
+    }
+
+    // Network connectivity listeners
+    window.addEventListener('online', updateNetworkStatus);
+    window.addEventListener('offline', updateNetworkStatus);
+
+    function updateNetworkStatus() {
+      const isOnline = navigator.onLine;
+      const badge = document.getElementById('connectionBadge');
+      const notice = document.getElementById('offlineNotice');
+      if (isOnline) {
+        if (badge) {
+          badge.className = 'hidden sm:inline-flex items-center gap-1 text-[11px] font-medium px-2 py-0.5 rounded-full bg-emerald-950 text-emerald-400 border border-emerald-800';
+          badge.innerHTML = `<span class="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span><span>Online</span>`;
+        }
+        if (notice) notice.classList.add('hidden');
+      } else {
+        if (badge) {
+          badge.className = 'inline-flex items-center gap-1 text-[11px] font-medium px-2 py-0.5 rounded-full bg-amber-950 text-amber-400 border border-amber-800';
+          badge.innerHTML = `<span class="w-1.5 h-1.5 rounded-full bg-amber-400"></span><span>Offline</span>`;
+        }
+        if (notice) notice.classList.remove('hidden');
+      }
+    }
+
+    // --- INITIALIZATION ---
+    window.addEventListener('DOMContentLoaded', async () => {
+      updateNetworkStatus();
+
+      // Check if URL has ?setupToken=...
+      const urlParams = new URLSearchParams(window.location.search);
+      const setupToken = urlParams.get('setupToken');
+
+      if (setupToken) {
+        switchAuthMode('setup');
+        document.getElementById('setupTokenInput').value = setupToken;
+        await verifyTokenDetails(setupToken);
+        return;
+      }
+
+      // Check existing saved session in localStorage
+      const savedToken = localStorage.getItem('medfinder_pharmacy_token');
+      if (savedToken) {
+        await restoreSession(savedToken);
+      } else {
+        showAuthView();
+      }
+    });
+
+    // --- AUTHENTICATION FLOWS ---
+    function switchAuthMode(mode) {
+      const tabLogin = document.getElementById('tabBtnLogin');
+      const tabSetup = document.getElementById('tabBtnSetup');
+      const formLogin = document.getElementById('loginForm');
+      const formSetup = document.getElementById('setupForm');
+
+      if (mode === 'login') {
+        tabLogin.className = 'flex-1 py-2 rounded-lg bg-white shadow-sm text-slate-900 transition font-bold';
+        tabSetup.className = 'flex-1 py-2 rounded-lg text-slate-500 hover:text-slate-800 transition';
+        formLogin.classList.remove('hidden');
+        formSetup.classList.add('hidden');
+        document.getElementById('authHeading').innerText = 'Pharmacy Studio Login';
+      } else {
+        tabSetup.className = 'flex-1 py-2 rounded-lg bg-white shadow-sm text-slate-900 transition font-bold';
+        tabLogin.className = 'flex-1 py-2 rounded-lg text-slate-500 hover:text-slate-800 transition';
+        formSetup.classList.remove('hidden');
+        formLogin.classList.add('hidden');
+        document.getElementById('authHeading').innerText = 'Activate Pharmacy Account';
+      }
+    }
+
+    async function verifyTokenDetails(token) {
+      try {
+        const res = await fetch(`/api/pharmacy/auth/verify-token?token=${encodeURIComponent(token)}`);
+        const data = await res.json();
+        const alertBox = document.getElementById('setupAlertBox');
+        if (data.success) {
+          alertBox.className = 'p-3 rounded-xl text-xs bg-emerald-50 text-emerald-800 border border-emerald-200';
+          alertBox.innerHTML = `✅ Token valid for <strong>${data.pharmacyName}</strong> (${data.subCity}). Set your password below.`;
+          alertBox.classList.remove('hidden');
+          if (data.username) {
+            document.getElementById('setupCustomUsername').value = data.username;
+          }
+        } else {
+          alertBox.className = 'p-3 rounded-xl text-xs bg-rose-50 text-rose-800 border border-rose-200';
+          alertBox.innerHTML = `⚠️ ${data.error || 'Token expired or invalid'}`;
+          alertBox.classList.remove('hidden');
+        }
+      } catch (err) {
+        console.error('Error verifying token:', err);
+      }
+    }
+
+    async function handleLoginSubmit(e) {
+      e.preventDefault();
+      const btn = document.getElementById('loginSubmitBtn');
+      const alertBox = document.getElementById('loginAlertBox');
+      const username = document.getElementById('loginUsername').value.trim();
+      const password = document.getElementById('loginPassword').value;
+
+      btn.disabled = true;
+      btn.innerText = 'Verifying...';
+      alertBox.classList.add('hidden');
+
+      try {
+        const res = await fetch('/api/pharmacy/auth/login', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ username, password })
+        });
+        const data = await res.json();
+
+        if (data.success && data.token) {
+          currentAuthSession = data;
+          localStorage.setItem('medfinder_pharmacy_token', data.token);
+
+          if (data.mustChangePassword) {
+            // Force first-time password change!
+            document.getElementById('pwdCurrent').value = password;
+            openChangePasswordModal(true);
+          } else {
+            activateStudioDashboard(data);
+          }
+        } else {
+          alertBox.className = 'p-3 rounded-xl text-xs bg-rose-50 text-rose-800 border border-rose-200';
+          alertBox.innerHTML = `<i class="fa-solid fa-circle-exclamation mr-1"></i> ${data.error || 'Invalid credentials'}`;
+          alertBox.classList.remove('hidden');
+        }
+      } catch (err) {
+        alertBox.className = 'p-3 rounded-xl text-xs bg-rose-50 text-rose-800 border border-rose-200';
+        alertBox.innerHTML = `Server error: ${err.message}`;
+        alertBox.classList.remove('hidden');
+      } finally {
+        btn.disabled = false;
+        btn.innerText = 'Sign In to Studio';
+      }
+    }
+
+    async function handleSetupSubmit(e) {
+      e.preventDefault();
+      const btn = document.getElementById('setupSubmitBtn');
+      const alertBox = document.getElementById('setupAlertBox');
+      const setupToken = document.getElementById('setupTokenInput').value.trim();
+      const newPassword = document.getElementById('setupNewPassword').value;
+      const customUsername = document.getElementById('setupCustomUsername').value.trim();
+
+      btn.disabled = true;
+      btn.innerText = 'Activating...';
+      alertBox.classList.add('hidden');
+
+      try {
+        const res = await fetch('/api/pharmacy/auth/activate-setup', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ setupToken, newPassword, customUsername })
+        });
+        const data = await res.json();
+
+        if (data.success && data.token) {
+          currentAuthSession = data;
+          localStorage.setItem('medfinder_pharmacy_token', data.token);
+          alert('🎉 Portal account activated successfully!');
+          activateStudioDashboard(data);
+        } else {
+          alertBox.className = 'p-3 rounded-xl text-xs bg-rose-50 text-rose-800 border border-rose-200';
+          alertBox.innerHTML = `<i class="fa-solid fa-circle-exclamation mr-1"></i> ${data.error || 'Activation failed'}`;
+          alertBox.classList.remove('hidden');
+        }
+      } catch (err) {
+        alertBox.className = 'p-3 rounded-xl text-xs bg-rose-50 text-rose-800 border border-rose-200';
+        alertBox.innerHTML = `Server error: ${err.message}`;
+        alertBox.classList.remove('hidden');
+      } finally {
+        btn.disabled = false;
+        btn.innerText = 'Set Password & Activate Portal';
+      }
+    }
+
+    async function restoreSession(token) {
+      try {
+        const res = await fetch('/api/pharmacy/auth/session', {
+          headers: { 'Authorization': `Bearer ${token}` }
+        });
+        const data = await res.json();
+        if (data.success) {
+          data.token = token;
+          currentAuthSession = data;
+          activateStudioDashboard(data);
+        } else {
+          localStorage.removeItem('medfinder_pharmacy_token');
+          showAuthView();
+        }
+      } catch (err) {
+        // If offline, check if we have cached pharmacy info
+        showAuthView();
+      }
+    }
+
+    function showAuthView() {
+      document.getElementById('authSection').classList.remove('hidden');
+      document.getElementById('studioDashboard').classList.add('hidden');
+      document.getElementById('authHeaderControls').classList.add('hidden');
+    }
+
+    function activateStudioDashboard(session) {
+      document.getElementById('authSection').classList.add('hidden');
+      document.getElementById('studioDashboard').classList.remove('hidden');
+      document.getElementById('authHeaderControls').classList.remove('hidden');
+
+      const pharm = session.pharmacy || {};
+      const acc = session.account || {};
+
+      const name = pharm.name || acc.pharmacyName || 'Pharmacy Partner';
+      const subCity = pharm.subCity || acc.subCity || 'Addis Ababa';
+      const license = pharm.efdaLicenseNumber || 'EFDA-AA-2025';
+      const tin = pharm.tinNumber || '—';
+
+      document.getElementById('headerPharmName').innerText = name;
+      document.getElementById('headerSubCity').innerText = subCity;
+      document.getElementById('dashPharmName').innerText = name;
+      document.getElementById('dashSubCity').innerText = subCity;
+      document.getElementById('dashLicenseTxt').innerText = license;
+      document.getElementById('dashTinTxt').innerText = tin;
+      document.getElementById('regEfdaLicense').innerText = license;
+      document.getElementById('regTinNumber').innerText = tin;
+
+      loadPharmacyInventory();
+    }
+
+    function logoutPharmacy() {
+      if (confirm('Are you sure you want to log out of this counter session?')) {
+        localStorage.removeItem('medfinder_pharmacy_token');
+        currentAuthSession = null;
+        window.location.href = '/pharmacy';
+      }
+    }
+
+    // --- TAB SWITCHING IN STUDIO ---
+    function switchStudioTab(tab) {
+      const tabs = ['inventory', 'vouchers', 'broadcasts', 'regulatory'];
+      tabs.forEach(t => {
+        const panel = document.getElementById('panel' + t.charAt(0).toUpperCase() + t.slice(1));
+        const nav = document.getElementById('tabNav' + t.charAt(0).toUpperCase() + t.slice(1));
+        if (t === tab) {
+          panel.classList.remove('hidden');
+          nav.className = 'px-4 py-2.5 text-xs font-bold border-b-2 border-emerald-600 text-emerald-700 whitespace-nowrap transition flex items-center gap-1.5';
+        } else {
+          panel.classList.add('hidden');
+          nav.className = 'px-4 py-2.5 text-xs font-semibold border-b-2 border-transparent text-slate-500 hover:text-slate-900 whitespace-nowrap transition flex items-center gap-1.5';
+        }
+      });
+      if (tab === 'broadcasts') loadActiveBroadcasts();
+    }
+
+    // --- INVENTORY MANAGEMENT ---
+    async function loadPharmacyInventory() {
+      if (!currentAuthSession || !currentAuthSession.account) return;
+      const pharmacyId = currentAuthSession.account.pharmacyId;
+      const tbody = document.getElementById('inventoryTableBody');
+      tbody.innerHTML = `<tr><td colspan="5" class="p-8 text-center text-slate-400">Loading shelf inventory...</td></tr>`;
+
+      try {
+        const res = await fetch(`/api/pharmacy/${pharmacyId}/inventory`);
+        const data = await res.json();
+        if (data.success && Array.isArray(data.inventory)) {
+          currentPharmacyInventory = data.inventory;
+          document.getElementById('dashShelfCount').innerText = `${currentPharmacyInventory.length} Items`;
+          document.getElementById('shelfLedgerBadge').innerText = `${currentPharmacyInventory.length} Items`;
+          renderInventoryTable(currentPharmacyInventory);
+        } else {
+          tbody.innerHTML = `<tr><td colspan="5" class="p-8 text-center text-slate-400">No items on shelf. Use buttons above to add medicines.</td></tr>`;
+        }
+      } catch (err) {
+        tbody.innerHTML = `<tr><td colspan="5" class="p-8 text-center text-rose-500">Failed to load inventory: ${err.message}</td></tr>`;
+      }
+    }
+
+    function renderInventoryTable(items) {
+      const tbody = document.getElementById('inventoryTableBody');
+      const pharmacyId = currentAuthSession?.account?.pharmacyId;
+
+      if (!items || items.length === 0) {
+        tbody.innerHTML = `<tr><td colspan="5" class="p-8 text-center text-slate-400 text-xs">No items currently on counter shelf. Click "1-Click Master Catalog" or "Add Single Medicine" above!</td></tr>`;
+        return;
+      }
+
+      tbody.innerHTML = items.map(item => `
+        <tr class="hover:bg-slate-50 transition">
+          <td class="p-3.5 font-bold text-slate-900">${item.name}</td>
+          <td class="p-3.5 text-slate-500">
+            ${item.genericName || '—'} 
+            <span class="text-[10px] bg-slate-100 text-slate-600 px-2 py-0.5 rounded font-medium ml-1">${item.category || 'General'}</span>
+          </td>
+          <td class="p-3.5 font-mono font-bold text-slate-900">${item.priceETB} ETB</td>
+          <td class="p-3.5">
+            <button onclick="toggleStock('${pharmacyId}', '${item.name}', ${!item.inStock})" class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-bold transition ${item.inStock ? 'bg-emerald-100 text-emerald-800 hover:bg-emerald-200' : 'bg-rose-100 text-rose-800 hover:bg-rose-200'}">
+              <span class="w-2 h-2 rounded-full ${item.inStock ? 'bg-emerald-500' : 'bg-rose-500'}"></span>
+              <span>${item.inStock ? 'In Stock' : 'Out of Stock'}</span>
+            </button>
+          </td>
+          <td class="p-3.5 text-right">
+            <button onclick="deleteItem('${pharmacyId}', '${item.name}')" title="Delete from shelf" class="text-xs text-rose-500 hover:text-rose-700 p-1.5 rounded-lg hover:bg-rose-50 transition">
+              <i class="fa-solid fa-trash"></i>
+            </button>
+          </td>
+        </tr>
+      `).join('');
+    }
+
+    function filterInventoryTable() {
+      const q = document.getElementById('filterInventoryInput').value.toLowerCase();
+      const filtered = currentPharmacyInventory.filter(i => 
+        i.name.toLowerCase().includes(q) || (i.genericName && i.genericName.toLowerCase().includes(q))
+      );
+      renderInventoryTable(filtered);
+    }
+
+    async function toggleStock(pharmacyId, medicineName, newStock) {
+      try {
+        const res = await fetch(`/api/pharmacy/${pharmacyId}/inventory/toggle-stock`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ medicineName, inStock: newStock })
+        });
+        const data = await res.json();
+        if (data.success) {
+          loadPharmacyInventory();
+        }
+      } catch (err) {
+        alert('Action failed: ' + err.message);
+      }
+    }
+
+    async function deleteItem(pharmacyId, medicineName) {
+      if (!confirm(`Are you sure you want to remove "${medicineName}" from your active shelf?`)) return;
+      try {
+        const res = await fetch(`/api/pharmacy/${pharmacyId}/inventory/${encodeURIComponent(medicineName)}`, {
+          method: 'DELETE'
+        });
+        const data = await res.json();
+        if (data.success) {
+          loadPharmacyInventory();
+        }
+      } catch (err) {
+        alert('Failed to delete item: ' + err.message);
+      }
+    }
+
+    // --- MASTER CHECKLIST MODAL ---
+    async function openMasterChecklistModal() {
+      document.getElementById('masterChecklistModal').classList.remove('hidden');
+      const container = document.getElementById('masterChecklistItemsContainer');
+      container.innerHTML = `<div class="text-center py-8 text-slate-400 text-xs">Loading Ethiopia Master Catalog...</div>`;
+
+      try {
+        const res = await fetch('/api/pharmacy/catalog/master');
+        const data = await res.json();
+        if (data.success) {
+          masterCatalog = data.catalog;
+          container.innerHTML = masterCatalog.map((item, idx) => `
+            <div class="p-3 rounded-xl border border-slate-200 bg-white hover:border-emerald-300 transition flex items-center justify-between gap-3">
+              <div class="flex items-center space-x-3">
+                <input type="checkbox" id="chk_${idx}" class="master-chk w-4 h-4 text-emerald-600 rounded" checked>
+                <div>
+                  <label for="chk_${idx}" class="font-bold text-xs text-slate-900 cursor-pointer block">${item.name}</label>
+                  <span class="text-[11px] text-slate-500">${item.genericName} • <span class="bg-slate-100 text-slate-600 px-1.5 py-0.5 rounded">${item.category}</span></span>
+                </div>
+              </div>
+              <div class="flex items-center space-x-1">
+                <span class="text-xs text-slate-400 font-medium">ETB:</span>
+                <input type="number" id="price_${idx}" value="${item.defaultPriceETB}" class="w-20 text-xs font-bold px-2 py-1 border border-slate-300 rounded-lg text-right outline-none">
+              </div>
+            </div>
+          `).join('');
+        }
+      } catch (err) {
+        container.innerHTML = `<div class="text-xs text-rose-500">Failed to load catalog.</div>`;
+      }
+    }
+
+    function toggleSelectAllChecklist(selectAll) {
+      document.querySelectorAll('.master-chk').forEach(c => c.checked = selectAll);
+    }
+
+    async function submitChecklistImport() {
+      const pharmacyId = currentAuthSession?.account?.pharmacyId;
+      const selectedItems = [];
+
+      masterCatalog.forEach((item, idx) => {
+        const chk = document.getElementById(`chk_${idx}`);
+        const priceInput = document.getElementById(`price_${idx}`);
+        if (chk && chk.checked) {
+          selectedItems.push({
+            name: item.name,
+            genericName: item.genericName,
+            category: item.category,
+            priceETB: parseFloat(priceInput.value) || item.defaultPriceETB
+          });
+        }
+      });
+
+      if (selectedItems.length === 0) {
+        alert('Please select at least 1 medicine to import.');
+        return;
+      }
+
+      const res = await fetch(`/api/pharmacy/${pharmacyId}/inventory/checklist`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ items: selectedItems })
+      });
+      const data = await res.json();
+      if (data.success) {
+        alert(`🎉 Successfully saved ${data.count} medicines to your shelf!`);
+        closeModal('masterChecklistModal');
+        loadPharmacyInventory();
+      }
+    }
+
+    // --- SINGLE MEDICINE ADD MODAL ---
+    function openSingleAddModal() {
+      document.getElementById('singleAddModal').classList.remove('hidden');
+    }
+
+    async function handleSingleAddSubmit(e) {
+      e.preventDefault();
+      const pharmacyId = currentAuthSession?.account?.pharmacyId;
+      const name = document.getElementById('singleMedName').value.trim();
+      const genericName = document.getElementById('singleGenericName').value.trim();
+      const category = document.getElementById('singleCategory').value;
+      const priceETB = parseFloat(document.getElementById('singlePriceETB').value);
+
+      const res = await fetch(`/api/pharmacy/${pharmacyId}/inventory/add`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name, genericName, category, priceETB, inStock: true })
+      });
+      const data = await res.json();
+      if (data.success) {
+        alert('Medicine added to shelf!');
+        document.getElementById('singleMedName').value = '';
+        document.getElementById('singlePriceETB').value = '';
+        closeModal('singleAddModal');
+        loadPharmacyInventory();
+      }
+    }
+
+    // --- EXCEL / CSV BATCH SPREADSHEET MODAL ---
+    function openCsvModal() {
+      document.getElementById('csvModal').classList.remove('hidden');
+    }
+
+    function handleSpreadsheetSelected(event) {
+      const file = event.target.files[0];
+      if (!file) return;
+
+      const reader = new FileReader();
+      reader.onload = function(e) {
+        const data = new Uint8Array(e.target.result);
+        const workbook = XLSX.read(data, { type: 'array' });
+        const firstSheetName = workbook.SheetNames[0];
+        const worksheet = workbook.Sheets[firstSheetName];
+        const rawJson = XLSX.utils.sheet_to_json(worksheet);
+
+        parsedFileItems = rawJson.map(row => {
+          const name = row['Name'] || row['Medicine'] || row['Drug'] || row['Item'] || row['Medicine Name'];
+          const price = row['Price'] || row['PriceETB'] || row['Retail Price'] || row['ETB'];
+          const category = row['Category'] || row['Type'] || 'General';
+          return {
+            name: String(name || '').trim(),
+            category: String(category || 'General').trim(),
+            priceETB: parseFloat(price) || 100
+          };
+        }).filter(item => item.name.length > 0);
+
+        const previewTbody = document.getElementById('csvPreviewTbody');
+        const previewBox = document.getElementById('csvPreviewBox');
+        const commitBtn = document.getElementById('commitImportBtn');
+
+        previewTbody.innerHTML = parsedFileItems.slice(0, 10).map(it => `
+          <tr class="border-b">
+            <td class="p-1 font-bold text-slate-800">${it.name}</td>
+            <td class="p-1 text-slate-500">${it.category}</td>
+            <td class="p-1 font-bold text-slate-800">${it.priceETB} ETB</td>
+          </tr>
+        `).join('');
+
+        previewBox.classList.remove('hidden');
+        commitBtn.disabled = false;
+        commitBtn.innerText = `Import All ${parsedFileItems.length} Medicines`;
+      };
+      reader.readAsArrayBuffer(file);
+    }
+
+    async function submitDirectFileImport() {
+      const pharmacyId = currentAuthSession?.account?.pharmacyId;
+      if (!parsedFileItems || parsedFileItems.length === 0) return;
+
+      const res = await fetch(`/api/pharmacy/${pharmacyId}/inventory/checklist`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ items: parsedFileItems })
+      });
+      const data = await res.json();
+      if (data.success) {
+        alert(`🎉 Imported ${data.count} medicines from spreadsheet!`);
+        closeModal('csvModal');
+        loadPharmacyInventory();
+      }
+    }
+
+    // --- VOUCHER HOLD CODE VERIFICATION ---
+    async function handleVoucherVerify(e) {
+      e.preventDefault();
+      const code = document.getElementById('voucherCodeInput').value.trim().replace('#', '');
+      const resultBox = document.getElementById('voucherResultBox');
+
+      try {
+        const res = await fetch('/api/reservation/verify', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ reservationCode: code })
+        });
+        const data = await res.json();
+
+        if (data.success && data.hold) {
+          resultBox.className = 'p-4 rounded-xl text-xs space-y-2 bg-emerald-50 border border-emerald-200 text-emerald-900';
+          resultBox.innerHTML = `
+            <div class="flex items-center space-x-2 font-bold text-sm text-emerald-800">
+              <i class="fa-solid fa-circle-check"></i>
+              <span>Voucher #${data.hold.reservationCode} Verified & Fulfilled!</span>
+            </div>
+            <div class="space-y-1 pt-1 border-t border-emerald-200">
+              <p>Medicine: <strong>${data.hold.medicineName}</strong></p>
+              <p>Locked Counter Price: <strong>${data.hold.lockedPriceETB} ETB</strong> (Price-Gouging Protected)</p>
+              <p>Patient Contact: <strong>${data.hold.phone}</strong></p>
+              <p>Status: <span class="bg-emerald-200 text-emerald-900 px-2 py-0.5 rounded font-bold uppercase text-[10px]">${data.hold.status}</span></p>
+            </div>
+          `;
+          resultBox.classList.remove('hidden');
+        } else {
+          resultBox.className = 'p-4 rounded-xl text-xs bg-rose-50 border border-rose-200 text-rose-800';
+          resultBox.innerHTML = `<i class="fa-solid fa-circle-exclamation mr-1"></i> ${data.error || 'Voucher not found or expired.'}`;
+          resultBox.classList.remove('hidden');
+        }
+      } catch (err) {
+        alert('Server error: ' + err.message);
+      }
+    }
+
+    // --- PASSWORD CHANGE MODAL ---
+    function openChangePasswordModal(isForced = false) {
+      const modal = document.getElementById('changePasswordModal');
+      const cancelBtn = document.getElementById('pwdCancelBtn');
+      modal.classList.remove('hidden');
+      if (isForced) {
+        cancelBtn.classList.add('hidden');
+        document.getElementById('pwdModalTitle').innerText = 'Mandatory: Set Permanent Password';
+      } else {
+        cancelBtn.classList.remove('hidden');
+        document.getElementById('pwdModalTitle').innerText = 'Update Portal Password';
+      }
+    }
+
+    async function handleChangePasswordSubmit(e) {
+      e.preventDefault();
+      const currentPassword = document.getElementById('pwdCurrent').value;
+      const newPassword = document.getElementById('pwdNew').value;
+      const confirmPassword = document.getElementById('pwdConfirm').value;
+      const alertBox = document.getElementById('pwdAlertBox');
+      const username = currentAuthSession?.account?.username;
+
+      if (newPassword !== confirmPassword) {
+        alertBox.className = 'p-3 rounded-xl text-xs bg-rose-50 text-rose-800 border border-rose-200';
+        alertBox.innerText = 'New passwords do not match.';
+        alertBox.classList.remove('hidden');
+        return;
+      }
+
+      try {
+        const res = await fetch('/api/pharmacy/auth/change-password', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ username, currentPassword, newPassword })
+        });
+        const data = await res.json();
+        if (data.success) {
+          alert('🎉 Permanent password updated successfully!');
+          closeModal('changePasswordModal');
+          if (currentAuthSession) currentAuthSession.mustChangePassword = false;
+          activateStudioDashboard(currentAuthSession);
+        } else {
+          alertBox.className = 'p-3 rounded-xl text-xs bg-rose-50 text-rose-800 border border-rose-200';
+          alertBox.innerText = data.error || 'Failed to update password';
+          alertBox.classList.remove('hidden');
+        }
+      } catch (err) {
+        alert('Server error: ' + err.message);
+      }
+    }
+
+    // Helper functions
+    function closeModal(id) {
+      document.getElementById(id).classList.add('hidden');
+    }
+
+    function togglePasswordVisibility(inputId, iconId) {
+      const input = document.getElementById(inputId);
+      const icon = document.getElementById(iconId);
+      if (input.type === 'password') {
+        input.type = 'text';
+        icon.className = 'fa-solid fa-eye-slash';
+      } else {
+        input.type = 'password';
+        icon.className = 'fa-solid fa-eye';
+      }
+    }
+
+    async function loadActiveBroadcasts() {
+      const container = document.getElementById('broadcastsContainer');
+      container.innerHTML = `<div class="text-center py-6 text-slate-400 text-xs">Checking for pending broadcast pings...</div>`;
+      setTimeout(() => {
+        container.innerHTML = `<div class="text-center py-8 text-slate-400 text-xs">No pending rare drug broadcast inquiries in this sub-city right now.</div>`;
+      }, 500);
+    }
+  </script>
+</body>
+</html>
