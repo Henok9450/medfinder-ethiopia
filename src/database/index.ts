@@ -24,15 +24,30 @@ export async function initDatabase(): Promise<{ isPostgres: boolean }> {
 }
 
 /**
+ * Dynamic Proxy Repository:
+ * Dispatches every operation in real-time to PostgresRepository when PostgreSQL is available,
+ * or safely falls back to InMemoryRepository if offline or in local development.
+ * Guarantees zero stale reference issues even if initialized before initDatabase() completes.
+ */
+const dynamicRepository = new Proxy({} as IDatabaseRepository, {
+  get(_target, prop) {
+    const targetRepo = (isPostgresAvailable && process.env.DATABASE_URL)
+      ? postgresRepository
+      : inMemoryRepository;
+    const value = (targetRepo as any)[prop];
+    if (typeof value === 'function') {
+      return value.bind(targetRepo);
+    }
+    return value;
+  },
+});
+
+/**
  * Repository Factory / Singleton Provider:
- * Dynamically delegates to PostgresRepository when DATABASE_URL is active and verified,
- * or safely falls back to InMemoryRepository for local development or offline mode.
+ * Returns the dynamic delegating repository singleton.
  */
 export function getDatabaseRepository(): IDatabaseRepository {
-  if (isPostgresAvailable && process.env.DATABASE_URL) {
-    return postgresRepository;
-  }
-  return inMemoryRepository;
+  return dynamicRepository;
 }
 
 export {

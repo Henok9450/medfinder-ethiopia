@@ -232,6 +232,24 @@ export class TelegramVerificationBotService {
         console.warn('[TelegramBot:PATIENT] Could not connect on boot:', err.message);
       });
     }
+
+    // Pre-sync applications from persistent database
+    this.syncApplicationsFromRepo();
+  }
+
+  /**
+   * Pre-loads all persistent applications from PostgreSQL into memory for rapid bot response
+   */
+  public async syncApplicationsFromRepo(): Promise<void> {
+    try {
+      const apps = await this.repo.getVerificationApplications();
+      if (apps && apps.length > 0) {
+        this.db.verificationApplications = apps;
+        console.log(`[TelegramBot] Synchronized ${apps.length} verification applications from PostgreSQL.`);
+      }
+    } catch (err: any) {
+      console.warn('[TelegramBot] Could not sync applications from repository:', err.message);
+    }
   }
 
   /**
@@ -2538,6 +2556,14 @@ Send **"Confirm"** to submit to the EFDA Compliance Desk.`;
         };
 
         const app = (await this.repo.submitVerificationApplication(appPayload)) || this.db.submitVerificationApplication(appPayload);
+
+        // Keep local memory store aligned with PostgreSQL
+        const appIdx = this.db.verificationApplications.findIndex((a) => a.id === app.id);
+        if (appIdx >= 0) {
+          this.db.verificationApplications[appIdx] = app;
+        } else {
+          this.db.verificationApplications.unshift(app);
+        }
 
         // Reset session
         session.step = 'START';
