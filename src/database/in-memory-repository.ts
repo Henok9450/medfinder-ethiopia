@@ -144,4 +144,50 @@ export class InMemoryRepository implements IDatabaseRepository {
   ): Promise<boolean> {
     return this.db.addOrUpdateMedicine(pharmacyId, item);
   }
+
+  public async toggleMedicineStock(pharmacyId: string, medicineName: string, inStock: boolean): Promise<boolean> {
+    return this.db.toggleMedicineStock(pharmacyId, medicineName, inStock);
+  }
+
+  public async removeMedicine(pharmacyId: string, medicineName: string): Promise<boolean> {
+    return this.db.removeMedicine(pharmacyId, medicineName);
+  }
+
+  public async bulkImportChecklist(
+    pharmacyId: string,
+    items: Array<{ name: string; priceETB: number; category?: string; genericName?: string }>
+  ): Promise<number> {
+    return this.db.bulkImportChecklist(pharmacyId, items);
+  }
+
+  public async parseAndImportCsv(pharmacyId: string, csvContent: string): Promise<{ imported: number; errors: number }> {
+    return this.db.parseAndImportCsv(pharmacyId, csvContent);
+  }
+
+  public async reportViolation(params: {
+    patientUserId: string;
+    pharmacyId: string;
+    medicineName: string;
+    issueType: 'PRICE_GOUGING' | 'OUT_OF_STOCK_PHANTOM' | 'EXPIRED_MEDICINE' | 'UNPROFESSIONAL';
+    description?: string;
+  }): Promise<{ success: boolean; strikeCount: number; newTrustScore: number; penaltyApplied: string }> {
+    return this.db.reportViolation(params);
+  }
+
+  public async getVerificationApplications(): Promise<PharmacyVerificationApplication[]> {
+    return [...this.db.verificationApplications];
+  }
+
+  public async resubmitVerificationApplication(
+    id: string,
+    updates: {
+      photoUrl?: string;
+      efdaLicenseNumber?: string;
+      tinNumber?: string;
+      location?: { latitude: number; longitude: number; subCity?: string; addressDetails?: string };
+      note?: string;
+    }
+  ): Promise<PharmacyVerificationApplication | null> {
+    return this.db.resubmitVerificationApplication(id, updates);
+  }
 }

@@ -2,6 +2,7 @@ import https from 'https';
 import fs from 'fs';
 import path from 'path';
 import { InMemoryDatabase, TelegramBotSession, PharmacyVerificationApplication, Pharmacy, MASTER_MEDICINE_CATALOG } from '../database/in-memory-db';
+import { getDatabaseRepository, IDatabaseRepository } from '../database';
 import { BroadcastMatchingService } from '../matching/broadcast-matching.service';
 
 /**
@@ -183,6 +184,7 @@ export interface TelegramBotEndpoint {
 
 export class TelegramVerificationBotService {
   private db: InMemoryDatabase;
+  private repo: IDatabaseRepository;
   private broadcastService: BroadcastMatchingService;
 
   // Dual Dedicated Bot Architecture (Roadmap 2: Industry Standard)
@@ -191,6 +193,7 @@ export class TelegramVerificationBotService {
 
   constructor() {
     this.db = InMemoryDatabase.getInstance();
+    this.repo = getDatabaseRepository();
     this.broadcastService = new BroadcastMatchingService();
 
     // 1. Pharmacy Partner Bot (Shelf Inventory, Accreditation & Live Hold Alerts)
@@ -1162,6 +1165,10 @@ export class TelegramVerificationBotService {
 
         if (photoUrl || documentUrl) {
           const newMedia = photoUrl || documentUrl;
+          await this.repo.resubmitVerificationApplication(waitingApp.id, {
+            photoUrl: newMedia,
+            note: 'Pharmacist uploaded updated Certificate of Competence photo via Telegram',
+          });
           this.db.resubmitVerificationApplication(waitingApp.id, {
             photoUrl: newMedia,
             note: 'Pharmacist uploaded updated Certificate of Competence photo via Telegram',
@@ -1171,6 +1178,15 @@ export class TelegramVerificationBotService {
             : `📸 New Certificate of Competence photo successfully received!`;
         } else if (location) {
           const parsedLoc = parseLocationOrAddress(cleanText || '', location);
+          await this.repo.resubmitVerificationApplication(waitingApp.id, {
+            location: {
+              latitude: parsedLoc.latitude,
+              longitude: parsedLoc.longitude,
+              subCity: parsedLoc.subCity,
+              addressDetails: parsedLoc.addressDetails,
+            },
+            note: `Pharmacist updated physical GPS location: ${parsedLoc.subCity} (${parsedLoc.latitude}, ${parsedLoc.longitude})`,
+          });
           this.db.resubmitVerificationApplication(waitingApp.id, {
             location: {
               latitude: parsedLoc.latitude,
@@ -1185,6 +1201,11 @@ export class TelegramVerificationBotService {
             : `📍 Updated pharmacy GPS location recorded (${parsedLoc.subCity})!`;
         } else if (cleanText.toUpperCase().includes('EFDA') || cleanText.toUpperCase().includes('TIN')) {
           const isEFDA = cleanText.toUpperCase().includes('EFDA');
+          await this.repo.resubmitVerificationApplication(waitingApp.id, {
+            efdaLicenseNumber: isEFDA ? cleanText : undefined,
+            tinNumber: !isEFDA ? cleanText : undefined,
+            note: `Pharmacist updated ${isEFDA ? 'EFDA License' : 'TIN'} number to: ${cleanText}`,
+          });
           this.db.resubmitVerificationApplication(waitingApp.id, {
             efdaLicenseNumber: isEFDA ? cleanText : undefined,
             tinNumber: !isEFDA ? cleanText : undefined,
@@ -1194,6 +1215,9 @@ export class TelegramVerificationBotService {
             ? `✍️ የተስተካከለው ቁጥር (${cleanText}) በማመልከቻዎ ላይ ተመዝግቧል!`
             : `✍️ Updated registration number (${cleanText}) recorded!`;
         } else {
+          await this.repo.resubmitVerificationApplication(waitingApp.id, {
+            note: `Applicant note: "${cleanText}"`,
+          });
           this.db.resubmitVerificationApplication(waitingApp.id, {
             note: `Applicant note: "${cleanText}"`,
           });
@@ -1414,7 +1438,7 @@ Type **/status** at any time to monitor progress.
 
       // 7. Active Step-by-Step Accreditation Questionnaire (When session.step !== 'START')
       if (session.step && session.step !== 'START') {
-        return this.processAccreditationStep(session, cleanText, photoUrl, documentUrl, location, chatId);
+        return await this.processAccreditationStep(session, cleanText, photoUrl, documentUrl, location, chatId);
       }
 
       // 8. Standalone Wall Certificate / CoC photo upload outside active registration
@@ -1543,7 +1567,13 @@ Type **/status** at any time to monitor progress.
       const inv = pharmacy.inventory?.find((it) => it.name.toLowerCase().includes(drugName.toLowerCase()));
       const lockedPrice = inv?.priceETB || 320;
 
-      const hold = this.db.createReservationHold({
+      const hold = (await this.repo.createReservationHold({
+        patientUserId: chatId,
+        pharmacyId: pharmacy.id,
+        medicineName: drugName,
+        lockedPriceETB: lockedPrice,
+        durationMinutes: 60,
+      })) || this.db.createReservationHold({
         patientUserId: chatId,
         pharmacyId: pharmacy.id,
         medicineName: drugName,
@@ -1865,7 +1895,8 @@ Type **/status** at any time to monitor progress.
         priceETB: c.defaultPriceETB,
       }));
 
-      const count = this.db.bulkImportChecklist(pharmacy.id, items);
+      const count = await this.repo.bulkImportChecklist(pharmacy.id, items);
+      this.db.bulkImportChecklist(pharmacy.id, items);
 
       return {
         chatId,
@@ -1907,6 +1938,12 @@ Type **/status** at any time to monitor progress.
         };
       }
 
+      await this.repo.addOrUpdateMedicine(pharmacy.id, {
+        name: drugName,
+        priceETB: price,
+        category: 'General',
+        inStock: true,
+      });
       this.db.addOrUpdateMedicine(pharmacy.id, {
         name: drugName,
         priceETB: price,
@@ -1957,6 +1994,7 @@ Type **/status** at any time to monitor progress.
       }
 
       const newStockStatus = !item.inStock;
+      await this.repo.toggleMedicineStock(pharmacy.id, item.name, newStockStatus);
       this.db.toggleMedicineStock(pharmacy.id, item.name, newStockStatus);
 
       const statusTextAm = newStockStatus ? '🟢 በክምችት አለ (In Stock)' : '🔴 ክምችት አልቋል (Out of Stock)';
@@ -2080,6 +2118,10 @@ ${itemsDisplay}
 
       if (photoUrl || documentUrl) {
         const newMedia = photoUrl || documentUrl;
+        await this.repo.resubmitVerificationApplication(waitingApp.id, {
+          photoUrl: newMedia,
+          note: 'Pharmacist uploaded updated Certificate of Competence photo via Telegram',
+        });
         this.db.resubmitVerificationApplication(waitingApp.id, {
           photoUrl: newMedia,
           note: 'Pharmacist uploaded updated Certificate of Competence photo via Telegram',
@@ -2089,6 +2131,15 @@ ${itemsDisplay}
           : `📸 New Certificate of Competence photo successfully received!`;
       } else if (location) {
         const parsedLoc = parseLocationOrAddress(cleanText || '', location);
+        await this.repo.resubmitVerificationApplication(waitingApp.id, {
+          location: {
+            latitude: parsedLoc.latitude,
+            longitude: parsedLoc.longitude,
+            subCity: parsedLoc.subCity,
+            addressDetails: parsedLoc.addressDetails,
+          },
+          note: `Pharmacist updated physical GPS location: ${parsedLoc.subCity} (${parsedLoc.latitude}, ${parsedLoc.longitude})`,
+        });
         this.db.resubmitVerificationApplication(waitingApp.id, {
           location: {
             latitude: parsedLoc.latitude,
@@ -2103,6 +2154,11 @@ ${itemsDisplay}
           : `📍 Updated pharmacy GPS location recorded (${parsedLoc.subCity})!`;
       } else if (cleanText.toUpperCase().includes('EFDA') || cleanText.toUpperCase().includes('TIN')) {
         const isEFDA = cleanText.toUpperCase().includes('EFDA');
+        await this.repo.resubmitVerificationApplication(waitingApp.id, {
+          efdaLicenseNumber: isEFDA ? cleanText : undefined,
+          tinNumber: !isEFDA ? cleanText : undefined,
+          note: `Pharmacist updated ${isEFDA ? 'EFDA License' : 'TIN'} number to: ${cleanText}`,
+        });
         this.db.resubmitVerificationApplication(waitingApp.id, {
           efdaLicenseNumber: isEFDA ? cleanText : undefined,
           tinNumber: !isEFDA ? cleanText : undefined,
@@ -2112,6 +2168,9 @@ ${itemsDisplay}
           ? `✍️ የተስተካከለው ቁጥር (${cleanText}) በማመልከቻዎ ላይ ተመዝግቧል!`
           : `✍️ Updated registration number (${cleanText}) recorded!`;
       } else {
+        await this.repo.resubmitVerificationApplication(waitingApp.id, {
+          note: `Applicant note: "${cleanText}"`,
+        });
         this.db.resubmitVerificationApplication(waitingApp.id, {
           note: `Applicant note: "${cleanText}"`,
         });
@@ -2287,14 +2346,14 @@ Type **/status** at any time to monitor progress.
   /**
    * Step-by-step accreditation state machine for @MedFinder_Verifier_bot
    */
-  private processAccreditationStep(
+  private async processAccreditationStep(
     session: TelegramBotSession,
     cleanText: string,
     photoUrl?: string,
     documentUrl?: string,
     location?: { latitude: number; longitude: number },
     chatId: string = ''
-  ): TelegramBotResponse {
+  ): Promise<TelegramBotResponse> {
     switch (session.step) {
       case 'LANGUAGE': {
         session.language = cleanText.includes('English') || cleanText === '2' ? 'en' : 'am';
@@ -2459,7 +2518,7 @@ Send **"Confirm"** to submit to the EFDA Compliance Desk.`;
         }
 
         // Create Official Application Packet
-        const app = this.db.submitVerificationApplication({
+        const appPayload = {
           telegramChatId: chatId,
           telegramUsername: session.username,
           pharmacyName: session.data.pharmacyName || 'Registered Pharmacy',
@@ -2476,7 +2535,9 @@ Send **"Confirm"** to submit to the EFDA Compliance Desk.`;
           counterPhotoUrl: session.data.counterPhotoUrl,
           efdaDocUrl: session.data.efdaDocUrl,
           adminNotes: 'Awaiting MedFinder Compliance Desk cross-check with EFDA iRIS portal.',
-        });
+        };
+
+        const app = (await this.repo.submitVerificationApplication(appPayload)) || this.db.submitVerificationApplication(appPayload);
 
         // Reset session
         session.step = 'START';

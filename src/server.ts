@@ -10,7 +10,7 @@ import { TemplateService } from './localization/template.service';
 import { AdminConfigController } from './admin/admin-config.controller';
 import { InMemoryDatabase, MASTER_MEDICINE_CATALOG, AdminRole, AdminPrivileges } from './database/in-memory-db';
 import { TelegramVerificationBotService } from './verification/telegram-verification-bot.service';
-import { getDatabaseRepository, initDatabase, closeDbPool, isPostgresConnected } from './database';
+import { getDatabaseRepository, initDatabase, closePostgresPool, isPostgresConnected } from './database';
 
 dotenv.config();
 
@@ -383,9 +383,9 @@ app.get('/api/pharmacy/catalog/master', (req: Request, res: Response) => {
 });
 
 // 2. Fetch specific pharmacy inventory
-app.get('/api/pharmacy/:pharmacyId/inventory', (req: Request, res: Response) => {
+app.get('/api/pharmacy/:pharmacyId/inventory', async (req: Request, res: Response) => {
   const pharmacyId = String(req.params.pharmacyId);
-  const pharmacy = db.pharmacies.find((p) => p.id === pharmacyId);
+  const pharmacy = await dbRepo.getPharmacyById(pharmacyId);
   if (!pharmacy) return res.status(404).json({ success: false, error: 'Pharmacy not found' });
   res.json({
     success: true,
@@ -395,13 +395,13 @@ app.get('/api/pharmacy/:pharmacyId/inventory', (req: Request, res: Response) => 
 });
 
 // 3. Register or update a single medicine
-app.post('/api/pharmacy/:pharmacyId/inventory/add', (req: Request, res: Response) => {
+app.post('/api/pharmacy/:pharmacyId/inventory/add', async (req: Request, res: Response) => {
   const pharmacyId = String(req.params.pharmacyId);
   const { name, genericName, category, priceETB, inStock } = req.body;
   if (!name || priceETB === undefined) {
     return res.status(400).json({ success: false, error: 'name and priceETB are required' });
   }
-  const success = db.addOrUpdateMedicine(pharmacyId, {
+  const success = await dbRepo.addOrUpdateMedicine(pharmacyId, {
     name,
     genericName,
     category,
@@ -412,40 +412,40 @@ app.post('/api/pharmacy/:pharmacyId/inventory/add', (req: Request, res: Response
 });
 
 // 4. Bulk 1-Click Checklist Registration
-app.post('/api/pharmacy/:pharmacyId/inventory/checklist', (req: Request, res: Response) => {
+app.post('/api/pharmacy/:pharmacyId/inventory/checklist', async (req: Request, res: Response) => {
   const pharmacyId = String(req.params.pharmacyId);
   const { items } = req.body;
   if (!Array.isArray(items)) {
     return res.status(400).json({ success: false, error: 'items array is required' });
   }
-  const count = db.bulkImportChecklist(pharmacyId, items);
+  const count = await dbRepo.bulkImportChecklist(pharmacyId, items);
   res.json({ success: true, count, message: `Successfully registered ${count} medicines from checklist.` });
 });
 
 // 5. Excel / CSV Bulk Inventory Import
-app.post('/api/pharmacy/:pharmacyId/inventory/csv', (req: Request, res: Response) => {
+app.post('/api/pharmacy/:pharmacyId/inventory/csv', async (req: Request, res: Response) => {
   const pharmacyId = String(req.params.pharmacyId);
   const { csvContent } = req.body;
   if (!csvContent) {
     return res.status(400).json({ success: false, error: 'csvContent is required' });
   }
-  const result = db.parseAndImportCsv(pharmacyId, String(csvContent));
+  const result = await dbRepo.parseAndImportCsv(pharmacyId, String(csvContent));
   res.json({ success: true, ...result, message: `Imported ${result.imported} items with ${result.errors} errors.` });
 });
 
 // 6. Toggle Stock In/Out
-app.post('/api/pharmacy/:pharmacyId/inventory/toggle', (req: Request, res: Response) => {
+app.post('/api/pharmacy/:pharmacyId/inventory/toggle', async (req: Request, res: Response) => {
   const pharmacyId = String(req.params.pharmacyId);
   const { medicineName, inStock } = req.body;
-  const success = db.toggleMedicineStock(pharmacyId, String(medicineName), Boolean(inStock));
+  const success = await dbRepo.toggleMedicineStock(pharmacyId, String(medicineName), Boolean(inStock));
   res.json({ success, inStock: Boolean(inStock) });
 });
 
 // 7. Delete Item from Shelf
-app.delete('/api/pharmacy/:pharmacyId/inventory/:medicineName', (req: Request, res: Response) => {
+app.delete('/api/pharmacy/:pharmacyId/inventory/:medicineName', async (req: Request, res: Response) => {
   const pharmacyId = String(req.params.pharmacyId);
   const medicineName = String(req.params.medicineName);
-  const success = db.removeMedicine(pharmacyId, medicineName);
+  const success = await dbRepo.removeMedicine(pharmacyId, medicineName);
   res.json({ success, message: 'Removed from inventory' });
 });
 
@@ -481,12 +481,12 @@ app.post('/api/reservation/verify', async (req: Request, res: Response) => {
 });
 
 // 3. Patient reports violation (Price Gouging, Phantom Stock, Expired Drug)
-app.post('/api/report/violation', (req: Request, res: Response) => {
+app.post('/api/report/violation', async (req: Request, res: Response) => {
   const { patientUserId, pharmacyId, medicineName, issueType, description } = req.body;
   if (!patientUserId || !pharmacyId || !issueType) {
     return res.status(400).json({ success: false, error: 'patientUserId, pharmacyId, and issueType are required' });
   }
-  const result = db.reportViolation({
+  const result = await dbRepo.reportViolation({
     patientUserId,
     pharmacyId,
     medicineName: medicineName || 'Unspecified Drug',
@@ -497,9 +497,9 @@ app.post('/api/report/violation', (req: Request, res: Response) => {
 });
 
 // 4. Pharmacy Trust Metrics and regulatory license inquiry
-app.get('/api/pharmacy/:pharmacyId/trust', (req: Request, res: Response) => {
+app.get('/api/pharmacy/:pharmacyId/trust', async (req: Request, res: Response) => {
   const pharmacyId = String(req.params.pharmacyId);
-  const pharmacy = db.pharmacies.find((p) => p.id === pharmacyId);
+  const pharmacy = await dbRepo.getPharmacyById(pharmacyId);
   if (!pharmacy) return res.status(404).json({ success: false, error: 'Pharmacy not found' });
   res.json({
     success: true,
@@ -873,10 +873,11 @@ app.post('/api/telegram/simulate-chat', async (req: Request, res: Response) => {
 });
 
 // List all verification applications for Admin Review Desk
-app.get('/api/telegram/applications', (_req: Request, res: Response) => {
+app.get('/api/telegram/applications', async (_req: Request, res: Response) => {
+  const applications = await dbRepo.getVerificationApplications();
   res.json({
     success: true,
-    applications: db.verificationApplications,
+    applications,
   });
 });
 
@@ -1113,18 +1114,12 @@ const server = app.listen(port, async () => {
 
 // Graceful Shutdown Hooks (SIGTERM & SIGINT)
 const gracefulShutdown = async (signal: string) => {
-  console.log(`\n[Server] Received ${signal}. Starting graceful shutdown...`);
+  console.log(`[Server] Received ${signal}. Closing HTTP server and database pool...`);
   server.close(async () => {
     console.log('[Server] HTTP server closed.');
-    await closeDbPool();
-    console.log('[Server] Graceful shutdown completed.');
+    await closePostgresPool(); // Call pool.end() from db-client.ts
     process.exit(0);
   });
-
-  setTimeout(() => {
-    console.error('[Server] Forcing shutdown after timeout.');
-    process.exit(1);
-  }, 10000).unref();
 };
 
 process.on('SIGTERM', () => gracefulShutdown('SIGTERM'));

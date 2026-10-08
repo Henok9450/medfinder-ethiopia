@@ -86,3 +86,6 @@ export async function closeDbPool(): Promise<void> {
   }
 }
 
+export const closePostgresPool = closeDbPool;
+
+

@@ -112,4 +112,57 @@ export interface IDatabaseRepository {
     pharmacyId: string,
     item: { name: string; genericName?: string; category?: string; priceETB: number; inStock?: boolean }
   ): Promise<boolean>;
+
+  /**
+   * Toggle medicine in/out of stock
+   */
+  toggleMedicineStock(pharmacyId: string, medicineName: string, inStock: boolean): Promise<boolean>;
+
+  /**
+   * Remove medicine from shelf
+   */
+  removeMedicine(pharmacyId: string, medicineName: string): Promise<boolean>;
+
+  /**
+   * Bulk import checklist
+   */
+  bulkImportChecklist(
+    pharmacyId: string,
+    items: Array<{ name: string; priceETB: number; category?: string; genericName?: string }>
+  ): Promise<number>;
+
+  /**
+   * Parse and import CSV/Excel inventory
+   */
+  parseAndImportCsv(pharmacyId: string, csvContent: string): Promise<{ imported: number; errors: number }>;
+
+  /**
+   * Report pharmacy violation (price gouging, phantom stock, etc.)
+   */
+  reportViolation(params: {
+    patientUserId: string;
+    pharmacyId: string;
+    medicineName: string;
+    issueType: 'PRICE_GOUGING' | 'OUT_OF_STOCK_PHANTOM' | 'EXPIRED_MEDICINE' | 'UNPROFESSIONAL';
+    description?: string;
+  }): Promise<{ success: boolean; strikeCount: number; newTrustScore: number; penaltyApplied: string }>;
+
+  /**
+   * Get all verification applications
+   */
+  getVerificationApplications(): Promise<PharmacyVerificationApplication[]>;
+
+  /**
+   * Resubmit verification application with updated docs/location
+   */
+  resubmitVerificationApplication(
+    id: string,
+    updates: {
+      photoUrl?: string;
+      efdaLicenseNumber?: string;
+      tinNumber?: string;
+      location?: { latitude: number; longitude: number; subCity?: string; addressDetails?: string };
+      note?: string;
+    }
+  ): Promise<PharmacyVerificationApplication | null>;
 }

@@ -637,4 +637,276 @@ export class PostgresRepository implements IDatabaseRepository {
 
     return true;
   }
+
+  public async toggleMedicineStock(pharmacyId: string, medicineName: string, inStock: boolean): Promise<boolean> {
+    const pool = getDbPool();
+    if (!pool) return false;
+
+    const pharmacy = await this.getPharmacyById(pharmacyId);
+    if (!pharmacy) return false;
+
+    const inventory = [...pharmacy.inventory];
+    const item = inventory.find((i) => i.name.toLowerCase() === medicineName.toLowerCase());
+    if (!item) return false;
+
+    item.inStock = inStock;
+    item.updatedAt = new Date().toISOString();
+
+    let inStockItems = [...pharmacy.inStockItems];
+    const lower = medicineName.toLowerCase();
+    if (!inStock) {
+      inStockItems = inStockItems.filter((i) => !i.includes(lower));
+    } else if (!inStockItems.includes(lower)) {
+      inStockItems.push(lower);
+    }
+
+    await pool.query(
+      `UPDATE pharmacies SET inventory = $1, in_stock_items = $2, updated_at = NOW() WHERE id = $3`,
+      [JSON.stringify(inventory), inStockItems, pharmacyId]
+    );
+
+    return true;
+  }
+
+  public async removeMedicine(pharmacyId: string, medicineName: string): Promise<boolean> {
+    const pool = getDbPool();
+    if (!pool) return false;
+
+    const pharmacy = await this.getPharmacyById(pharmacyId);
+    if (!pharmacy) return false;
+
+    const inventory = pharmacy.inventory.filter((i) => i.name.toLowerCase() !== medicineName.toLowerCase());
+    const inStockItems = pharmacy.inStockItems.filter((i) => !i.includes(medicineName.toLowerCase()));
+
+    await pool.query(
+      `UPDATE pharmacies SET inventory = $1, in_stock_items = $2, updated_at = NOW() WHERE id = $3`,
+      [JSON.stringify(inventory), inStockItems, pharmacyId]
+    );
+
+    return true;
+  }
+
+  public async bulkImportChecklist(
+    pharmacyId: string,
+    items: Array<{ name: string; priceETB: number; category?: string; genericName?: string }>
+  ): Promise<number> {
+    let count = 0;
+    for (const item of items) {
+      if (await this.addOrUpdateMedicine(pharmacyId, item)) {
+        count++;
+      }
+    }
+    return count;
+  }
+
+  public async parseAndImportCsv(pharmacyId: string, csvContent: string): Promise<{ imported: number; errors: number }> {
+    const lines = csvContent.split('\n');
+    let imported = 0;
+    let errors = 0;
+
+    for (const line of lines) {
+      const trimmed = line.trim();
+      if (!trimmed || trimmed.toLowerCase().startsWith('medicine') || trimmed.toLowerCase().startsWith('name')) {
+        continue;
+      }
+
+      const parts = trimmed.split(',').map((p) => p.trim());
+      if (parts.length >= 2) {
+        const name = parts[0];
+        const priceETB = parseFloat(parts[1]);
+        const category = parts[2] || 'Imported';
+
+        if (name && !isNaN(priceETB)) {
+          const ok = await this.addOrUpdateMedicine(pharmacyId, { name, priceETB, category });
+          if (ok) imported++;
+          else errors++;
+        } else {
+          errors++;
+        }
+      }
+    }
+
+    return { imported, errors };
+  }
+
+  public async reportViolation(params: {
+    patientUserId: string;
+    pharmacyId: string;
+    medicineName: string;
+    issueType: 'PRICE_GOUGING' | 'OUT_OF_STOCK_PHANTOM' | 'EXPIRED_MEDICINE' | 'UNPROFESSIONAL';
+    description?: string;
+  }): Promise<{ success: boolean; strikeCount: number; newTrustScore: number; penaltyApplied: string }> {
+    const pool = getDbPool();
+    if (!pool) return { success: false, strikeCount: 0, newTrustScore: 0, penaltyApplied: 'Database offline' };
+
+    const pharmacy = await this.getPharmacyById(params.pharmacyId);
+    if (!pharmacy) return { success: false, strikeCount: 0, newTrustScore: 0, penaltyApplied: 'Pharmacy not found' };
+
+    const newStrike = pharmacy.strikeCount + 1;
+    const newTrust = Math.max(10, pharmacy.trustScore - 15);
+    let penalty = 'Formal Warning Logged';
+    let isShadowBanned = pharmacy.isShadowBanned;
+    let shadowBanUntil: string | null = pharmacy.shadowBanUntil || null;
+    let isVerified = pharmacy.isVerified;
+    let isPermanentlyBanned = pharmacy.isPermanentlyBanned;
+
+    if (newStrike === 1) {
+      isShadowBanned = true;
+      shadowBanUntil = new Date(Date.now() + 48 * 60 * 60 * 1000).toISOString();
+      penalty = 'Strike 1: 48-Hour Broadcast Shadowban applied + Trust Score dropped by 15%.';
+    } else if (newStrike === 2) {
+      isVerified = false;
+      isShadowBanned = true;
+      penalty = 'Strike 2: "Verified" EFDA Badge revoked and pharmacy deprioritized.';
+    } else if (newStrike >= 3) {
+      isPermanentlyBanned = true;
+      isVerified = false;
+      penalty = 'Strike 3: Permanent Blacklist! License and TIN permanently banned from MedFinder.';
+    }
+
+    await pool.query(
+      `UPDATE pharmacies SET 
+        strike_count = $1, trust_score = $2, is_shadow_banned = $3, 
+        shadow_ban_until = $4, is_verified = $5, is_permanently_banned = $6,
+        updated_at = NOW()
+       WHERE id = $7`,
+      [newStrike, newTrust, isShadowBanned, shadowBanUntil ? new Date(shadowBanUntil) : null, isVerified, isPermanentlyBanned, params.pharmacyId]
+    );
+
+    const reportId = `REP-${Date.now()}`;
+    await pool.query(
+      `INSERT INTO violation_reports (
+        id, patient_user_id, pharmacy_id, pharmacy_name, medicine_name,
+        issue_type, description, reported_at, strike_applied, new_trust_score
+      )
+      VALUES ($1, $2, $3, $4, $5, $6, $7, NOW(), TRUE, $8)`,
+      [reportId, params.patientUserId, pharmacy.id, pharmacy.name, params.medicineName, params.issueType, params.description || null, newTrust]
+    );
+
+    return {
+      success: true,
+      strikeCount: newStrike,
+      newTrustScore: newTrust,
+      penaltyApplied: penalty,
+    };
+  }
+
+  public async getVerificationApplications(): Promise<PharmacyVerificationApplication[]> {
+    const pool = getDbPool();
+    if (!pool) return [];
+
+    const res = await pool.query(
+      `SELECT *, ST_Y(location::geometry) as lat, ST_X(location::geometry) as lng 
+       FROM pharmacy_verification_applications ORDER BY submitted_at DESC`
+    );
+
+    return res.rows.map((r) => ({
+      id: r.id,
+      telegramChatId: r.telegram_chat_id,
+      telegramUsername: r.telegram_username,
+      pharmacyName: r.pharmacy_name,
+      subCity: r.sub_city,
+      addressDetails: r.address_details,
+      latitude: r.lat !== null ? parseFloat(r.lat) : undefined,
+      longitude: r.lng !== null ? parseFloat(r.lng) : undefined,
+      gpsLocationVerified: Boolean(r.gps_location_verified),
+      phone: r.phone,
+      pharmacistName: r.pharmacist_name,
+      pharmacistLicenseNumber: r.pharmacist_license_number,
+      efdaLicenseNumber: r.efda_license_number,
+      tinNumber: r.tin_number,
+      counterPhotoUrl: r.counter_photo_url,
+      efdaDocUrl: r.efda_doc_url,
+      status: r.status,
+      adminNotes: r.admin_notes,
+      requestedInfoReason: r.requested_info_reason,
+      submittedAt: new Date(r.submitted_at).toISOString(),
+      reviewedAt: r.reviewed_at ? new Date(r.reviewed_at).toISOString() : undefined,
+      approvedPharmacyId: r.approved_pharmacy_id,
+      portalUsername: r.portal_username,
+      portalTempPassword: r.portal_temp_password,
+      portalSetupToken: r.portal_setup_token,
+    }));
+  }
+
+  public async resubmitVerificationApplication(
+    id: string,
+    updates: {
+      photoUrl?: string;
+      efdaLicenseNumber?: string;
+      tinNumber?: string;
+      location?: { latitude: number; longitude: number; subCity?: string; addressDetails?: string };
+      note?: string;
+    }
+  ): Promise<PharmacyVerificationApplication | null> {
+    const pool = getDbPool();
+    if (!pool) return null;
+
+    let locSql = '';
+    const params: any[] = [id];
+
+    if (updates.location) {
+      params.push(updates.location.longitude, updates.location.latitude);
+      locSql = `, location = ST_SetSRID(ST_MakePoint($${params.length - 1}, $${params.length}), 4326), gps_location_verified = TRUE`;
+      if (updates.location.subCity) {
+        params.push(updates.location.subCity);
+        locSql += `, sub_city = $${params.length}`;
+      }
+      if (updates.location.addressDetails) {
+        params.push(updates.location.addressDetails);
+        locSql += `, address_details = $${params.length}`;
+      }
+    }
+
+    if (updates.photoUrl) {
+      params.push(updates.photoUrl);
+      locSql += `, counter_photo_url = $${params.length}, efda_doc_url = $${params.length}`;
+    }
+    if (updates.efdaLicenseNumber) {
+      params.push(updates.efdaLicenseNumber);
+      locSql += `, efda_license_number = $${params.length}`;
+    }
+    if (updates.tinNumber) {
+      params.push(updates.tinNumber);
+      locSql += `, tin_number = $${params.length}`;
+    }
+
+    const note = updates.note || 'Applicant uploaded updated verification materials';
+    params.push(note);
+    const noteParamIdx = params.length;
+
+    const query = `
+      UPDATE pharmacy_verification_applications
+      SET status = 'RESUBMITTED', resubmitted_at = NOW(), pharmacist_update_note = $${noteParamIdx}
+          ${locSql}
+      WHERE id = $1
+      RETURNING *, ST_Y(location::geometry) as lat, ST_X(location::geometry) as lng;
+    `;
+
+    const res = await pool.query(query, params);
+    if (res.rows.length === 0) return null;
+    const r = res.rows[0];
+
+    return {
+      id: r.id,
+      telegramChatId: r.telegram_chat_id,
+      telegramUsername: r.telegram_username,
+      pharmacyName: r.pharmacy_name,
+      subCity: r.sub_city,
+      addressDetails: r.address_details,
+      latitude: r.lat !== null ? parseFloat(r.lat) : undefined,
+      longitude: r.lng !== null ? parseFloat(r.lng) : undefined,
+      gpsLocationVerified: Boolean(r.gps_location_verified),
+      phone: r.phone,
+      pharmacistName: r.pharmacist_name,
+      pharmacistLicenseNumber: r.pharmacist_license_number,
+      efdaLicenseNumber: r.efda_license_number,
+      tinNumber: r.tin_number,
+      counterPhotoUrl: r.counter_photo_url,
+      efdaDocUrl: r.efda_doc_url,
+      status: r.status,
+      submittedAt: new Date(r.submitted_at).toISOString(),
+    };
+  }
 }
+

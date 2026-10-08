@@ -1,7 +1,7 @@
 import { IDatabaseRepository } from './repository.interface';
 import { PostgresRepository } from './postgres-repository';
 import { InMemoryRepository } from './in-memory-repository';
-import { isPostgresConnected, getDbPool, closeDbPool, runMigrations } from './db-client';
+import { isPostgresConnected, getDbPool, closeDbPool, closePostgresPool, runMigrations } from './db-client';
 
 const inMemoryRepository = new InMemoryRepository();
 const postgresRepository = new PostgresRepository();
@@ -42,5 +42,6 @@ export {
   isPostgresConnected,
   getDbPool,
   closeDbPool,
+  closePostgresPool,
   runMigrations,
 };
