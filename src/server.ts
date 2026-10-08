@@ -10,6 +10,7 @@ import { TemplateService } from './localization/template.service';
 import { AdminConfigController } from './admin/admin-config.controller';
 import { InMemoryDatabase, MASTER_MEDICINE_CATALOG, AdminRole, AdminPrivileges } from './database/in-memory-db';
 import { TelegramVerificationBotService } from './verification/telegram-verification-bot.service';
+import { isPostgresConnected, runMigrations } from './database/db-client';
 
 dotenv.config();
 
@@ -1063,12 +1064,18 @@ app.post('/api/telegram/disconnect', requireAdminAuth, requirePrivilege('canMana
 });
 
 // System Health & Status
-app.get('/api/health', (req: Request, res: Response) => {
+app.get('/api/health', async (req: Request, res: Response) => {
   const policy = configService.getPolicy();
+  const dbConnected = await isPostgresConnected();
   res.json({
     name: 'MedFinder Ethiopia API',
     status: 'ACTIVE',
     version: policy.version,
+    database: {
+      type: dbConnected ? 'PostgreSQL (PostGIS)' : 'In-Memory (Development)',
+      connected: dbConnected,
+      postgisEnabled: dbConnected,
+    },
     currentFreePromotionUntil: policy.monetization.freePromotionUntil,
     activeMode: policy.monetization.globalMode,
     monthlyPassETB: policy.monetization.pricing.monthlyPassETB,
@@ -1088,9 +1095,21 @@ app.get('/', (req: Request, res: Response) => {
   res.sendFile(path.join(__dirname, '../public/index.html'));
 });
 
-app.listen(port, () => {
+app.listen(port, async () => {
   console.log(`=======================================================`);
   console.log(` MedFinder Ethiopia Server running on http://localhost:${port}`);
   console.log(` Dynamic Free Promotion Ends: ${configService.getPolicy().monetization.freePromotionUntil}`);
+  
+  if (process.env.DATABASE_URL) {
+    const isConnected = await isPostgresConnected();
+    if (isConnected) {
+      console.log(` Database: PostgreSQL + PostGIS connected! Running auto-migration...`);
+      await runMigrations();
+    } else {
+      console.warn(` ⚠️ Database: Could not connect to DATABASE_URL. Falling back to in-memory.`);
+    }
+  } else {
+    console.log(` Database: Running with In-Memory store (Add DATABASE_URL to .env to enable Supabase)`);
+  }
   console.log(`=======================================================`);
 });
