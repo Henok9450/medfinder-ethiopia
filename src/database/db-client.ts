@@ -1,6 +1,7 @@
 import { Pool, PoolConfig } from 'pg';
 import fs from 'fs';
 import path from 'path';
+import crypto from 'crypto';
 import dotenv from 'dotenv';
 
 dotenv.config();
@@ -77,6 +78,27 @@ export async function runMigrations(): Promise<{ success: boolean; message: stri
     console.log('[PostgreSQL] Running PostGIS migrations on Supabase/Postgres...');
     await p.query(sql);
     console.log('[PostgreSQL] ✅ PostGIS extensions and tables created successfully!');
+
+    // Ensure default master admin exists
+    const defaultUsername = 'admin';
+    const defaultPassword = process.env.ADMIN_DEFAULT_PASSWORD || 'Admin@MedFinder2026!';
+    const passwordHash = crypto.createHash('sha256').update(defaultPassword + '_medfinder_ethiopia_salt').digest('hex');
+    const privileges = JSON.stringify({
+      canReviewApplications: true,
+      canManagePolicies: true,
+      canImposeSanctions: true,
+      canManageAdmins: true,
+      canViewAuditLogs: true,
+    });
+
+    await p.query(
+      `INSERT INTO admin_users (id, username, full_name, email, role, privileges, password_hash)
+       VALUES ($1, $2, $3, $4, $5, $6, $7)
+       ON CONFLICT (username) DO NOTHING`,
+      ['adm-super-01', defaultUsername, 'Chief Regulatory Administrator (EFDA)', 'admin@efda.gov.et', 'SUPER_ADMIN', privileges, passwordHash]
+    );
+    console.log('[PostgreSQL] ✅ Master admin user verified/seeded!');
+
     return { success: true, message: 'Migrations completed successfully.' };
   } catch (err: any) {
     console.error('[PostgreSQL] ❌ Migration failed:', err.message);
