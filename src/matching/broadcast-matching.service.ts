@@ -1,10 +1,34 @@
 import { v4 as uuidv4 } from 'uuid';
 import { DynamicConfigService } from '../config/dynamic-config.service';
 import { InMemoryDatabase, Pharmacy, BroadcastRequest } from '../database/in-memory-db';
+import { getDatabaseRepository } from '../database';
 
 export class BroadcastMatchingService {
   private configService = DynamicConfigService.getInstance();
   private db = InMemoryDatabase.getInstance();
+
+  /**
+   * Search for pre-indexed medicines near user location using Repository Layer (PostGIS or In-Memory)
+   */
+  public async searchCatalogWithRepository(params: {
+    medicineName: string;
+    userLat: number;
+    userLng: number;
+  }): Promise<Array<{ pharmacy: Pharmacy; distanceKm: number }>> {
+    const policy = this.configService.getPolicy();
+    const radius = policy.geoMatching.initialRadiusKm;
+    const repo = getDatabaseRepository();
+    const results = await repo.searchPharmacies(
+      params.medicineName,
+      params.userLat,
+      params.userLng,
+      radius
+    );
+    return results.map((p) => {
+      const { distanceKm, ...pharmacy } = p;
+      return { pharmacy: pharmacy as Pharmacy, distanceKm: distanceKm || 0 };
+    });
+  }
 
   /**
    * Calculate distance between two lat/lng points in kilometers using Haversine formula

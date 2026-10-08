@@ -72,3 +72,17 @@ export async function runMigrations(): Promise<{ success: boolean; message: stri
     return { success: false, message: err.message };
   }
 }
+
+export async function closeDbPool(): Promise<void> {
+  if (pool) {
+    try {
+      await pool.end();
+      console.log('[PostgreSQL] Connection pool closed gracefully.');
+    } catch (err: any) {
+      console.error('[PostgreSQL] Error closing pool:', err.message);
+    } finally {
+      pool = null;
+    }
+  }
+}
+

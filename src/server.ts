@@ -10,7 +10,7 @@ import { TemplateService } from './localization/template.service';
 import { AdminConfigController } from './admin/admin-config.controller';
 import { InMemoryDatabase, MASTER_MEDICINE_CATALOG, AdminRole, AdminPrivileges } from './database/in-memory-db';
 import { TelegramVerificationBotService } from './verification/telegram-verification-bot.service';
-import { isPostgresConnected, runMigrations } from './database/db-client';
+import { getDatabaseRepository, initDatabase, closeDbPool, isPostgresConnected } from './database';
 
 dotenv.config();
 
@@ -35,6 +35,7 @@ const broadcastService = new BroadcastMatchingService();
 const templateService = new TemplateService();
 const adminController = new AdminConfigController();
 const db = InMemoryDatabase.getInstance();
+const dbRepo = getDatabaseRepository();
 const telegramBotService = new TelegramVerificationBotService();
 
 // ==========================================
@@ -89,8 +90,8 @@ app.post('/api/search', async (req: Request, res: Response) => {
   // 2. Access is Allowed (Free promo period, active pass, or free quota)
   monetizationService.recordSearchUsage(userId);
 
-  // 3. Search direct indexed inventory
-  const directMatches = broadcastService.searchDirectCatalog({
+  // 3. Search direct indexed inventory using Repository (PostGIS or In-Memory)
+  const directMatches = await broadcastService.searchCatalogWithRepository({
     medicineName,
     userLat: Number(userLat),
     userLng: Number(userLng),
@@ -188,18 +189,18 @@ app.post('/api/pharmacy/respond', (req: Request, res: Response) => {
 // ==========================================
 // 3A. PHARMACY PORTAL AUTHENTICATION & SETUP
 // ==========================================
-app.post('/api/pharmacy/auth/login', (req: Request, res: Response) => {
+app.post('/api/pharmacy/auth/login', async (req: Request, res: Response) => {
   const { username, password } = req.body;
   if (!username || !password) {
     return res.status(400).json({ success: false, error: 'Username and password are required' });
   }
 
-  const auth = db.authenticatePharmacy(String(username), String(password));
+  const auth = await dbRepo.authenticatePharmacy(String(username), String(password));
   if (!auth.success || !auth.account) {
     return res.status(401).json({ success: false, error: auth.error || 'Invalid credentials' });
   }
 
-  const pharmacy = db.pharmacies.find((p) => p.id === auth.account?.pharmacyId);
+  const pharmacy = await dbRepo.getPharmacyById(auth.account.pharmacyId);
 
   res.json({
     success: true,
@@ -339,7 +340,7 @@ app.get(['/pharmacy', '/pharmacy/setup', '/pharmacy/index.html'], (_req: Request
 });
 
 // Update Pharmacy GPS Location from Counter Web Studio
-app.post('/api/pharmacy/:pharmacyId/location', (req: Request, res: Response) => {
+app.post('/api/pharmacy/:pharmacyId/location', async (req: Request, res: Response) => {
   const pharmacyId = String(req.params.pharmacyId);
   const { latitude, longitude, subCity, addressDetails } = req.body;
 
@@ -347,12 +348,13 @@ app.post('/api/pharmacy/:pharmacyId/location', (req: Request, res: Response) => 
     return res.status(400).json({ success: false, error: 'latitude and longitude are required' });
   }
 
-  const result = db.updatePharmacyLocation(pharmacyId, {
-    latitude: Number(latitude),
-    longitude: Number(longitude),
-    subCity: subCity ? String(subCity) : undefined,
-    addressDetails: addressDetails ? String(addressDetails) : undefined,
-  });
+  const result = await dbRepo.updatePharmacyLocation(
+    pharmacyId,
+    Number(latitude),
+    Number(longitude),
+    subCity ? String(subCity) : undefined,
+    addressDetails ? String(addressDetails) : undefined
+  );
 
   if (!result.success) {
     return res.status(404).json(result);
@@ -451,12 +453,12 @@ app.delete('/api/pharmacy/:pharmacyId/inventory/:medicineName', (req: Request, r
 // 3C. ANTI-SCAM & PRICE-LOCK RESERVATION APIS
 // ==========================================
 // 1. Create a 60-Minute Price Lock Reservation Hold (Protects patient from bait-and-switch)
-app.post('/api/reservation/create', (req: Request, res: Response) => {
+app.post('/api/reservation/create', async (req: Request, res: Response) => {
   const { patientUserId, pharmacyId, medicineName, lockedPriceETB } = req.body;
   if (!patientUserId || !pharmacyId || !medicineName || lockedPriceETB === undefined) {
     return res.status(400).json({ success: false, error: 'Missing required reservation fields' });
   }
-  const hold = db.createReservationHold({
+  const hold = await dbRepo.createReservationHold({
     patientUserId,
     pharmacyId,
     medicineName,
@@ -471,10 +473,10 @@ app.post('/api/reservation/create', (req: Request, res: Response) => {
 });
 
 // 2. Counter verification by pharmacist when patient arrives
-app.post('/api/reservation/verify', (req: Request, res: Response) => {
+app.post('/api/reservation/verify', async (req: Request, res: Response) => {
   const { reservationCode } = req.body;
   if (!reservationCode) return res.status(400).json({ success: false, error: 'reservationCode is required' });
-  const result = db.verifyAndFulfillReservation(String(reservationCode));
+  const result = await dbRepo.verifyAndFulfillReservation(String(reservationCode));
   res.json(result);
 });
 
@@ -689,13 +691,13 @@ app.post('/api/auth/logout', (req: Request, res: Response) => {
 });
 
 // --- Admin Auth Endpoints ---
-app.post('/api/admin/auth/login', (req: Request, res: Response) => {
+app.post('/api/admin/auth/login', async (req: Request, res: Response) => {
   const { username, password } = req.body;
   if (!username || !password) {
     return res.status(400).json({ success: false, error: 'Username and password are required' });
   }
 
-  const result = db.authenticateAdmin(String(username), String(password));
+  const result = await dbRepo.authenticateAdmin(String(username), String(password));
   if (!result.success) {
     return res.status(401).json({ success: false, error: result.error || 'Invalid administrator credentials' });
   }
@@ -887,7 +889,7 @@ app.post('/api/telegram/applications/:id/review', requireAdminAuth, requirePrivi
     return res.status(400).json({ success: false, error: 'Valid status required: APPROVED, REJECTED, INFO_REQUESTED' });
   }
 
-  const reviewResult = db.reviewVerificationApplication(id, status, adminNotes, efdaLicenseNumber);
+  const reviewResult = await dbRepo.reviewVerificationApplication(id, status, adminNotes, efdaLicenseNumber);
   if (!reviewResult.success || !reviewResult.application) {
     return res.status(404).json({ success: false, error: reviewResult.error || 'Application not found' });
   }
@@ -1095,21 +1097,36 @@ app.get('/', (req: Request, res: Response) => {
   res.sendFile(path.join(__dirname, '../public/index.html'));
 });
 
-app.listen(port, async () => {
+const server = app.listen(port, async () => {
   console.log(`=======================================================`);
   console.log(` MedFinder Ethiopia Server running on http://localhost:${port}`);
   console.log(` Dynamic Free Promotion Ends: ${configService.getPolicy().monetization.freePromotionUntil}`);
   
-  if (process.env.DATABASE_URL) {
-    const isConnected = await isPostgresConnected();
-    if (isConnected) {
-      console.log(` Database: PostgreSQL + PostGIS connected! Running auto-migration...`);
-      await runMigrations();
-    } else {
-      console.warn(` ⚠️ Database: Could not connect to DATABASE_URL. Falling back to in-memory.`);
-    }
+  const { isPostgres } = await initDatabase();
+  if (isPostgres) {
+    console.log(` Database: Production PostgreSQL + PostGIS connected & migrations applied!`);
   } else {
-    console.log(` Database: Running with In-Memory store (Add DATABASE_URL to .env to enable Supabase)`);
+    console.log(` Database: Running with In-Memory store (Configure DATABASE_URL to enable PostgreSQL)`);
   }
   console.log(`=======================================================`);
 });
+
+// Graceful Shutdown Hooks (SIGTERM & SIGINT)
+const gracefulShutdown = async (signal: string) => {
+  console.log(`\n[Server] Received ${signal}. Starting graceful shutdown...`);
+  server.close(async () => {
+    console.log('[Server] HTTP server closed.');
+    await closeDbPool();
+    console.log('[Server] Graceful shutdown completed.');
+    process.exit(0);
+  });
+
+  setTimeout(() => {
+    console.error('[Server] Forcing shutdown after timeout.');
+    process.exit(1);
+  }, 10000).unref();
+};
+
+process.on('SIGTERM', () => gracefulShutdown('SIGTERM'));
+process.on('SIGINT', () => gracefulShutdown('SIGINT'));
+
