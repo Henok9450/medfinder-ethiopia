@@ -28,6 +28,7 @@ RUN npm install --omit=dev
 
 # Copy compiled JavaScript from builder stage
 COPY --from=builder /app/dist ./dist
+COPY src/database/schema.sql ./dist/database/schema.sql
 
 # Copy public static assets & html web studio
 COPY public/ ./public/

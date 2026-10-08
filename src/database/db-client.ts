@@ -47,6 +47,8 @@ export async function isPostgresConnected(): Promise<boolean> {
   }
 }
 
+import { SCHEMA_SQL } from './schema-sql';
+
 export async function runMigrations(): Promise<{ success: boolean; message: string }> {
   const p = getDbPool();
   if (!p) {
@@ -57,12 +59,21 @@ export async function runMigrations(): Promise<{ success: boolean; message: stri
   }
 
   try {
-    const schemaPath = path.join(__dirname, 'schema.sql');
-    if (!fs.existsSync(schemaPath)) {
-      throw new Error(`Schema file not found at: ${schemaPath}`);
+    const candidatePaths = [
+      path.join(__dirname, 'schema.sql'),
+      path.join(__dirname, '../src/database/schema.sql'),
+      path.join(process.cwd(), 'src/database/schema.sql'),
+      path.join(process.cwd(), 'dist/database/schema.sql'),
+    ];
+
+    let sql = SCHEMA_SQL;
+    for (const pth of candidatePaths) {
+      if (fs.existsSync(pth)) {
+        sql = fs.readFileSync(pth, 'utf8');
+        break;
+      }
     }
 
-    const sql = fs.readFileSync(schemaPath, 'utf8');
     console.log('[PostgreSQL] Running PostGIS migrations on Supabase/Postgres...');
     await p.query(sql);
     console.log('[PostgreSQL] ✅ PostGIS extensions and tables created successfully!');
