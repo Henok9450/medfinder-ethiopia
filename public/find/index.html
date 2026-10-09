@@ -748,6 +748,7 @@
 
           const dirBtn = document.getElementById('voucherDirectionsBtn');
           if (dirBtn) {
+            dirBtn.classList.remove('hidden');
             dirBtn.className = 'flex items-center justify-center gap-2 w-full py-3 px-3 bg-emerald-600 hover:bg-emerald-700 active:scale-98 text-white rounded-xl text-xs font-bold transition shadow-md';
           }
 
@@ -839,8 +840,16 @@
             const countdownWrapper = document.getElementById('voucherCountdownWrapper');
             if (countdownWrapper) countdownWrapper.innerHTML = 'Status: <strong class="text-rose-400 font-bold">CANCELLED (ተሰርዟል)</strong>';
 
+            // Hide directions button since medicine is out of stock at this location
+            const dirBtn = document.getElementById('voucherDirectionsBtn');
+            if (dirBtn) dirBtn.classList.add('hidden');
+
             // Prominent "Find Another" button
-            document.getElementById('voucherFindAnotherBtn').classList.remove('hidden');
+            const findAnotherBtn = document.getElementById('voucherFindAnotherBtn');
+            if (findAnotherBtn) {
+              findAnotherBtn.classList.remove('hidden');
+              findAnotherBtn.className = 'w-full bg-emerald-600 hover:bg-emerald-700 active:scale-98 text-white text-xs font-black py-3.5 px-4 rounded-xl transition shadow-lg ring-4 ring-emerald-400/30 flex items-center justify-center gap-2 animate-bounce';
+            }
             document.getElementById('voucherCloseBtn').innerText = 'Dismiss';
           } else if (r.status === 'FULFILLED') {
             // Fulfilled & Dispensed at Counter!
@@ -978,11 +987,18 @@
     }
 
     function findAnotherPharmacy() {
+      const medName = document.getElementById('voucherMedicineName')?.innerText?.trim() || '';
       closeReservationModal();
-      const input = document.getElementById('searchQuery');
+      const input = document.getElementById('medicineInput');
       if (input) {
+        if (medName) {
+          input.value = medName;
+        }
         input.focus();
         input.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      }
+      if (medName && typeof executeMedicineSearch === 'function') {
+        executeMedicineSearch();
       }
     }
 
@@ -1013,6 +1029,23 @@
       stopSafetyTimer();
       currentReservationCode = null;
     }
+
+    // Auto-search if opened from Telegram or deep-link with ?q=Medicine
+    window.addEventListener('DOMContentLoaded', () => {
+      try {
+        const params = new URLSearchParams(window.location.search);
+        const q = params.get('q') || params.get('search');
+        if (q) {
+          const input = document.getElementById('medicineInput');
+          if (input) {
+            input.value = q;
+            executeMedicineSearch();
+          }
+        }
+      } catch (e) {
+        console.warn('[Startup] Deep-link query parse failed:', e);
+      }
+    });
   </script>
 </body>
 </html>

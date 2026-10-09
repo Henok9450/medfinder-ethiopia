@@ -1069,6 +1069,9 @@ export class TelegramVerificationBotService {
     const ep = this.patientBot.token ? this.patientBot : this.pharmacyBot;
     if (!ep.token || !hold.patientUserId) return false;
 
+    const patientPwaUrl = this.getPatientPwaUrl();
+    const webSearchUrl = `${patientPwaUrl}?q=${encodeURIComponent(hold.medicineName)}`;
+
     const text = `⚠️ **አስፈላጊ ማሳወቂያ፦ መድኃኒቱ በካውንተር ላይ አልቋል**
 **Stock Unavailable / Sold Out**
 ━━━━━━━━━━━━━━━━━━━━━━━━━━
@@ -1077,13 +1080,25 @@ export class TelegramVerificationBotService {
 ━━━━━━━━━━━━━━━━━━━━━━━━━━
 ይቅርታ፣ ፋርማሲው መድኃኒቱ በካውንተር ላይ እንዳለቀ ስላሳወቀ አላስፈላጊ ጉዞ እንዳያደርጉ ማስያዣው (#${hold.reservationCode}) ተሰርዟል።
 
-እባክዎ በአቅራቢያዎ የሚገኝ ሌላ ፋርማሲ ይፈልጉ።
-👉 **/start** ብለው በመጻፍ አዲስ ፍለጋ ማካሄድ ይችላሉ።`;
+እባክዎ በአቅራቢያዎ የሚገኝ ሌላ ፋርማሲ ይፈልጉ። ከታች ያለውን ቁልፍ በመጫን ለዚህ መድኃኒት ሌሎች ፋርማሲዎችን ወዲያውኑ መፈለግ ይችላሉ፦`;
+
+    const inlineKeyboard: Array<Array<{ text: string; url?: string; callback_data?: string }>> = [
+      [
+        { text: `🔍 ሌላ ፋርማሲ ፈልግ (${hold.medicineName})`, callback_data: `search_${hold.medicineName}` },
+      ],
+      [
+        { text: '🌐 በድረ-ገጽ ፈልግ / Search on Web', url: webSearchUrl },
+      ],
+      [
+        { text: '💊 አዲስ ፍለጋ / New Search', callback_data: '/start' },
+      ],
+    ];
 
     await this.sendRealTelegramReply(hold.patientUserId, {
       chatId: hold.patientUserId,
       replyText: text,
-      quickReplies: ['/start', '💊 አዲስ ፍለጋ'],
+      quickReplies: [`search_${hold.medicineName}`, '/start', '💊 አዲስ ፍለጋ'],
+      inlineKeyboard,
     }, ep);
 
     return true;
@@ -1206,11 +1221,19 @@ ${statusEmoji} **የአሁኑ ሁኔታ (Current Status):**
 ${statusBadge}
 ━━━━━━━━━━━━━━━━━━━━━━━━━━
 🔔 ፋርማሲስቱ የሰጠው ምላሽ በቅጽበት እዚህ ቴሌግራም ላይ ይደርስዎታል።`,
-          quickReplies: [`check_hold_${hold.reservationCode}`, '/start', '💊 አዲስ ፍለጋ'],
-          inlineKeyboard: [
-            [{ text: '🔄 ሁኔታውን በድጋሚ ፈትሽ (Refresh Status)', callback_data: `check_hold_${hold.reservationCode}` }],
-            [{ text: '🌐 Web App (/find)', url: this.getPatientPwaUrl() }]
-          ],
+          quickReplies: hold.status === 'CANCELLED' 
+            ? [`search_${hold.medicineName}`, '/start', '💊 አዲስ ፍለጋ']
+            : [`check_hold_${hold.reservationCode}`, '/start', '💊 አዲስ ፍለጋ'],
+          inlineKeyboard: hold.status === 'CANCELLED'
+            ? [
+                [{ text: `🔍 ሌላ ፋርማሲ ፈልግ (${hold.medicineName})`, callback_data: `search_${hold.medicineName}` }],
+                [{ text: '🌐 በድረ-ገጽ ፈልግ / Search on Web', url: `${this.getPatientPwaUrl()}?q=${encodeURIComponent(hold.medicineName)}` }],
+                [{ text: '💊 አዲስ ፍለጋ / New Search', callback_data: '/start' }],
+              ]
+            : [
+                [{ text: '🔄 ሁኔታውን በድጋሚ ፈትሽ (Refresh Status)', callback_data: `check_hold_${hold.reservationCode}` }],
+                [{ text: '🌐 Web App (/find)', url: this.getPatientPwaUrl() }],
+              ],
           sessionStep: 'PATIENT_SEARCH',
         };
       }

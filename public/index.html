@@ -1524,7 +1524,7 @@
       </div>
 
       <div class="p-4 border-t border-slate-100 bg-slate-50 space-y-2">
-        <button id="mainResFindAnotherBtn" onclick="closeModal('reservationModal')" class="hidden w-full bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-2.5 rounded-xl text-xs shadow-md transition flex items-center justify-center gap-1.5">
+        <button id="mainResFindAnotherBtn" onclick="findAnotherPharmacyMain()" class="hidden w-full bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-2.5 rounded-xl text-xs shadow-md transition flex items-center justify-center gap-1.5">
           <i class="fa-solid fa-magnifying-glass"></i>
           <span>Search Another Pharmacy Nearby (ሌላ ፈልግ)</span>
         </button>
@@ -4323,8 +4323,16 @@
             const countdownSubtext = document.getElementById('mainResCountdownSubtext');
             if (countdownSubtext) countdownSubtext.innerHTML = '❌ <span class="text-rose-400 font-bold">CANCELLED (ተሰርዟል)</span>';
 
+            // Hide directions button since pharmacy does not have the medicine
+            const dirBtn = document.getElementById('mainResDirectionsBtn');
+            if (dirBtn) dirBtn.classList.add('hidden');
+
             // Show "Search Another" button prominently
-            document.getElementById('mainResFindAnotherBtn').classList.remove('hidden');
+            const findAnotherBtn = document.getElementById('mainResFindAnotherBtn');
+            if (findAnotherBtn) {
+              findAnotherBtn.classList.remove('hidden');
+              findAnotherBtn.className = 'w-full bg-emerald-600 hover:bg-emerald-700 active:scale-98 text-white font-black py-3.5 px-4 rounded-xl text-xs shadow-lg ring-4 ring-emerald-400/30 transition flex items-center justify-center gap-2 animate-bounce';
+            }
             document.getElementById('mainResCloseBtn').innerText = 'Dismiss';
           } else if (r.status === 'FULFILLED') {
             // Dispensed & Fulfilled
@@ -4512,6 +4520,7 @@
 
           const dirBtn = document.getElementById('mainResDirectionsBtn');
           if (dirBtn) {
+            dirBtn.classList.remove('hidden');
             dirBtn.className = 'flex items-center justify-center gap-2 w-full py-3 px-4 bg-emerald-600 hover:bg-emerald-700 active:scale-98 text-white rounded-xl text-xs font-bold transition shadow-md';
           }
 
@@ -4777,13 +4786,42 @@
     loadTelegramApplications();
     initGlobalAuth();
 
-    // Check for direct tab navigation from Telegram Bot (e.g. ?tab=pharmacy&pharmId=pharm-bole-01)
+    function findAnotherPharmacyMain() {
+      const medName = document.getElementById('resMedName')?.innerText?.trim() || '';
+      closeModal('reservationModal');
+      if (typeof switchTab === 'function') {
+        switchTab('search');
+      }
+      const input = document.getElementById('medicineInput');
+      if (input) {
+        if (medName) {
+          input.value = medName;
+        }
+        input.focus();
+        input.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      }
+      if (medName && typeof performSearch === 'function') {
+        performSearch();
+      }
+    }
+
+    // Check for direct tab navigation or search query from Telegram Bot (e.g. ?tab=pharmacy or ?q=Insulin)
     window.addEventListener('DOMContentLoaded', () => {
       const urlParams = new URLSearchParams(window.location.search);
       const tabParam = urlParams.get('tab');
       const pharmIdParam = urlParams.get('pharmId');
+      const qParam = urlParams.get('q') || urlParams.get('search');
 
-      if (tabParam === 'pharmacy') {
+      if (qParam) {
+        if (typeof switchTab === 'function') switchTab('search');
+        const input = document.getElementById('medicineInput');
+        if (input) {
+          input.value = qParam;
+          if (typeof performSearch === 'function') {
+            performSearch();
+          }
+        }
+      } else if (tabParam === 'pharmacy') {
         switchTab('pharmacy');
         if (pharmIdParam) {
           const selectEl = document.getElementById('actingPharmacySelect');
