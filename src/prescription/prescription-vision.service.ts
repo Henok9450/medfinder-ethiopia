@@ -256,13 +256,13 @@ export class PrescriptionVisionService {
     const prompt = `You are a Senior Pharmacist and Clinical Handwriting Specialist in Ethiopia working with EFDA (Ethiopian Food and Drug Authority).
 
 CRITICAL FIRST STEP - MEDICAL RELEVANCE VALIDATION:
-Check if the image is an actual medical item:
+Check if the image contains or displays a medical prescription or medicine:
 - A doctor's handwritten or printed prescription slip / hospital discharge summary / clinic note.
-- An actual pharmaceutical medicine box, bottle, syrup, blister pack foil, ampoule, or inhaler.
+- An actual pharmaceutical medicine box, bottle, syrup, blister pack foil, ampoule, inhaler, or medicine packaging (including photos taken of a medicine package, box, or bottle displayed on a screen, paper, or flyer).
 
-If the image is NOT a medical prescription or medicine (for example: a computer keyboard, laptop screen, desk, chair, animal, food, clothing, landscape, selfie, or blurry random object), you MUST set "isMedicalImage": false and provide a polite rejection reason in "rejectionReason". Do NOT invent or hallucinate medicine names.
+If the image is completely unrelated to medicine or healthcare (for example: ONLY a bare computer keyboard, an empty chair, animal, food, clothing, landscape, selfie, or blurry random object with no medicine), set "isMedicalImage": false and provide a polite rejection reason in "rejectionReason".
 
-If it IS a valid medical prescription or medicine:
+If ANY medicine bottle, syrup, inhaler, tablet box, or prescription is visible anywhere in the photo (even if pictured on a laptop screen or counter): set "isMedicalImage": true and decipher the medicine brand name and generic ingredient.
 Carefully read and decipher:
 - Doctor's handwriting, cursive script, and shorthand (e.g. Rx, tab, cap, po, bid, tid, qid, prn, stat, od, hs).
 - Trade brand names (e.g. Augmentin, Ventolin, Humulin, Panadol, Losec, Eltroxin, Brufen, Glucophage).
@@ -290,16 +290,38 @@ Return ONLY a pure JSON object (no markdown, no backticks, no other text) with t
   ]
 }`;
 
-    // Try latest models including gemini-3.8-flash, gemini-2.5-flash, gemini-2.0-flash, and fallback
-    const models = [
-      'gemini-3.8-flash',
+    // 1. Candidate models to try in order of performance and availability
+    let modelsToTry = [
       'gemini-2.5-flash',
+      'gemini-3.8-flash',
       'gemini-2.5-pro',
       'gemini-2.0-flash',
       'gemini-1.5-flash',
       'gemini-1.5-pro',
     ];
-    for (const model of models) {
+
+    // Attempt dynamic model discovery if needed
+    try {
+      const listRes = await fetch(`https://generativelanguage.googleapis.com/v1beta/models?key=${apiKey}`, {
+        signal: AbortSignal.timeout(5000),
+      });
+      if (listRes.ok) {
+        const listData = await listRes.json() as any;
+        const availableGenerateModels = (listData.models || [])
+          .filter((m: any) => m.supportedGenerationMethods?.includes('generateContent'))
+          .map((m: any) => m.name.replace(/^models\//, ''));
+        if (availableGenerateModels.length > 0) {
+          // Put discovered models at the front, prioritized by flash models
+          const flashDiscovered = availableGenerateModels.filter((m: string) => m.includes('flash'));
+          const otherDiscovered = availableGenerateModels.filter((m: string) => !m.includes('flash'));
+          modelsToTry = Array.from(new Set([...flashDiscovered, ...modelsToTry, ...otherDiscovered]));
+        }
+      }
+    } catch (e: any) {
+      console.warn('[Gemini Vision] Model listing skipped:', e.message);
+    }
+
+    for (const model of modelsToTry) {
       try {
         const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`;
         const res = await fetch(url, {
@@ -324,7 +346,7 @@ Return ONLY a pure JSON object (no markdown, no backticks, no other text) with t
               responseMimeType: 'application/json',
             },
           }),
-          signal: AbortSignal.timeout(12000),
+          signal: AbortSignal.timeout(15000),
         });
 
         if (!res.ok) {
