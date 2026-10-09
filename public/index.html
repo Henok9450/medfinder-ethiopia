@@ -521,13 +521,26 @@
               </h3>
             </div>
             <div class="flex items-center gap-2">
-              <button onclick="toggleSoundAlerts()" id="soundAlertBtn" class="text-[11px] font-semibold px-2.5 py-1 rounded-lg border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 transition flex items-center gap-1.5 shadow-sm">
-                <i class="fa-solid fa-volume-high text-emerald-600"></i> Sound Alerts: ON
+              <button onclick="toggleSoundAlerts()" id="soundAlertBtn" class="text-[11px] font-semibold px-2.5 py-1 rounded-lg border border-emerald-300 bg-emerald-50 hover:bg-emerald-100 text-emerald-800 transition flex items-center gap-1.5 shadow-sm ring-2 ring-emerald-400/20" title="Click to test chime & verify sound is active">
+                <i class="fa-solid fa-volume-high text-emerald-600 animate-pulse"></i> Sound Alerts: ON (Test 🔔)
               </button>
               <button onclick="loadActiveReservations()" class="text-[11px] font-semibold px-2.5 py-1 rounded-lg border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 transition flex items-center gap-1 shadow-sm">
                 <i class="fa-solid fa-arrows-rotate"></i> Refresh
               </button>
             </div>
+          </div>
+          <!-- URGENT PERSISTENT INCOMING HOLD ALARM BANNER -->
+          <div id="activeHoldsAlarmBanner" class="hidden p-3 bg-gradient-to-r from-amber-500 to-rose-500 text-white rounded-xl text-xs font-bold flex items-center justify-between gap-3 shadow-lg ring-4 ring-amber-400/30 animate-pulse">
+            <div class="flex items-center gap-2.5">
+              <span class="text-xl animate-bounce">🚨</span>
+              <div>
+                <strong class="block text-white text-xs">NEW HOLD ALERT: Patient Waiting for Shelf Check!</strong>
+                <span class="text-[11px] text-amber-100 font-normal">Check counter shelf and click "Confirm Stock" or "Sold Out" below to stop alert.</span>
+              </div>
+            </div>
+            <button onclick="stopPersistentHoldAlarm(true)" class="bg-white/20 hover:bg-white/30 text-white text-[11px] font-semibold px-3 py-1.5 rounded-lg transition border border-white/40 shrink-0">
+              🔇 Snooze Chime
+            </button>
           </div>
           <div id="activeHoldsContainer" class="space-y-2">
             <div class="p-3 text-center text-slate-400 text-xs bg-slate-50 rounded-xl border border-dashed border-slate-200">
@@ -4614,52 +4627,213 @@
       }
     }
 
-    // --- LIVE COUNTER HOLDS & WEB AUDIO CHIME SYSTEM ---
+    // --- LIVE COUNTER HOLDS & ROBUST UNLOCKABLE AUDIO ALERT SYSTEM ---
     let soundAlertsEnabled = true;
+    let pharmacyAudioCtx = null;
     let knownReservationCodes = new Set();
+    let holdAlarmInterval = null;
+    let tabTitleOriginal = document.title || 'MedFinder Ethiopia';
+    let tabTitleInterval = null;
+    let isChimeSilencedManually = false;
 
-    function toggleSoundAlerts() {
+    // Singleton audio context with automatic user-gesture unlock
+    function getPharmacyAudioContext() {
+      if (!pharmacyAudioCtx) {
+        const AudioCtx = window.AudioContext || window.webkitAudioContext;
+        if (AudioCtx) {
+          pharmacyAudioCtx = new AudioCtx();
+        }
+      }
+      return pharmacyAudioCtx;
+    }
+
+    async function unlockPharmacyAudio() {
+      const ctx = getPharmacyAudioContext();
+      if (ctx && ctx.state === 'suspended') {
+        try {
+          await ctx.resume();
+        } catch (e) {
+          console.warn('[Audio] Resume error:', e);
+        }
+      }
+      updateSoundAlertButtonUI();
+    }
+
+    // Attach passive gesture listener across entire window to unlock AudioContext permanently
+    ['click', 'touchstart', 'touchend', 'pointerdown', 'keydown'].forEach(evt => {
+      window.addEventListener(evt, () => {
+        unlockPharmacyAudio();
+      }, { passive: true });
+    });
+
+    async function toggleSoundAlerts() {
+      await unlockPharmacyAudio();
       soundAlertsEnabled = !soundAlertsEnabled;
-      const btn = document.getElementById('soundAlertBtn');
-      if (btn) {
-        btn.innerHTML = soundAlertsEnabled
-          ? '<i class="fa-solid fa-volume-high text-emerald-600"></i> Sound Alerts: ON'
-          : '<i class="fa-solid fa-volume-xmark text-slate-400"></i> Sound Alerts: OFF';
+      isChimeSilencedManually = !soundAlertsEnabled;
+      updateSoundAlertButtonUI();
+      if (soundAlertsEnabled) {
+        playCounterChime(true); // Audible test chime confirming sound is working
+      } else {
+        stopPersistentHoldAlarm(true);
       }
     }
 
-    function playCounterChime() {
-      if (!soundAlertsEnabled) return;
+    function updateSoundAlertButtonUI() {
+      const btn = document.getElementById('soundAlertBtn');
+      if (!btn) return;
+      if (!soundAlertsEnabled) {
+        btn.className = 'text-[11px] font-semibold px-2.5 py-1 rounded-lg border border-slate-200 bg-slate-100 hover:bg-slate-200 text-slate-500 transition flex items-center gap-1.5 shadow-sm';
+        btn.innerHTML = '<i class="fa-solid fa-volume-xmark text-slate-400"></i> Sound Alerts: MUTED';
+      } else {
+        btn.className = 'text-[11px] font-semibold px-2.5 py-1 rounded-lg border border-emerald-300 bg-emerald-50 hover:bg-emerald-100 text-emerald-800 transition flex items-center gap-1.5 shadow-sm ring-2 ring-emerald-400/20';
+        btn.innerHTML = '<i class="fa-solid fa-volume-high text-emerald-600 animate-pulse"></i> Sound Alerts: ON (Test 🔔)';
+      }
+    }
+
+    // High-penetration dual-tone Ding-Dong with Dynamics Compression & Maximum Gain
+    async function playCounterChime(isTest = false) {
+      if (!soundAlertsEnabled && !isTest) return;
+
+      // Haptic Vibration for Counter Phones and Tablets (alerts even when device is on physical mute)
       try {
-        const AudioCtx = window.AudioContext || window.webkitAudioContext;
-        if (!AudioCtx) return;
-        const ctx = new AudioCtx();
+        if ('vibrate' in navigator) {
+          navigator.vibrate([400, 150, 400, 150, 600]);
+        }
+      } catch (ve) {}
+
+      try {
+        const ctx = getPharmacyAudioContext();
+        if (!ctx) return;
+        if (ctx.state === 'suspended') {
+          await ctx.resume();
+        }
+
         const now = ctx.currentTime;
 
-        // Two-tone bell: High clarity pleasant counter alert (880Hz then 1320Hz)
-        const osc1 = ctx.createOscillator();
-        const gain1 = ctx.createGain();
-        osc1.type = 'sine';
-        osc1.frequency.setValueAtTime(880, now);
-        gain1.gain.setValueAtTime(0.3, now);
-        gain1.gain.exponentialRampToValueAtTime(0.001, now + 0.5);
-        osc1.connect(gain1);
-        gain1.connect(ctx.destination);
-        osc1.start(now);
-        osc1.stop(now + 0.5);
+        // Dynamics Compressor to normalize volume and maximize punch without clipping
+        const compressor = ctx.createDynamicsCompressor();
+        compressor.threshold.setValueAtTime(-24, now);
+        compressor.knee.setValueAtTime(20, now);
+        compressor.ratio.setValueAtTime(12, now);
+        compressor.attack.setValueAtTime(0.003, now);
+        compressor.release.setValueAtTime(0.25, now);
 
-        const osc2 = ctx.createOscillator();
-        const gain2 = ctx.createGain();
-        osc2.type = 'triangle';
-        osc2.frequency.setValueAtTime(1320, now + 0.15);
-        gain2.gain.setValueAtTime(0.35, now + 0.15);
-        gain2.gain.exponentialRampToValueAtTime(0.001, now + 0.85);
-        osc2.connect(gain2);
-        gain2.connect(ctx.destination);
-        osc2.start(now + 0.15);
-        osc2.stop(now + 0.85);
+        const masterGain = ctx.createGain();
+        masterGain.gain.setValueAtTime(0.95, now); // Near maximum digital ceiling
+
+        compressor.connect(masterGain);
+        masterGain.connect(ctx.destination);
+
+        const playStroke = (startTime) => {
+          // "Ding" (High bright bell: B5 987.77 Hz + harmonic 1975.5 Hz)
+          const osc1 = ctx.createOscillator();
+          const g1 = ctx.createGain();
+          osc1.type = 'sine';
+          osc1.frequency.setValueAtTime(987.77, startTime);
+          g1.gain.setValueAtTime(0.85, startTime);
+          g1.gain.exponentialRampToValueAtTime(0.001, startTime + 0.45);
+          osc1.connect(g1);
+          g1.connect(compressor);
+          osc1.start(startTime);
+          osc1.stop(startTime + 0.45);
+
+          const osc2 = ctx.createOscillator();
+          const g2 = ctx.createGain();
+          osc2.type = 'triangle';
+          osc2.frequency.setValueAtTime(1975.54, startTime);
+          g2.gain.setValueAtTime(0.5, startTime);
+          g2.gain.exponentialRampToValueAtTime(0.001, startTime + 0.35);
+          osc2.connect(g2);
+          g2.connect(compressor);
+          osc2.start(startTime);
+          osc2.stop(startTime + 0.35);
+
+          // "Dong" (Deep resonant bell: G5 783.99 Hz + harmonic 1568 Hz)
+          const tDong = startTime + 0.16;
+          const osc3 = ctx.createOscillator();
+          const g3 = ctx.createGain();
+          osc3.type = 'sine';
+          osc3.frequency.setValueAtTime(783.99, tDong);
+          g3.gain.setValueAtTime(0.9, tDong);
+          g3.gain.exponentialRampToValueAtTime(0.001, tDong + 0.65);
+          osc3.connect(g3);
+          g3.connect(compressor);
+          osc3.start(tDong);
+          osc3.stop(tDong + 0.65);
+
+          const osc4 = ctx.createOscillator();
+          const g4 = ctx.createGain();
+          osc4.type = 'triangle';
+          osc4.frequency.setValueAtTime(1567.98, tDong);
+          g4.gain.setValueAtTime(0.45, tDong);
+          g4.gain.exponentialRampToValueAtTime(0.001, tDong + 0.5);
+          osc4.connect(g4);
+          g4.connect(compressor);
+          osc4.start(tDong);
+          osc4.stop(tDong + 0.5);
+        };
+
+        playStroke(now);
+        playStroke(now + 0.65); // Second stroke for unmistakable "Ding-Dong! Ding-Dong!"
       } catch (e) {
-        console.warn('Web Audio Chime error:', e);
+        console.warn('[Audio] Chime generation error:', e);
+      }
+    }
+
+    // Persistent alert loop for incoming holds waiting for shelf check
+    function startPersistentHoldAlarm(count) {
+      if (isChimeSilencedManually) return;
+
+      const banner = document.getElementById('activeHoldsAlarmBanner');
+      if (banner) banner.classList.remove('hidden');
+
+      // Start flashing tab title
+      if (!tabTitleInterval) {
+        let flash = false;
+        tabTitleInterval = setInterval(() => {
+          flash = !flash;
+          document.title = flash ? `🚨 [NEW HOLD] (${count}) Check Shelf!` : `💊 MedFinder Ethiopia Counter`;
+        }, 1000);
+      }
+
+      // If ringer loop is not already active, start it!
+      if (!holdAlarmInterval) {
+        playCounterChime(); // Play immediately
+        holdAlarmInterval = setInterval(() => {
+          if (soundAlertsEnabled && !isChimeSilencedManually) {
+            playCounterChime();
+          }
+        }, 6000); // Repeat every 6 seconds until acknowledged
+      }
+    }
+
+    function stopPersistentHoldAlarm(manual = false) {
+      if (manual) {
+        isChimeSilencedManually = true;
+      }
+      if (holdAlarmInterval) {
+        clearInterval(holdAlarmInterval);
+        holdAlarmInterval = null;
+      }
+      if (tabTitleInterval) {
+        clearInterval(tabTitleInterval);
+        tabTitleInterval = null;
+        document.title = tabTitleOriginal;
+      }
+      const banner = document.getElementById('activeHoldsAlarmBanner');
+      if (banner) banner.classList.add('hidden');
+    }
+
+    // Browser Notification API for background tabs
+    function notifyCounterDesktop(h) {
+      if ('Notification' in window && Notification.permission === 'granted') {
+        try {
+          new Notification(`🚨 Shelf Check: ${h.medicineName}`, {
+            body: `Hold #${h.reservationCode} at ${h.lockedPriceETB} ETB. Please verify shelf stock!`,
+            icon: '/favicon.ico',
+            tag: `hold-${h.reservationCode}`
+          });
+        } catch (e) {}
       }
     }
 
@@ -4677,16 +4851,22 @@
         const badge = document.getElementById('activeHoldsBadge');
         if (badge) badge.innerText = `${list.length} Active`;
 
+        const unacked = list.filter(h => !h.pharmacistAcknowledged);
         let hasNew = false;
         list.forEach(h => {
           if (!knownReservationCodes.has(h.reservationCode)) {
             knownReservationCodes.add(h.reservationCode);
             hasNew = true;
+            notifyCounterDesktop(h);
           }
         });
 
-        if (hasNew && list.length > 0) {
-          playCounterChime();
+        if (unacked.length > 0) {
+          if (hasNew) isChimeSilencedManually = false; // Fresh incoming hold re-engages sound
+          startPersistentHoldAlarm(unacked.length);
+        } else {
+          stopPersistentHoldAlarm(false);
+          isChimeSilencedManually = false;
         }
 
         const container = document.getElementById('activeHoldsContainer');
@@ -4704,29 +4884,30 @@
           const expMinutes = Math.max(0, Math.round((new Date(h.expiresAt).getTime() - Date.now()) / 60000));
           const isAck = h.pharmacistAcknowledged;
           return `
-            <div class="p-3 rounded-xl border ${isAck ? 'border-emerald-300 bg-emerald-50/60' : 'border-amber-300 bg-amber-50/70'} flex flex-col md:flex-row md:items-center justify-between gap-3 shadow-sm transition">
-              <div class="space-y-1">
+            <div class="p-3.5 rounded-2xl border ${isAck ? 'border-emerald-300 bg-emerald-50/70' : 'border-2 border-amber-500 bg-amber-50/90 shadow-md ring-4 ring-amber-400/20'} flex flex-col md:flex-row md:items-center justify-between gap-3 shadow-sm transition">
+              <div class="space-y-1.5">
                 <div class="flex flex-wrap items-center gap-2">
-                  <span class="font-mono font-black text-xs bg-slate-900 text-white px-2 py-0.5 rounded-lg shadow-inner">#${h.reservationCode}</span>
-                  <span class="font-bold text-slate-900 text-xs">${h.medicineName}</span>
-                  <span class="text-xs font-black text-emerald-700 bg-emerald-100 px-2 py-0.5 rounded-md">${h.lockedPriceETB} ETB</span>
+                  <span class="font-mono font-black text-xs bg-slate-900 text-white px-2.5 py-1 rounded-lg shadow-inner">#${h.reservationCode}</span>
+                  <span class="font-bold text-slate-900 text-sm">${h.medicineName}</span>
+                  <span class="text-xs font-black text-emerald-800 bg-emerald-100 px-2 py-0.5 rounded-md border border-emerald-200">${h.lockedPriceETB} ETB</span>
                   <span class="text-[10px] font-semibold text-slate-500 bg-white border border-slate-200 px-2 py-0.5 rounded-md">⏳ ${expMinutes}m left</span>
+                  ${!isAck ? '<span class="text-[10px] font-black uppercase text-amber-900 bg-amber-200 px-2 py-0.5 rounded animate-pulse">⚠️ Check Shelf Stock</span>' : ''}
                 </div>
                 <div class="text-[11px] text-slate-600 flex items-center gap-2">
                   <span>Patient ID: <b class="font-mono">${h.patientUserId}</b></span>
-                  <span>• Status: <b class="${isAck ? 'text-emerald-700' : 'text-amber-700'}">${isAck ? '🟢 Stock Held at Counter' : '🟡 Waiting Stock Confirmation'}</b></span>
+                  <span>• Status: <b class="${isAck ? 'text-emerald-700 font-bold' : 'text-amber-800 font-extrabold'}">${isAck ? '🟢 Stock Held at Counter' : '🟡 Waiting Stock Confirmation'}</b></span>
                 </div>
               </div>
               <div class="flex items-center gap-1.5 shrink-0">
                 ${!isAck ? `
-                  <button onclick="confirmHoldAction('${h.reservationCode}')" class="px-2.5 py-1.5 text-xs font-bold rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white transition flex items-center gap-1 shadow-sm">
+                  <button onclick="confirmHoldAction('${h.reservationCode}')" class="px-3.5 py-2 text-xs font-black rounded-xl bg-emerald-600 hover:bg-emerald-700 active:scale-95 text-white transition flex items-center gap-1.5 shadow-md">
                     <i class="fa-solid fa-check"></i> Confirm Stock
                   </button>
-                  <button onclick="rejectHoldAction('${h.reservationCode}')" class="px-2.5 py-1.5 text-xs font-bold rounded-lg bg-rose-600 hover:bg-rose-700 text-white transition flex items-center gap-1 shadow-sm">
+                  <button onclick="rejectHoldAction('${h.reservationCode}')" class="px-3 py-2 text-xs font-bold rounded-xl bg-rose-600 hover:bg-rose-700 active:scale-95 text-white transition flex items-center gap-1.5 shadow-sm">
                     <i class="fa-solid fa-xmark"></i> Sold Out
                   </button>
                 ` : `
-                  <button onclick="fulfillFromQueue('${h.reservationCode}')" class="px-3 py-1.5 text-xs font-bold rounded-lg bg-slate-900 hover:bg-slate-800 text-white transition flex items-center gap-1 shadow-sm">
+                  <button onclick="fulfillFromQueue('${h.reservationCode}')" class="px-3 py-2 text-xs font-bold rounded-xl bg-slate-900 hover:bg-black active:scale-95 text-white transition flex items-center gap-1.5 shadow-sm">
                     <i class="fa-solid fa-circle-check text-emerald-400"></i> Fulfill & Check-In
                   </button>
                 `}
@@ -4747,6 +4928,7 @@
         });
         const d = await res.json();
         if (d.success) {
+          stopPersistentHoldAlarm(false);
           loadActiveReservations();
         } else {
           alert('Could not confirm hold: ' + (d.message || d.error));
@@ -4764,6 +4946,7 @@
         });
         const d = await res.json();
         if (d.success) {
+          stopPersistentHoldAlarm(false);
           loadActiveReservations();
         } else {
           alert('Could not reject hold: ' + (d.message || d.error));
@@ -4777,8 +4960,8 @@
       loadActiveReservations();
     }
 
-    // Auto-poll active counter reservations every 10 seconds
-    setInterval(loadActiveReservations, 10000);
+    // Auto-poll active counter reservations every 3.5 seconds for instant real-time alerting
+    setInterval(loadActiveReservations, 3500);
 
     // Init on load
     fetchPolicy();
