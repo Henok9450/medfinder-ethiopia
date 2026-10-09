@@ -325,8 +325,11 @@ export class InMemoryDatabase {
     if (hold.status !== 'ACTIVE' || new Date() > new Date(hold.expiresAt)) {
       return { success: false, message: 'Reservation is no longer active or expired' };
     }
+    const now = new Date();
+    const expiresAt = new Date(now.getTime() + 60 * 60 * 1000);
     hold.pharmacistAcknowledged = true;
-    hold.acknowledgedAt = new Date().toISOString();
+    hold.acknowledgedAt = now.toISOString();
+    hold.expiresAt = expiresAt.toISOString();
     return { success: true, message: 'Shelf stock physically confirmed and held at counter.', reservation: hold };
   }
 

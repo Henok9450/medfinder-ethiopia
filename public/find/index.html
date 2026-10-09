@@ -723,15 +723,15 @@
           badge.className = 'text-[10px] font-bold uppercase tracking-wider text-emerald-700 bg-emerald-50 px-2.5 py-0.5 rounded-full border border-emerald-200';
           badge.innerText = 'Official Price-Lock Voucher';
 
-          document.getElementById('voucherModalTitle').innerText = 'Medicine Held for 60 Minutes';
-          document.getElementById('voucherModalSubtitle').innerText = 'Show this code at the pharmacy counter to claim your locked price.';
+          document.getElementById('voucherModalTitle').innerText = 'Verifying Shelf Availability';
+          document.getElementById('voucherModalSubtitle').innerText = 'The pharmacist was notified. The 60-minute travel hold timer begins once confirmed.';
 
           const banner = document.getElementById('voucherStatusBanner');
           banner.className = 'p-3 rounded-2xl text-xs font-semibold flex items-center gap-2.5 bg-amber-50 text-amber-900 border border-amber-200 text-left transition-all';
           document.getElementById('voucherStatusIcon').className = 'fa-solid fa-spinner fa-spin text-amber-600 text-base shrink-0';
           document.getElementById('voucherStatusDesc').innerHTML = `
             <strong class="block text-amber-800">Checking Pharmacy Shelf...</strong>
-            <span class="text-[11px] text-amber-700 font-normal">The pharmacist was notified. Checking shelf stock now.</span>
+            <span class="text-[11px] text-amber-700 font-normal">Pharmacist is checking counter stock. 60-minute travel window begins once verified.</span>
           `;
 
           const codeBox = document.getElementById('voucherCodeBox');
@@ -739,11 +739,12 @@
           document.getElementById('voucherCodeDisplay').className = 'text-2xl font-mono font-black tracking-widest text-emerald-400';
           document.getElementById('voucherCodeDisplay').innerText = `#${r.reservationCode}`;
 
-          // Reset Countdown Display
+          // Stage 1 Timer Display: Waiting for shelf confirmation before starting travel clock
+          if (countdownInterval) { clearInterval(countdownInterval); countdownInterval = null; }
           const timerIcon = document.getElementById('voucherTimerIcon');
-          if (timerIcon) timerIcon.className = 'fa-regular fa-clock text-amber-400';
+          if (timerIcon) timerIcon.className = 'fa-solid fa-hourglass-half text-amber-400 animate-spin';
           const countdownWrapper = document.getElementById('voucherCountdownWrapper');
-          if (countdownWrapper) countdownWrapper.innerHTML = 'Expires in: <strong id="voucherCountdown" class="text-amber-300">59:59</strong>';
+          if (countdownWrapper) countdownWrapper.innerHTML = '⏱️ 60-Min Hold: <strong id="voucherCountdown" class="text-amber-300 font-bold">Starts upon confirmation</strong>';
 
           const dirBtn = document.getElementById('voucherDirectionsBtn');
           if (dirBtn) {
@@ -765,9 +766,6 @@
 
           document.getElementById('voucherFindAnotherBtn').classList.add('hidden');
           document.getElementById('voucherCloseBtn').innerText = 'Done / Close Voucher';
-
-          // Start 60-min countdown
-          startCountdown(60 * 60);
 
           // Start 90-second direct-dial safety valve
           startSafetyTimer(phone, r.reservationCode, r.medicineName, r.lockedPriceETB);
@@ -875,9 +873,8 @@
             const countdownWrapper = document.getElementById('voucherCountdownWrapper');
             if (countdownWrapper) countdownWrapper.innerHTML = 'Status: <strong class="text-emerald-300 font-bold">CLAIMED & COMPLETED (ተረክበዋል)</strong>';
           } else if (r.pharmacistAcknowledged && r.status === 'ACTIVE') {
-            // Confirmed & Held! Stop countdown and show confirmed state
+            // STAGE 2: Stock Confirmed & Held! Start the full 60-minute travel countdown!
             clearInterval(pollReservationInterval);
-            if (countdownInterval) { clearInterval(countdownInterval); countdownInterval = null; }
             stopSafetyTimer();
             playAlertChime('confirm');
 
@@ -889,7 +886,7 @@
             badge.className = 'text-[10px] font-bold uppercase tracking-wider text-emerald-800 bg-emerald-100 px-2.5 py-0.5 rounded-full border border-emerald-300';
             badge.innerText = '✅ Confirmed & Held at Counter (ተረጋግጧል)';
 
-            document.getElementById('voucherModalTitle').innerText = 'Stock Confirmed! Head Over Now';
+            document.getElementById('voucherModalTitle').innerText = 'Stock Confirmed! Travel Hold Active';
             document.getElementById('voucherModalSubtitle').innerText = 'The pharmacist has physically confirmed the medicine and put it aside for you.';
 
             const banner = document.getElementById('voucherStatusBanner');
@@ -897,14 +894,21 @@
             document.getElementById('voucherStatusIcon').className = 'fa-solid fa-box-archive text-emerald-600 text-base shrink-0';
             document.getElementById('voucherStatusDesc').innerHTML = `
               <strong class="block text-emerald-800">Physically Set Aside at Counter (ተይዞልዎታል)</strong>
-              <span class="text-[11px] text-emerald-700 font-normal">Counter is waiting for you. Tap the green Turn-by-Turn Navigation button below to guide you there!</span>
+              <span class="text-[11px] text-emerald-700 font-normal">Counter is waiting for you. You have a full 60 minutes to travel and collect your medicine!</span>
             `;
 
-            // STOP COUNTDOWN & SHOW CONFIRMED
+            // Start full 60-min travel countdown NOW
+            let remainingSecs = 60 * 60;
+            if (r.expiresAt) {
+              const diff = Math.floor((new Date(r.expiresAt).getTime() - Date.now()) / 1000);
+              if (diff > 0) remainingSecs = diff;
+            }
+            startCountdown(remainingSecs);
+
             const timerIcon = document.getElementById('voucherTimerIcon');
-            if (timerIcon) timerIcon.className = 'fa-solid fa-circle-check text-emerald-400';
+            if (timerIcon) timerIcon.className = 'fa-regular fa-clock text-amber-400';
             const countdownWrapper = document.getElementById('voucherCountdownWrapper');
-            if (countdownWrapper) countdownWrapper.innerHTML = 'Status: <strong class="text-emerald-300 font-bold">CONFIRMED & HELD (ተይዞልዎታል)</strong>';
+            if (countdownWrapper) countdownWrapper.innerHTML = 'Expires in: <strong id="voucherCountdown" class="text-amber-300">59:59</strong>';
 
             // Prominent Turn-by-Turn directions button
             const dirBtn = document.getElementById('voucherDirectionsBtn');
@@ -989,10 +993,15 @@
       countdownInterval = setInterval(() => {
         const minutes = parseInt(timer / 60, 10);
         const seconds = parseInt(timer % 60, 10);
-        display.textContent = `${minutes < 10 ? '0' + minutes : minutes}:${seconds < 10 ? '0' + seconds : seconds}`;
+        if (display) {
+          display.textContent = `${minutes < 10 ? '0' + minutes : minutes}:${seconds < 10 ? '0' + seconds : seconds}`;
+        }
         if (--timer < 0) {
           clearInterval(countdownInterval);
-          display.textContent = 'EXPIRED';
+          countdownInterval = null;
+          if (display) display.textContent = 'EXPIRED';
+          const countdownWrapper = document.getElementById('voucherCountdownWrapper');
+          if (countdownWrapper) countdownWrapper.innerHTML = 'Status: <strong class="text-rose-400 font-bold">HOLD EXPIRED (ጊዜው አልቋል)</strong>';
         }
       }, 1000);
     }

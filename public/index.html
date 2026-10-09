@@ -2497,6 +2497,10 @@
           clearInterval(mainPollResInterval);
           mainPollResInterval = null;
         }
+        if (typeof mainCountdownInterval !== 'undefined' && mainCountdownInterval) {
+          clearInterval(mainCountdownInterval);
+          mainCountdownInterval = null;
+        }
         if (typeof stopMainSafetyTimer === 'function') {
           stopMainSafetyTimer();
         }
@@ -4346,6 +4350,7 @@
             const countdownSubtext = document.getElementById('mainResCountdownSubtext');
             if (countdownSubtext) countdownSubtext.innerHTML = '✅ <strong class="text-emerald-400 font-bold">CLAIMED & COMPLETED (ተረክበዋል)</strong>';
           } else if (r.pharmacistAcknowledged && r.status === 'ACTIVE') {
+            // STAGE 2: Stock Confirmed & Held! Start the full 60-minute travel countdown!
             clearInterval(mainPollResInterval);
             stopMainSafetyTimer();
             playMainChime('confirm');
@@ -4354,19 +4359,23 @@
             document.getElementById('mainResIconBox').className = 'w-14 h-14 mx-auto rounded-full bg-emerald-600 text-white flex items-center justify-center text-2xl shadow-lg mb-3 transition-all';
             document.getElementById('mainResIconI').className = 'fa-solid fa-circle-check';
 
-            document.getElementById('mainResTitle').innerText = 'Stock Confirmed & Held at Counter!';
-            document.getElementById('mainResSubtitle').innerText = 'The pharmacist has set aside your medicine. Head to the pharmacy counter now.';
+            document.getElementById('mainResTitle').innerText = 'Stock Confirmed! Travel Hold Active';
+            document.getElementById('mainResSubtitle').innerText = 'The pharmacist has set aside your medicine. You have 60 minutes to reach the counter.';
 
             const banner = document.getElementById('mainResStatusBanner');
             banner.className = 'mt-3 p-3 rounded-2xl text-xs font-semibold flex items-center gap-2.5 bg-emerald-50 text-emerald-900 border border-emerald-300 text-left transition-all';
             document.getElementById('mainResStatusIcon').className = 'fa-solid fa-box-archive text-emerald-600 text-base shrink-0';
             document.getElementById('mainResStatusDesc').innerHTML = `
               <strong class="block text-emerald-800">Physically Set Aside at Counter (ተይዞልዎታል)</strong>
-              <span class="text-[11px] text-emerald-700 font-normal">The counter is expecting you. Tap Turn-by-Turn Navigation below to guide your way!</span>
+              <span class="text-[11px] text-emerald-700 font-normal">Counter is waiting for you. You have a full 60 minutes to travel and collect your medicine!</span>
             `;
 
-            const countdownSubtext = document.getElementById('mainResCountdownSubtext');
-            if (countdownSubtext) countdownSubtext.innerHTML = '✅ <strong class="text-emerald-400 font-bold">STOCK CONFIRMED & HELD (ተይዞልዎታል)</strong>';
+            let remainingSecs = 60 * 60;
+            if (r.expiresAt) {
+              const diff = Math.floor((new Date(r.expiresAt).getTime() - Date.now()) / 1000);
+              if (diff > 0) remainingSecs = diff;
+            }
+            startMainCountdown(remainingSecs);
 
             // Highlight directions button
             const dirBtn = document.getElementById('mainResDirectionsBtn');
@@ -4378,6 +4387,25 @@
           console.warn('[Poll] Status error:', err.message);
         }
       }, 2500);
+    }
+
+    let mainCountdownInterval = null;
+    function startMainCountdown(durationSeconds) {
+      if (mainCountdownInterval) clearInterval(mainCountdownInterval);
+      let timer = durationSeconds;
+      const subtext = document.getElementById('mainResCountdownSubtext');
+      mainCountdownInterval = setInterval(() => {
+        const minutes = parseInt(timer / 60, 10);
+        const seconds = parseInt(timer % 60, 10);
+        if (subtext) {
+          subtext.innerHTML = `⏱️ Expires in: <strong class="text-amber-300 font-bold">${minutes < 10 ? '0' + minutes : minutes}:${seconds < 10 ? '0' + seconds : seconds}</strong>`;
+        }
+        if (--timer < 0) {
+          clearInterval(mainCountdownInterval);
+          mainCountdownInterval = null;
+          if (subtext) subtext.innerHTML = 'Status: <strong class="text-rose-400 font-bold">HOLD EXPIRED (ጊዜው አልቋል)</strong>';
+        }
+      }, 1000);
     }
 
     let mainSafetyTimerInterval = null;
@@ -4458,19 +4486,20 @@
             resv.subCity || ph.subCity || subCity
           );
 
-          // Reset UI
+          // Reset UI to Stage 1 (Verifying Shelf Stock)
+          if (mainCountdownInterval) { clearInterval(mainCountdownInterval); mainCountdownInterval = null; }
           document.getElementById('mainResModalHeader').className = 'p-6 text-center bg-gradient-to-b from-emerald-50 to-white border-b border-emerald-100 transition-all';
           document.getElementById('mainResIconBox').className = 'w-14 h-14 mx-auto rounded-full bg-emerald-600 text-white flex items-center justify-center text-2xl shadow-lg mb-3 transition-all';
-          document.getElementById('mainResIconI').className = 'fa-solid fa-lock';
-          document.getElementById('mainResTitle').innerText = 'Price-Lock Reservation Confirmed';
-          document.getElementById('mainResSubtitle').innerText = 'Present this code at the pharmacy counter. The stated price is legally locked for 60 minutes.';
+          document.getElementById('mainResIconI').className = 'fa-solid fa-shield-halved';
+          document.getElementById('mainResTitle').innerText = 'Verifying Shelf Availability';
+          document.getElementById('mainResSubtitle').innerText = 'The pharmacist was notified. The 60-minute travel hold timer begins once confirmed.';
 
           const banner = document.getElementById('mainResStatusBanner');
           banner.className = 'mt-3 p-3 rounded-2xl text-xs font-semibold flex items-center gap-2.5 bg-amber-50 text-amber-900 border border-amber-200 text-left transition-all';
           document.getElementById('mainResStatusIcon').className = 'fa-solid fa-spinner fa-spin text-amber-600 text-base shrink-0';
           document.getElementById('mainResStatusDesc').innerHTML = `
             <strong class="block text-amber-800">Checking Pharmacy Shelf...</strong>
-            <span class="text-[11px] text-amber-700 font-normal">Alert sent to pharmacy counter. Verifying physical stock now.</span>
+            <span class="text-[11px] text-amber-700 font-normal">Pharmacist is checking counter stock. 60-minute travel window begins once verified.</span>
           `;
 
           const codeBox = document.getElementById('mainResCodeBox');
@@ -4479,7 +4508,7 @@
           document.getElementById('resCodeDisplay').innerText = `#${resv.reservationCode}`;
 
           const countdownSubtext = document.getElementById('mainResCountdownSubtext');
-          if (countdownSubtext) countdownSubtext.innerHTML = '⏱️ Valid for next 60 Minutes';
+          if (countdownSubtext) countdownSubtext.innerHTML = '⏱️ 60-Min Hold: <strong class="text-amber-300 font-bold">Starts upon confirmation</strong>';
 
           const dirBtn = document.getElementById('mainResDirectionsBtn');
           if (dirBtn) {

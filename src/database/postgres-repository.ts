@@ -315,12 +315,19 @@ export class PostgresRepository implements IDatabaseRepository {
     }
 
     const cleanCode = code.trim().replace(/^#/, '');
+    const now = new Date();
+    const expiresAt = new Date(now.getTime() + 60 * 60 * 1000);
     await pool.query(
-      `UPDATE reservations SET pharmacist_acknowledged = TRUE, acknowledged_at = NOW() WHERE UPPER(reservation_code) = UPPER($1) OR reservation_code = $1`,
-      [cleanCode]
+      `UPDATE reservations 
+       SET pharmacist_acknowledged = TRUE, 
+           acknowledged_at = $1, 
+           expires_at = $2 
+       WHERE UPPER(reservation_code) = UPPER($3) OR reservation_code = $3`,
+      [now, expiresAt, cleanCode]
     );
     hold.pharmacistAcknowledged = true;
-    hold.acknowledgedAt = new Date().toISOString();
+    hold.acknowledgedAt = now.toISOString();
+    hold.expiresAt = expiresAt.toISOString();
 
     return {
       success: true,
