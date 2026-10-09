@@ -297,8 +297,33 @@
           </div>
 
           <div>
-            <label class="block text-xs font-medium text-slate-600 mb-1">Medicine Name (Brand or Generic)</label>
-            <input type="text" id="medicineInput" placeholder="Enter medicine name (e.g. Paracetamol, Amoxicillin)..." class="w-full text-sm px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-emerald-500 outline-none">
+            <div class="flex items-center justify-between mb-1">
+              <label class="block text-xs font-medium text-slate-600">Medicine Name (Brand or Generic)</label>
+              <button type="button" onclick="triggerMainPrescriptionScan()" class="text-xs text-sky-600 hover:text-sky-700 font-bold flex items-center gap-1 hover:underline">
+                <i class="fa-solid fa-camera"></i> AI Scan Prescription
+              </button>
+            </div>
+            <div class="flex items-center gap-2">
+              <input type="text" id="medicineInput" placeholder="Enter medicine name or snap photo..." class="w-full text-sm px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-emerald-500 outline-none">
+              <button type="button" onclick="triggerMainPrescriptionScan()" title="Snap photo of prescription or medicine box" class="bg-sky-600 hover:bg-sky-700 text-white px-3.5 py-2 rounded-lg text-sm transition shrink-0 shadow-sm flex items-center gap-1 font-semibold">
+                <i class="fa-solid fa-camera"></i>
+                <span class="text-xs hidden sm:inline">Scan</span>
+              </button>
+              <input type="file" id="mainPrescriptionCameraInput" accept="image/*" capture="environment" class="hidden" onchange="handleMainPrescriptionFileSelected(event)">
+            </div>
+
+            <!-- Quick AI Scan Promo Card -->
+            <div onclick="triggerMainPrescriptionScan()" class="mt-2 p-2.5 rounded-xl bg-gradient-to-r from-sky-50 to-indigo-50 border border-sky-200 cursor-pointer flex items-center justify-between gap-2 hover:border-sky-400 transition group shadow-xs">
+              <div class="flex items-center gap-2">
+                <span class="w-7 h-7 rounded-lg bg-sky-600 text-white flex items-center justify-center text-xs group-hover:scale-105 transition"><i class="fa-solid fa-camera-retro"></i></span>
+                <div>
+                  <strong class="block text-[11px] text-sky-950 font-bold">📸 የሐኪም ማዘዣ ወይም ማሸጊያ ፎቶ አንሳ (AI Vision)</strong>
+                  <span class="text-[10px] text-slate-500">Scan handwritten doctor prescription or pill box / bottle</span>
+                </div>
+              </div>
+              <span class="text-[10px] bg-sky-600 text-white font-bold px-2 py-0.5 rounded-md shrink-0">Scan ⚡</span>
+            </div>
+
             <div class="flex flex-wrap gap-1.5 mt-2">
               <span class="text-xs text-slate-400">Popular searches:</span>
               <button onclick="setDrug('Paracetamol')" class="text-xs bg-slate-100 hover:bg-emerald-50 text-slate-700 px-2 py-0.5 rounded">Paracetamol</button>
@@ -1549,6 +1574,97 @@
   </div>
 
   <!-- ============================================================== -->
+  <!-- MODAL 4B: AI MEDICAL PRESCRIPTION & MEDICINE PACKAGING SCANNER -->
+  <!-- ============================================================== -->
+  <div id="mainPrescriptionModal" class="hidden fixed inset-0 z-50 bg-black/75 backdrop-blur-md flex items-center justify-center p-4">
+    <div class="bg-white rounded-3xl max-w-sm w-full p-5 shadow-2xl space-y-3 border border-slate-100 text-center animate-in fade-in zoom-in duration-150 max-h-[90vh] overflow-y-auto">
+      
+      <!-- HEADER -->
+      <div class="flex items-center justify-between pb-2 border-b border-slate-100">
+        <div class="flex items-center gap-2 text-left">
+          <div class="w-8 h-8 rounded-xl bg-sky-100 text-sky-700 flex items-center justify-center text-sm font-bold">
+            <i class="fa-solid fa-camera"></i>
+          </div>
+          <div>
+            <h3 class="text-xs font-black text-slate-900">AI Medical Vision Scanner</h3>
+            <span class="text-[10px] text-slate-500">Deciphers Doctor Handwriting & Packaging</span>
+          </div>
+        </div>
+        <button onclick="closeModal('mainPrescriptionModal')" class="text-slate-400 hover:text-slate-700 text-sm p-1">
+          <i class="fa-solid fa-xmark"></i>
+        </button>
+      </div>
+
+      <!-- IMAGE PREVIEW & SCANNING LASER -->
+      <div class="relative rounded-2xl overflow-hidden bg-slate-950 aspect-video flex items-center justify-center border border-slate-200 shadow-inner">
+        <img id="mainPrescriptionPreviewImg" src="" alt="Prescription" class="w-full h-full object-contain">
+        
+        <!-- SCANNING LASER OVERLAY -->
+        <div id="mainPrescriptionScanningOverlay" class="absolute inset-0 bg-sky-950/50 backdrop-blur-[1px] flex flex-col items-center justify-center gap-2 text-white">
+          <div class="w-full h-1 bg-gradient-to-r from-transparent via-emerald-400 to-transparent absolute top-0 animate-bounce"></div>
+          <div class="w-10 h-10 rounded-full border-2 border-emerald-400 border-t-transparent animate-spin"></div>
+          <span class="text-xs font-bold text-emerald-300 animate-pulse">Deciphering Medical Image...</span>
+          <span class="text-[10px] text-slate-300">Reading doctor handwriting, abbreviations & dosage</span>
+        </div>
+      </div>
+
+      <!-- RESULT CARD -->
+      <div id="mainPrescriptionResultCard" class="hidden space-y-3 text-left">
+        <div class="p-3.5 bg-emerald-50 rounded-2xl border border-emerald-200 space-y-2">
+          <div class="flex items-start justify-between gap-2">
+            <div>
+              <span class="text-[9px] font-bold uppercase tracking-wider text-emerald-800 bg-emerald-200 px-2 py-0.5 rounded-full inline-flex items-center gap-1">
+                <i class="fa-solid fa-check"></i> Medicine Identified
+              </span>
+              <h4 id="mainDetectedMedName" class="text-base font-black text-slate-900 mt-1">Augmentin 625mg</h4>
+              <p id="mainDetectedGenericName" class="text-xs text-slate-600 font-medium">Amoxicillin + Clavulanic Acid</p>
+            </div>
+            <div id="mainDetectedConfidenceBadge" class="text-right shrink-0">
+              <span class="text-[10px] font-bold text-emerald-700 bg-white px-2 py-1 rounded-lg border border-emerald-300">96% Match</span>
+            </div>
+          </div>
+
+          <div class="grid grid-cols-2 gap-2 pt-1 text-[11px] text-slate-600 border-t border-emerald-200/60">
+            <div>
+              <span class="text-[10px] text-slate-400 block">Form / Strength</span>
+              <strong id="mainDetectedStrengthForm" class="text-slate-800">625mg Tablet</strong>
+            </div>
+            <div>
+              <span class="text-[10px] text-slate-400 block">Dosage / Frequency</span>
+              <strong id="mainDetectedInstructions" class="text-slate-800">1x2 po bid</strong>
+            </div>
+          </div>
+        </div>
+
+        <!-- ACTIONS -->
+        <div class="space-y-2 pt-1">
+          <button onclick="applyMainScanAndSearch()" class="w-full bg-emerald-600 hover:bg-emerald-700 active:scale-95 text-white text-xs font-black py-3 rounded-xl shadow-md transition flex items-center justify-center gap-2">
+            <i class="fa-solid fa-magnifying-glass"></i>
+            <span>Search Pharmacies with Stock (በአቅራቢያ ፈልግ)</span>
+          </button>
+          <button onclick="triggerMainPrescriptionScan()" class="w-full bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-semibold py-2.5 rounded-xl transition flex items-center justify-center gap-1.5">
+            <i class="fa-solid fa-camera"></i>
+            <span>Retake Another Photo (እንደገና አንሳ)</span>
+          </button>
+        </div>
+      </div>
+
+      <!-- ERROR STATE -->
+      <div id="mainPrescriptionErrorCard" class="hidden p-3.5 bg-rose-50 rounded-2xl border border-rose-200 text-left text-xs text-rose-800 space-y-2">
+        <div class="flex items-center gap-2 font-bold text-rose-900">
+          <i class="fa-solid fa-triangle-exclamation"></i>
+          <span>Could Not Read Image</span>
+        </div>
+        <p id="mainPrescriptionErrorMsg" class="text-[11px] text-rose-700">Please take a clearer picture with better lighting or type the medicine name directly.</p>
+        <button onclick="triggerMainPrescriptionScan()" class="w-full bg-rose-600 hover:bg-rose-700 text-white text-xs font-bold py-2 rounded-xl transition">
+          Retake Photo
+        </button>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- ============================================================== -->
   <!-- MODAL 5: REPORT VIOLATION & PRICE GOUGING (ANTI-SCAM)          -->
   <!-- ============================================================== -->
   <div id="reportModal" class="hidden fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4">
@@ -2501,6 +2617,86 @@
 
     function setDrug(name) {
       document.getElementById('medicineInput').value = name;
+    }
+
+    // --- AI MEDICAL PRESCRIPTION & MEDICINE SCANNER (PORTAL) ---
+    let mainDetectedMedicineName = '';
+
+    function triggerMainPrescriptionScan() {
+      const input = document.getElementById('mainPrescriptionCameraInput');
+      if (input) {
+        input.value = '';
+        input.click();
+      }
+    }
+
+    async function handleMainPrescriptionFileSelected(event) {
+      const file = event.target.files && event.target.files[0];
+      if (!file) return;
+
+      const modal = document.getElementById('mainPrescriptionModal');
+      const previewImg = document.getElementById('mainPrescriptionPreviewImg');
+      const scanningOverlay = document.getElementById('mainPrescriptionScanningOverlay');
+      const resultCard = document.getElementById('mainPrescriptionResultCard');
+      const errorCard = document.getElementById('mainPrescriptionErrorCard');
+
+      modal.classList.remove('hidden');
+      scanningOverlay.classList.remove('hidden');
+      resultCard.classList.add('hidden');
+      errorCard.classList.add('hidden');
+
+      const reader = new FileReader();
+      reader.onload = async (e) => {
+        const base64Data = e.target.result;
+        previewImg.src = base64Data;
+
+        try {
+          const res = await fetch('/api/prescription/scan', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              image: base64Data,
+              mimeType: file.type || 'image/jpeg',
+              source: 'MAIN_PORTAL_CAMERA'
+            })
+          });
+
+          const data = await res.json();
+          scanningOverlay.classList.add('hidden');
+
+          if (data.success && data.medicines && data.medicines.length > 0) {
+            const med = data.medicines[0];
+            mainDetectedMedicineName = med.name;
+
+            document.getElementById('mainDetectedMedName').innerText = med.name;
+            document.getElementById('mainDetectedGenericName').innerText = med.genericName || 'EFDA Essential Drug';
+            document.getElementById('mainDetectedStrengthForm').innerText = `${med.strength || ''} ${med.form || 'Tablet'}`.trim() || 'Standard';
+            document.getElementById('mainDetectedInstructions').innerText = med.dosageInstructions || 'As Prescribed';
+            document.getElementById('mainDetectedConfidenceBadge').innerText = `${Math.round((med.confidence || 0.95) * 100)}% Match`;
+
+            resultCard.classList.remove('hidden');
+          } else {
+            document.getElementById('mainPrescriptionErrorMsg').innerText = data.error || 'Could not decipher handwritten text or packaging. Please retry with clearer focus.';
+            errorCard.classList.remove('hidden');
+          }
+        } catch (err) {
+          scanningOverlay.classList.add('hidden');
+          document.getElementById('mainPrescriptionErrorMsg').innerText = 'Network error: ' + err.message;
+          errorCard.classList.remove('hidden');
+        }
+      };
+      reader.readAsDataURL(file);
+    }
+
+    function applyMainScanAndSearch() {
+      if (mainDetectedMedicineName) {
+        const input = document.getElementById('medicineInput');
+        if (input) {
+          input.value = mainDetectedMedicineName;
+        }
+      }
+      closeModal('mainPrescriptionModal');
+      performSearch();
     }
 
     function closeModal(id) {

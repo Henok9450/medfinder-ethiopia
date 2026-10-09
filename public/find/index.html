@@ -93,25 +93,53 @@
         </h2>
       </div>
 
-      <!-- SEARCH INPUT BAR -->
+      <!-- SEARCH INPUT BAR & CAMERA SCANNER -->
       <div class="space-y-2">
-        <div class="relative flex items-center">
-          <i class="fa-solid fa-magnifying-glass absolute left-3.5 text-slate-400 text-sm"></i>
-          <input 
-            type="text" 
-            id="medicineInput"
-            placeholder="Type medicine name (e.g. Insulin, Ventolin, Augmentin)..." 
-            onkeydown="if(event.key==='Enter') executeMedicineSearch()"
-            class="w-full bg-white/10 backdrop-blur-md text-white placeholder-slate-400 text-xs font-medium pl-10 pr-24 py-3 rounded-2xl border border-white/20 outline-none focus:ring-2 focus:ring-emerald-400 focus:bg-white/15 transition shadow-inner"
-          >
+        <div class="flex items-center gap-2">
+          <div class="relative flex-1 flex items-center">
+            <i class="fa-solid fa-magnifying-glass absolute left-3.5 text-slate-400 text-sm"></i>
+            <input 
+              type="text" 
+              id="medicineInput"
+              placeholder="Type medicine (e.g. Augmentin) or snap picture..." 
+              onkeydown="if(event.key==='Enter') executeMedicineSearch()"
+              class="w-full bg-white/10 backdrop-blur-md text-white placeholder-slate-400 text-xs font-medium pl-10 pr-24 py-3 rounded-2xl border border-white/20 outline-none focus:ring-2 focus:ring-emerald-400 focus:bg-white/15 transition shadow-inner"
+            >
+            <button 
+              onclick="executeMedicineSearch()"
+              id="searchBtn"
+              class="absolute right-1.5 bg-emerald-500 hover:bg-emerald-400 active:bg-emerald-600 text-slate-950 text-xs font-bold px-4 py-2 rounded-xl transition flex items-center space-x-1 shadow-sm"
+            >
+              <span>Search</span>
+              <i class="fa-solid fa-arrow-right text-[10px]"></i>
+            </button>
+          </div>
           <button 
-            onclick="executeMedicineSearch()"
-            id="searchBtn"
-            class="absolute right-1.5 bg-emerald-500 hover:bg-emerald-400 active:bg-emerald-600 text-slate-950 text-xs font-bold px-4 py-2 rounded-xl transition flex items-center space-x-1 shadow-sm"
+            type="button"
+            onclick="triggerPrescriptionScan()" 
+            id="scanPrescriptionBtn"
+            class="bg-gradient-to-tr from-sky-500 to-emerald-500 hover:from-sky-400 hover:to-emerald-400 active:scale-95 text-white p-3 rounded-2xl shadow-md transition flex items-center justify-center shrink-0 border border-white/20 group"
+            title="Scan doctor's prescription or medicine packaging"
           >
-            <span>Search</span>
-            <i class="fa-solid fa-arrow-right text-[10px]"></i>
+            <i class="fa-solid fa-camera text-base group-hover:scale-110 transition"></i>
           </button>
+          <input type="file" id="prescriptionCameraInput" accept="image/*" capture="environment" class="hidden" onchange="handlePrescriptionFileSelected(event)">
+        </div>
+
+        <!-- 📸 PRESCRIPTION & MEDICINE SCANNER QUICK BANNER -->
+        <div onclick="triggerPrescriptionScan()" class="cursor-pointer bg-gradient-to-r from-sky-950/70 via-slate-900/80 to-emerald-950/70 hover:border-emerald-400/50 border border-sky-400/30 rounded-2xl p-2.5 flex items-center justify-between gap-2 text-white transition shadow-sm group">
+          <div class="flex items-center gap-2.5">
+            <div class="w-8 h-8 rounded-xl bg-sky-500/20 text-sky-300 flex items-center justify-center text-sm border border-sky-400/30 group-hover:scale-105 transition">
+              <i class="fa-solid fa-camera-retro"></i>
+            </div>
+            <div class="text-left">
+              <strong class="block text-[11px] text-sky-200">📸 የሐኪም ማዘዣ ወይም ማሸጊያ ፎቶ አንሳ (AI Vision)</strong>
+              <span class="text-[10px] text-slate-300">Scan handwritten doctor prescription or pill box / bottle</span>
+            </div>
+          </div>
+          <span class="text-[10px] bg-sky-500/20 text-sky-200 px-2.5 py-1 rounded-xl border border-sky-400/30 font-bold shrink-0 group-hover:bg-emerald-500 group-hover:text-slate-950 transition">
+            Scan ⚡
+          </span>
         </div>
 
         <!-- LOCATION SELECTOR & GPS -->
@@ -353,6 +381,95 @@
           በተመረጠው ክፍለ ከተማ ቀጥል (Use Sub-City)
         </button>
       </div>
+    </div>
+  </div>
+
+  <!-- PRESCRIPTION & MEDICINE PACKAGING SCANNER MODAL -->
+  <div id="prescriptionModal" class="hidden fixed inset-0 z-50 bg-black/75 backdrop-blur-md flex items-center justify-center p-4">
+    <div class="bg-white rounded-3xl max-w-sm w-full p-5 shadow-2xl space-y-3 border border-slate-100 text-center animate-in fade-in zoom-in duration-150 max-h-[90vh] overflow-y-auto">
+      
+      <!-- HEADER -->
+      <div class="flex items-center justify-between pb-2 border-b border-slate-100">
+        <div class="flex items-center gap-2 text-left">
+          <div class="w-8 h-8 rounded-xl bg-sky-100 text-sky-700 flex items-center justify-center text-sm font-bold">
+            <i class="fa-solid fa-camera"></i>
+          </div>
+          <div>
+            <h3 class="text-xs font-black text-slate-900">AI Medical Vision Scanner</h3>
+            <span class="text-[10px] text-slate-500">EFDA Clinical Handwriting & Package OCR</span>
+          </div>
+        </div>
+        <button onclick="closePrescriptionModal()" class="text-slate-400 hover:text-slate-700 text-sm p-1">
+          <i class="fa-solid fa-xmark"></i>
+        </button>
+      </div>
+
+      <!-- IMAGE PREVIEW & SCANNING LASER -->
+      <div class="relative rounded-2xl overflow-hidden bg-slate-950 aspect-video flex items-center justify-center border border-slate-200 shadow-inner">
+        <img id="prescriptionPreviewImg" src="" alt="Prescription" class="w-full h-full object-contain">
+        
+        <!-- SCANNING LASER OVERLAY -->
+        <div id="prescriptionScanningOverlay" class="absolute inset-0 bg-sky-950/50 backdrop-blur-[1px] flex flex-col items-center justify-center gap-2 text-white">
+          <div class="w-full h-1 bg-gradient-to-r from-transparent via-emerald-400 to-transparent absolute top-0 animate-bounce"></div>
+          <div class="w-10 h-10 rounded-full border-2 border-emerald-400 border-t-transparent animate-spin"></div>
+          <span class="text-xs font-bold text-emerald-300 animate-pulse">Deciphering Medical Image...</span>
+          <span class="text-[10px] text-slate-300">Reading doctor cursive, dosage & packaging</span>
+        </div>
+      </div>
+
+      <!-- RESULT CARD -->
+      <div id="prescriptionResultCard" class="hidden space-y-3 text-left">
+        <div class="p-3.5 bg-emerald-50 rounded-2xl border border-emerald-200 space-y-2">
+          <div class="flex items-start justify-between gap-2">
+            <div>
+              <span class="text-[9px] font-bold uppercase tracking-wider text-emerald-800 bg-emerald-200 px-2 py-0.5 rounded-full inline-flex items-center gap-1">
+                <i class="fa-solid fa-check"></i> Medicine Identified
+              </span>
+              <h4 id="detectedMedName" class="text-base font-black text-slate-900 mt-1">Augmentin 625mg</h4>
+              <p id="detectedGenericName" class="text-xs text-slate-600 font-medium">Amoxicillin + Clavulanic Acid</p>
+            </div>
+            <div id="detectedConfidenceBadge" class="text-right shrink-0">
+              <span class="text-[10px] font-bold text-emerald-700 bg-white px-2 py-1 rounded-lg border border-emerald-300">96% Match</span>
+            </div>
+          </div>
+
+          <div class="grid grid-cols-2 gap-2 pt-1 text-[11px] text-slate-600 border-t border-emerald-200/60">
+            <div>
+              <span class="text-[10px] text-slate-400 block">Form / Strength</span>
+              <strong id="detectedStrengthForm" class="text-slate-800">625mg Tablet</strong>
+            </div>
+            <div>
+              <span class="text-[10px] text-slate-400 block">Dosage / Frequency</span>
+              <strong id="detectedInstructions" class="text-slate-800">1x2 po bid</strong>
+            </div>
+          </div>
+        </div>
+
+        <!-- ACTIONS -->
+        <div class="space-y-2 pt-1">
+          <button onclick="applyScanAndSearch()" class="w-full bg-emerald-600 hover:bg-emerald-700 active:scale-95 text-white text-xs font-black py-3 rounded-xl shadow-md transition flex items-center justify-center gap-2">
+            <i class="fa-solid fa-magnifying-glass"></i>
+            <span>Search Pharmacies with Stock (በአቅራቢያ ፈልግ)</span>
+          </button>
+          <button onclick="triggerPrescriptionScan()" class="w-full bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-semibold py-2.5 rounded-xl transition flex items-center justify-center gap-1.5">
+            <i class="fa-solid fa-camera"></i>
+            <span>Retake Another Photo (እንደገና አንሳ)</span>
+          </button>
+        </div>
+      </div>
+
+      <!-- ERROR STATE -->
+      <div id="prescriptionErrorCard" class="hidden p-3.5 bg-rose-50 rounded-2xl border border-rose-200 text-left text-xs text-rose-800 space-y-2">
+        <div class="flex items-center gap-2 font-bold text-rose-900">
+          <i class="fa-solid fa-triangle-exclamation"></i>
+          <span>Could Not Read Image</span>
+        </div>
+        <p id="prescriptionErrorMsg" class="text-[11px] text-rose-700">Please take a clearer picture with better lighting or type the medicine name directly.</p>
+        <button onclick="triggerPrescriptionScan()" class="w-full bg-rose-600 hover:bg-rose-700 text-white text-xs font-bold py-2 rounded-xl transition">
+          Retake Photo
+        </button>
+      </div>
+
     </div>
   </div>
 
@@ -1028,6 +1145,90 @@
       if (pollReservationInterval) clearInterval(pollReservationInterval);
       stopSafetyTimer();
       currentReservationCode = null;
+    }
+
+    // --- AI MEDICAL VISION: PRESCRIPTION & MEDICINE SCANNER ---
+    let lastDetectedMedicineName = '';
+
+    function triggerPrescriptionScan() {
+      const input = document.getElementById('prescriptionCameraInput');
+      if (input) {
+        input.value = '';
+        input.click();
+      }
+    }
+
+    async function handlePrescriptionFileSelected(event) {
+      const file = event.target.files && event.target.files[0];
+      if (!file) return;
+
+      const modal = document.getElementById('prescriptionModal');
+      const previewImg = document.getElementById('prescriptionPreviewImg');
+      const scanningOverlay = document.getElementById('prescriptionScanningOverlay');
+      const resultCard = document.getElementById('prescriptionResultCard');
+      const errorCard = document.getElementById('prescriptionErrorCard');
+
+      modal.classList.remove('hidden');
+      scanningOverlay.classList.remove('hidden');
+      resultCard.classList.add('hidden');
+      errorCard.classList.add('hidden');
+
+      const reader = new FileReader();
+      reader.onload = async (e) => {
+        const base64Data = e.target.result;
+        previewImg.src = base64Data;
+
+        try {
+          const res = await fetch('/api/prescription/scan', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              image: base64Data,
+              mimeType: file.type || 'image/jpeg',
+              source: 'FIND_PWA_CAMERA'
+            })
+          });
+
+          const data = await res.json();
+          scanningOverlay.classList.add('hidden');
+
+          if (data.success && data.medicines && data.medicines.length > 0) {
+            const med = data.medicines[0];
+            lastDetectedMedicineName = med.name;
+
+            document.getElementById('detectedMedName').innerText = med.name;
+            document.getElementById('detectedGenericName').innerText = med.genericName || 'EFDA Essential Drug';
+            document.getElementById('detectedStrengthForm').innerText = `${med.strength || ''} ${med.form || 'Tablet'}`.trim() || 'Standard';
+            document.getElementById('detectedInstructions').innerText = med.dosageInstructions || 'As Prescribed';
+            document.getElementById('detectedConfidenceBadge').innerText = `${Math.round((med.confidence || 0.95) * 100)}% Match`;
+
+            resultCard.classList.remove('hidden');
+          } else {
+            document.getElementById('prescriptionErrorMsg').innerText = data.error || 'Could not decipher handwritten text or packaging. Please retry with clearer focus.';
+            errorCard.classList.remove('hidden');
+          }
+        } catch (err) {
+          scanningOverlay.classList.add('hidden');
+          document.getElementById('prescriptionErrorMsg').innerText = 'Network error: ' + err.message;
+          errorCard.classList.remove('hidden');
+        }
+      };
+      reader.readAsDataURL(file);
+    }
+
+    function applyScanAndSearch() {
+      if (lastDetectedMedicineName) {
+        const input = document.getElementById('medicineInput');
+        if (input) {
+          input.value = lastDetectedMedicineName;
+        }
+      }
+      closePrescriptionModal();
+      executeMedicineSearch();
+    }
+
+    function closePrescriptionModal() {
+      document.getElementById('prescriptionModal').classList.add('hidden');
     }
 
     // Auto-search if opened from Telegram or deep-link with ?q=Medicine

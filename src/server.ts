@@ -11,12 +11,14 @@ import { AdminConfigController } from './admin/admin-config.controller';
 import { InMemoryDatabase, MASTER_MEDICINE_CATALOG, AdminRole, AdminPrivileges } from './database/in-memory-db';
 import { TelegramVerificationBotService } from './verification/telegram-verification-bot.service';
 import { getDatabaseRepository, initDatabase, closePostgresPool, isPostgresConnected, getDbPool } from './database';
+import { PrescriptionVisionService } from './prescription/prescription-vision.service';
 
 dotenv.config();
 
 const app = express();
 app.use(cors());
-app.use(express.json());
+app.use(express.json({ limit: '25mb' }));
+app.use(express.urlencoded({ limit: '25mb', extended: true }));
 app.use((_req, res, next) => {
   res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
   next();
@@ -37,6 +39,37 @@ const adminController = new AdminConfigController();
 const db = InMemoryDatabase.getInstance();
 const dbRepo = getDatabaseRepository();
 const telegramBotService = new TelegramVerificationBotService();
+const prescriptionVision = PrescriptionVisionService.getInstance();
+
+// ==========================================
+// 0. PRESCRIPTION & MEDICINE VISION AI SCAN
+// ==========================================
+app.post('/api/prescription/scan', async (req: Request, res: Response) => {
+  try {
+    const { image, base64Data, mimeType, source } = req.body;
+    const rawImage = image || base64Data;
+    if (!rawImage || typeof rawImage !== 'string' || rawImage.length < 50) {
+      return res.status(400).json({
+        success: false,
+        error: 'Please provide or take a clear picture of the prescription or medicine box.',
+      });
+    }
+
+    const result = await prescriptionVision.analyzeImage({
+      base64Data: rawImage,
+      mimeType: mimeType || 'image/jpeg',
+      source: source || 'PATIENT_CAMERA',
+    });
+
+    return res.json(result);
+  } catch (err: any) {
+    console.error('[API /prescription/scan] Error:', err);
+    return res.status(500).json({
+      success: false,
+      error: err.message || 'Prescription scanning failed. Please retry or enter name manually.',
+    });
+  }
+});
 
 // ==========================================
 // 1. PATIENT / USER SEARCH ENDPOINT

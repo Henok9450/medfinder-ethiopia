@@ -4,6 +4,7 @@ import path from 'path';
 import { InMemoryDatabase, TelegramBotSession, PharmacyVerificationApplication, Pharmacy, MASTER_MEDICINE_CATALOG, ReservationHold } from '../database/in-memory-db';
 import { getDatabaseRepository, IDatabaseRepository } from '../database';
 import { BroadcastMatchingService } from '../matching/broadcast-matching.service';
+import { PrescriptionVisionService } from '../prescription/prescription-vision.service';
 
 /**
  * Robust native HTTPS dispatcher for Telegram Bot API
@@ -1238,6 +1239,78 @@ ${statusBadge}
         };
       }
 
+      // 0B. Photo & Prescription Handwriting OCR / Medicine Packaging Scanner
+      if (photoUrl || documentUrl) {
+        const fileId = (photoUrl || documentUrl || '').split('/').pop();
+        if (fileId) {
+          try {
+            const buffer = await this.fetchTelegramFileBuffer(fileId);
+            if (buffer && buffer.length > 0) {
+              const visionService = PrescriptionVisionService.getInstance();
+              const scanResult = await visionService.analyzeImage({
+                buffer,
+                mimeType: 'image/jpeg',
+                source: 'TELEGRAM_PATIENT_PHOTO',
+              });
+
+              if (scanResult.success && scanResult.medicines.length > 0) {
+                const med = scanResult.medicines[0];
+                session.patientSearchDrug = med.name;
+
+                const patientPwaUrl = this.getPatientPwaUrl();
+                const webSearchUrl = `${patientPwaUrl}?q=${encodeURIComponent(med.name)}`;
+
+                // If patient already has a known location (GPS or SubCity), run immediate search
+                if (session.patientLat && session.patientLng) {
+                  return this.searchMedicineForPatient({
+                    chatId,
+                    medicineName: med.name,
+                    userLat: session.patientLat,
+                    userLng: session.patientLng,
+                    subCityName: session.patientSubCity || 'Bole',
+                    lang: session.language || 'am',
+                  });
+                }
+
+                return {
+                  chatId,
+                  replyText: `🩺 **የመድኃኒት ማዘዣ / ማሸጊያ ተመርምሯል!**
+━━━━━━━━━━━━━━━━━━━━━━━━━━
+📸 **Deciphered from Photo / Handwriting:**
+💊 **የታዘዘው መድኃኒት፦** **${med.name}**
+🔬 **ንቁ ንጥረ ነገር፦** ${med.genericName}
+${med.strength ? `⚖️ **መጠን (Strength)፦** ${med.strength}\n` : ''}${med.form ? `📦 **ዓይነት (Form)፦** ${med.form}\n` : ''}${med.dosageInstructions ? `📋 **አወሳሰድ፦** ${med.dosageInstructions}\n` : ''}
+━━━━━━━━━━━━━━━━━━━━━━━━━━
+📍 **በአቅራቢያዎ ያሉ የተረጋገጡ ፋርማሲዎችን (EFDA Verified) ለመፈለግ ከታች ይምረጡ፦**`,
+                  quickReplies: [
+                    '📍 የኔን ጂፒኤስ ላክ (Share GPS)',
+                    '📍 Bole (ቦሌ)',
+                    '📍 Kirkos (ቂርቆስ)',
+                    '📍 Yeka (የካ)',
+                    '📍 Arada (ፒያሳ)',
+                    '/start',
+                  ],
+                  inlineKeyboard: [
+                    [
+                      { text: `🔍 ፈልግ (${med.name})`, callback_data: `search_${encodeURIComponent(med.name)}` },
+                    ],
+                    [
+                      { text: '🌐 በድረ-ገጽ ራዳር ክፈት (Web Radar)', url: webSearchUrl },
+                    ],
+                    [
+                      { text: '💊 አዲስ ፍለጋ (New Search)', callback_data: '/start' },
+                    ],
+                  ],
+                  sessionStep: 'PATIENT_SEARCH',
+                };
+              }
+            }
+          } catch (scanErr: any) {
+            console.warn('[TelegramBot] Prescription scan error:', scanErr.message);
+          }
+        }
+      }
+
       // 1. Patient Welcome Screen
       if (cleanText === '/start' || cleanText.toLowerCase() === 'reset') {
         session.mode = 'PATIENT';
@@ -1254,14 +1327,14 @@ ${statusBadge}
 
 🔍 **እንዴት መፈለግ ይችላሉ?**
 1️⃣ የሚፈልጉትን መድኃኒት ስም እዚህ ይጻፉ (ምሳሌ፦ *Insulin*, *Ventolin*, *Augmentin*...)
-2️⃣ ወይም ከታች ካሉት ፈጣን ቁልፎች አንዱን ይጫኑ
+2️⃣ 📸 **ወይም የመድኃኒት ማዘዣዎን (Prescription) ወይም የያዙትን መድኃኒት ማሸጊያ ፎቶ አንስተው እዚህ ይላኩ!** ሲስተሙ በእጅ የተጻፈውን ወይም ማሸጊያውን አንብቦ ወዲያውኑ ይፈልግልዎታል!
 3️⃣ የተገኘውን መድኃኒት ዋጋ ለ60 ደቂቃ በካውንተር ለማስያዝ **[🔒 ዋጋ አስይዝ]** ቁልፍን ይጫኑ!
 
 🌐 **ልዩ የታካሚ ድረ-ገጽ እና PWA መተግበሪያ (Dedicated Web App):**
 የቀጥታ ካርታ ራዳርን እና ፈጣን ፍለጋን በብሮውዘርዎ ያለ ምንም ምዝገባ ለመጠቀም፦
 👉 **${patientPwaUrl}** (በስልክዎ ላይ በቀጥታ Install ማድረግ ይችላሉ!)
 ━━━━━━━━━━━━━━━━━━━━━━━━━━
-👇 **ፈጣን ፍለጋ ለመጀመር ከታች ይምረጡ፦**`,
+👇 **ፈጣን ፍለጋ ለመጀመር ከታች ይምረጡ ወይም ፎቶ ይላኩ፦**`,
           quickReplies: [
             '💊 Insulin',
             '💊 Augmentin',
