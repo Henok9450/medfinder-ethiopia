@@ -3531,6 +3531,13 @@
                     <i class="fa-solid fa-file-lines"></i> View Certificate
                   </button>
                   <span class="text-xs text-emerald-600 font-semibold inline-flex items-center gap-1 ml-1"><i class="fa-solid fa-shield-halved"></i> Verified</span>
+                  ${a.portalUsername ? `
+                    <div class="mt-1 text-[11px] font-mono text-slate-700 bg-emerald-50 border border-emerald-200 rounded px-2 py-1 text-left block">
+                      <span>👤 User: <strong>${a.portalUsername}</strong></span>
+                      ${a.portalTempPassword ? `<span class="ml-1.5 text-slate-600">| 🔑 Pass: <code class="font-bold">${a.portalTempPassword}</code></span>` : ''}
+                      ${a.portalSetupToken ? `<a href="/pharmacy?setupToken=${encodeURIComponent(a.portalSetupToken)}" target="_blank" class="text-sky-600 font-sans hover:underline ml-2 font-semibold inline-flex items-center gap-0.5"><i class="fa-solid fa-arrow-up-right-from-square text-[9px]"></i> Setup Link</a>` : ''}
+                    </div>
+                  ` : ''}
                 `}
               </td>
             </tr>

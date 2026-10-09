@@ -148,11 +148,42 @@ export class InMemoryRepository implements IDatabaseRepository {
     return this.db.authenticatePharmacy(username, password);
   }
 
+  public async getAccountBySetupToken(setupToken: string): Promise<PharmacyPortalAccount | null> {
+    const acc = this.db.getAccountBySetupToken(setupToken);
+    return acc || null;
+  }
+
+  public async activateAccountWithToken(
+    setupToken: string,
+    newPassword: string,
+    customUsername?: string
+  ): Promise<{ success: boolean; account?: PharmacyPortalAccount; token?: string; error?: string }> {
+    return this.db.activateAccountWithToken(setupToken, newPassword, customUsername);
+  }
+
+  public async changePharmacyPassword(
+    username: string,
+    currentPassword: string,
+    newPassword: string
+  ): Promise<{ success: boolean; account?: PharmacyPortalAccount; error?: string }> {
+    return this.db.changePharmacyPassword(username, currentPassword, newPassword);
+  }
+
+  public async getAccountBySession(token: string): Promise<PharmacyPortalAccount | null> {
+    const acc = this.db.getAccountBySession(token);
+    return acc || null;
+  }
+
   public async authenticateAdmin(
     username: string,
     password: string
   ): Promise<{ success: boolean; admin?: Omit<AdminUser, 'passwordHash'>; token?: string; error?: string }> {
     return this.db.authenticateAdmin(username, password);
+  }
+
+  public async getAdminBySession(token: string): Promise<AdminUser | null> {
+    const admin = this.db.getAdminBySession(token);
+    return admin || null;
   }
 
   public async getOrCreateSubscription(userId: string): Promise<UserSubscription> {

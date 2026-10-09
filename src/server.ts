@@ -10,7 +10,7 @@ import { TemplateService } from './localization/template.service';
 import { AdminConfigController } from './admin/admin-config.controller';
 import { InMemoryDatabase, MASTER_MEDICINE_CATALOG, AdminRole, AdminPrivileges } from './database/in-memory-db';
 import { TelegramVerificationBotService } from './verification/telegram-verification-bot.service';
-import { getDatabaseRepository, initDatabase, closePostgresPool, isPostgresConnected } from './database';
+import { getDatabaseRepository, initDatabase, closePostgresPool, isPostgresConnected, getDbPool } from './database';
 
 dotenv.config();
 
@@ -227,13 +227,13 @@ app.post('/api/pharmacy/auth/login', async (req: Request, res: Response) => {
   });
 });
 
-app.post('/api/pharmacy/auth/change-password', (req: Request, res: Response) => {
+app.post('/api/pharmacy/auth/change-password', async (req: Request, res: Response) => {
   const { username, currentPassword, newPassword } = req.body;
   if (!username || !currentPassword || !newPassword) {
     return res.status(400).json({ success: false, error: 'username, currentPassword, and newPassword are required' });
   }
 
-  const result = db.changePharmacyPassword(String(username), String(currentPassword), String(newPassword));
+  const result = await dbRepo.changePharmacyPassword(String(username), String(currentPassword), String(newPassword));
   if (!result.success) {
     return res.status(400).json({ success: false, error: result.error });
   }
@@ -241,11 +241,11 @@ app.post('/api/pharmacy/auth/change-password', (req: Request, res: Response) => 
   res.json({ success: true, message: 'Password updated successfully. You can now access your studio.' });
 });
 
-app.get('/api/pharmacy/auth/verify-token', (req: Request, res: Response) => {
+app.get('/api/pharmacy/auth/verify-token', async (req: Request, res: Response) => {
   const token = String(req.query.token || '');
   if (!token) return res.status(400).json({ success: false, error: 'Token is required' });
 
-  const account = db.getAccountBySetupToken(token);
+  const account = await dbRepo.getAccountBySetupToken(token);
   if (!account) return res.status(404).json({ success: false, error: 'Invalid or expired setup token' });
 
   if (account.setupTokenExpiresAt && new Date(account.setupTokenExpiresAt).getTime() < Date.now()) {
@@ -261,18 +261,18 @@ app.get('/api/pharmacy/auth/verify-token', (req: Request, res: Response) => {
   });
 });
 
-app.post('/api/pharmacy/auth/activate-setup', (req: Request, res: Response) => {
+app.post('/api/pharmacy/auth/activate-setup', async (req: Request, res: Response) => {
   const { setupToken, newPassword, customUsername } = req.body;
   if (!setupToken || !newPassword) {
     return res.status(400).json({ success: false, error: 'setupToken and newPassword are required' });
   }
 
-  const result = db.activateAccountWithToken(String(setupToken), String(newPassword), customUsername ? String(customUsername) : undefined);
+  const result = await dbRepo.activateAccountWithToken(String(setupToken), String(newPassword), customUsername ? String(customUsername) : undefined);
   if (!result.success || !result.account) {
     return res.status(400).json({ success: false, error: result.error });
   }
 
-  const pharmacy = db.pharmacies.find((p) => p.id === result.account?.pharmacyId);
+  const pharmacy = await dbRepo.getPharmacyById(result.account.pharmacyId);
 
   res.json({
     success: true,
@@ -300,15 +300,15 @@ app.post('/api/pharmacy/auth/activate-setup', (req: Request, res: Response) => {
   });
 });
 
-app.get('/api/pharmacy/auth/session', (req: Request, res: Response) => {
+app.get('/api/pharmacy/auth/session', async (req: Request, res: Response) => {
   const authHeader = req.headers.authorization || '';
   const token = authHeader.replace(/^Bearer\s+/i, '') || String(req.query.token || '');
   if (!token) return res.status(401).json({ success: false, error: 'Not authenticated' });
 
-  const account = db.getAccountBySession(token);
+  const account = await dbRepo.getAccountBySession(token);
   if (!account) return res.status(401).json({ success: false, error: 'Session expired or invalid' });
 
-  const pharmacy = db.pharmacies.find((p) => p.id === account.pharmacyId);
+  const pharmacy = await dbRepo.getPharmacyById(account.pharmacyId);
 
   res.json({
     success: true,
@@ -673,14 +673,17 @@ app.post('/api/payment/webhook', (req: Request, res: Response) => {
 // ==========================================
 
 // Middleware for Admin Authentication
-const requireAdminAuth = (req: Request, res: Response, next: any) => {
+const requireAdminAuth = async (req: Request, res: Response, next: any) => {
   const authHeader = req.headers.authorization || '';
   const token = authHeader.replace(/^Bearer\s+/i, '') || String(req.query.adminToken || '');
   if (!token) {
     return res.status(401).json({ success: false, error: 'Administrator authentication required.' });
   }
 
-  const admin = db.getAdminBySession(token);
+  let admin: any = await dbRepo.getAdminBySession(token);
+  if (!admin) {
+    admin = db.getAdminBySession(token);
+  }
   if (!admin) {
     return res.status(401).json({ success: false, error: 'Session expired or invalid credentials.' });
   }
@@ -709,14 +712,14 @@ const requirePrivilege = (privilegeKey: keyof AdminPrivileges) => {
 // ==========================================
 // UNIFIED PLATFORM AUTHENTICATION (ALL ROLES)
 // ==========================================
-app.post('/api/auth/login', (req: Request, res: Response) => {
+app.post('/api/auth/login', async (req: Request, res: Response) => {
   const { username, password } = req.body;
   if (!username || !password) {
     return res.status(400).json({ success: false, error: 'Username and password are required' });
   }
 
   // 1. Check Administrator credentials
-  const adminAuth = db.authenticateAdmin(String(username), String(password));
+  const adminAuth = await dbRepo.authenticateAdmin(String(username), String(password));
   if (adminAuth.success && adminAuth.admin) {
     return res.json({
       success: true,
@@ -730,9 +733,9 @@ app.post('/api/auth/login', (req: Request, res: Response) => {
   }
 
   // 2. Check Pharmacy credentials
-  const pharmAuth = db.authenticatePharmacy(String(username), String(password));
+  const pharmAuth = await dbRepo.authenticatePharmacy(String(username), String(password));
   if (pharmAuth.success && pharmAuth.account) {
-    const pharmacy = db.pharmacies.find((p) => p.id === pharmAuth.account?.pharmacyId);
+    const pharmacy = await dbRepo.getPharmacyById(pharmAuth.account.pharmacyId);
     return res.json({
       success: true,
       userType: 'PHARMACY',
@@ -752,13 +755,16 @@ app.post('/api/auth/login', (req: Request, res: Response) => {
   return res.status(401).json({ success: false, error: 'Invalid username or password' });
 });
 
-app.get('/api/auth/session', (req: Request, res: Response) => {
+app.get('/api/auth/session', async (req: Request, res: Response) => {
   const authHeader = req.headers.authorization || '';
   const token = authHeader.replace(/^Bearer\s+/i, '') || String(req.query.token || '');
   if (!token) return res.status(401).json({ success: false, error: 'No active session token' });
 
   // 1. Check Admin Session
-  const admin = db.getAdminBySession(token);
+  let admin: any = await dbRepo.getAdminBySession(token);
+  if (!admin) {
+    admin = db.getAdminBySession(token);
+  }
   if (admin) {
     const { passwordHash, ...safeAdmin } = admin;
     return res.json({
@@ -769,9 +775,9 @@ app.get('/api/auth/session', (req: Request, res: Response) => {
   }
 
   // 2. Check Pharmacy Session
-  const pharmAccount = db.getAccountBySession(token);
+  const pharmAccount = await dbRepo.getAccountBySession(token);
   if (pharmAccount) {
-    const pharmacy = db.pharmacies.find((p) => p.id === pharmAccount.pharmacyId);
+    const pharmacy = await dbRepo.getPharmacyById(pharmAccount.pharmacyId);
     return res.json({
       success: true,
       userType: 'PHARMACY',
@@ -790,7 +796,7 @@ app.get('/api/auth/session', (req: Request, res: Response) => {
   return res.status(401).json({ success: false, error: 'Session expired or invalid' });
 });
 
-app.post('/api/auth/logout', (req: Request, res: Response) => {
+app.post('/api/auth/logout', async (req: Request, res: Response) => {
   const authHeader = req.headers.authorization || '';
   const token = authHeader.replace(/^Bearer\s+/i, '') || String(req.query.token || '');
   if (token) {
@@ -799,6 +805,12 @@ app.post('/api/auth/logout', (req: Request, res: Response) => {
 
     const account = db.getAccountBySession(token);
     if (account) account.sessionToken = undefined;
+
+    const pool = getDbPool();
+    if (pool) {
+      await pool.query('UPDATE admin_users SET session_token = NULL WHERE session_token = $1', [token]);
+      await pool.query('UPDATE pharmacy_portal_accounts SET session_token = NULL WHERE session_token = $1', [token]);
+    }
   }
   res.json({ success: true, message: 'Logged out successfully' });
 });
@@ -1012,7 +1024,8 @@ app.post('/api/telegram/applications/:id/review', requireAdminAuth, requirePrivi
   telegramBotService.notifyReviewDecision(
     reviewResult.application.telegramChatId,
     status,
-    adminNotes
+    adminNotes,
+    reviewResult.application
   ).catch((err: any) => console.error('[Telegram Notification Error]:', err.message));
 
   res.json({

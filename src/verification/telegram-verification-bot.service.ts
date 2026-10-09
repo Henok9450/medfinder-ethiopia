@@ -2777,9 +2777,34 @@ Send **"Confirm"** to submit to the EFDA Compliance Desk.`;
   /**
    * Send notification to pharmacy when compliance review decision is made
    */
-  public async notifyReviewDecision(chatId: string, status: 'APPROVED' | 'REJECTED' | 'INFO_REQUESTED', adminNotes?: string): Promise<boolean> {
+  public async notifyReviewDecision(
+    chatId: string,
+    status: 'APPROVED' | 'REJECTED' | 'INFO_REQUESTED',
+    adminNotes?: string,
+    passedApp?: PharmacyVerificationApplication
+  ): Promise<boolean> {
     let message = '';
-    const app = this.db.verificationApplications.find((a) => a.telegramChatId === chatId);
+    let app: PharmacyVerificationApplication | undefined = passedApp;
+    if (!app) {
+      app = this.db.verificationApplications.find((a) => a.telegramChatId === chatId);
+      if (!app) {
+        try {
+          const apps = await this.repo.getVerificationApplications();
+          app = apps.find((a) => a.telegramChatId === chatId);
+        } catch (e) {
+          // ignore
+        }
+      }
+    }
+
+    // Keep in-memory cache synchronized if app has new credentials
+    if (app && app.portalUsername) {
+      const existingIdx = this.db.verificationApplications.findIndex((a) => a.id === app?.id || a.telegramChatId === chatId);
+      if (existingIdx >= 0) {
+        this.db.verificationApplications[existingIdx] = { ...this.db.verificationApplications[existingIdx], ...app };
+      }
+    }
+
     const portalUrl = this.getWebStudioUrl();
     const setupToken = app?.portalSetupToken;
     const setupUrl = setupToken ? this.getPharmacyPortalSetupUrl(setupToken) : portalUrl;

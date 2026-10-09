@@ -121,12 +121,45 @@ export interface IDatabaseRepository {
   ): Promise<{ success: boolean; account?: PharmacyPortalAccount; token?: string; error?: string }>;
 
   /**
+   * Get pharmacy portal account by setup token
+   */
+  getAccountBySetupToken(setupToken: string): Promise<PharmacyPortalAccount | null>;
+
+  /**
+   * Activate pharmacy portal account with setup token and new password
+   */
+  activateAccountWithToken(
+    setupToken: string,
+    newPassword: string,
+    customUsername?: string
+  ): Promise<{ success: boolean; account?: PharmacyPortalAccount; token?: string; error?: string }>;
+
+  /**
+   * Change pharmacy portal account password
+   */
+  changePharmacyPassword(
+    username: string,
+    currentPassword: string,
+    newPassword: string
+  ): Promise<{ success: boolean; account?: PharmacyPortalAccount; error?: string }>;
+
+  /**
+   * Get pharmacy portal account by session token
+   */
+  getAccountBySession(token: string): Promise<PharmacyPortalAccount | null>;
+
+  /**
    * Authenticate an administrative account
    */
   authenticateAdmin(
     username: string,
     password: string
   ): Promise<{ success: boolean; admin?: Omit<AdminUser, 'passwordHash'>; token?: string; error?: string }>;
+
+  /**
+   * Get admin user by session token
+   */
+  getAdminBySession(token: string): Promise<AdminUser | null>;
 
   /**
    * Get or create a patient user's subscription and search quota
