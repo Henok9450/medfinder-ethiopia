@@ -230,6 +230,35 @@
         </div>
       </div>
 
+      <!-- 90-SECOND DIRECT-DIAL SAFETY VALVE (Human-in-the-Loop Safeguard) -->
+      <div id="safetyCheckSection" class="space-y-2">
+        <div id="safetyTimerBox" class="p-2.5 bg-amber-50/80 border border-amber-200 rounded-xl text-left flex items-center justify-between text-[11px] text-amber-900">
+          <div class="flex items-center gap-1.5 font-medium">
+            <i class="fa-solid fa-hourglass-half text-amber-600 animate-spin"></i>
+            <span>Waiting for Pharmacist:</span>
+          </div>
+          <span id="safetyCountdownDisplay" class="font-mono font-bold bg-amber-200/80 text-amber-900 px-2 py-0.5 rounded-md text-[10px]">01:30</span>
+        </div>
+
+        <!-- Direct Dial Escalation Card (Elevates automatically after 90s if unconfirmed) -->
+        <div id="safetyDirectDialCard" class="hidden p-3 bg-rose-50 border-2 border-rose-300 rounded-2xl text-left space-y-2 animate-in fade-in">
+          <div class="flex items-center gap-2 text-rose-900 font-extrabold text-xs">
+            <i class="fa-solid fa-phone-volume text-rose-600 text-sm animate-bounce"></i>
+            <span>Pharmacist hasn't checked yet!</span>
+          </div>
+          <p class="text-[11px] text-rose-800 leading-snug">
+            Their counter phone or tablet may be in their pocket. Call the pharmacist directly now to ensure the medicine is in hand before traveling:
+          </p>
+          <a id="safetyCallBtn" href="tel:" class="flex items-center justify-center gap-2 w-full py-2.5 bg-rose-600 hover:bg-rose-700 active:scale-95 text-white rounded-xl text-xs font-black shadow-md transition">
+            <i class="fa-solid fa-phone"></i>
+            <span id="safetyCallBtnText">📞 Call Pharmacy Counter Now</span>
+          </a>
+          <div class="bg-white/90 p-2 rounded-xl text-[10px] text-slate-600 border border-rose-200 leading-tight">
+            💡 <strong>Quick Call Script:</strong> "Selam, I just placed hold <span id="safetyScriptCode" class="font-bold text-slate-900">#...</span> on MedFinder for <span id="safetyScriptMed" class="font-bold text-slate-900">...</span> at <span id="safetyScriptPrice" class="font-bold text-slate-900">...</span> ETB. Can you hold it for me?"
+          </div>
+        </div>
+      </div>
+
       <!-- VOUCHER CODE BOX -->
       <div id="voucherCodeBox" class="bg-slate-900 text-white p-4 rounded-2xl space-y-1.5 shadow-inner transition-all">
         <span class="text-[10px] text-slate-400 font-medium">RESERVATION HOLD CODE</span>
@@ -701,6 +730,9 @@
           // Start 60-min countdown
           startCountdown(60 * 60);
 
+          // Start 90-second direct-dial safety valve
+          startSafetyTimer(phone, r.reservationCode, r.medicineName, r.lockedPriceETB);
+
           // Start fast status polling
           startReservationPolling(r.reservationCode);
 
@@ -727,6 +759,7 @@
 
           if (r.status === 'CANCELLED') {
             clearInterval(pollReservationInterval);
+            stopSafetyTimer();
             playAlertChime('cancel');
 
             // Modal Icon -> Red Alert
@@ -762,6 +795,7 @@
           } else if (r.pharmacistAcknowledged && r.status === 'ACTIVE') {
             // Confirmed & Held!
             clearInterval(pollReservationInterval);
+            stopSafetyTimer();
             playAlertChime('confirm');
 
             const iconBox = document.getElementById('voucherModalIcon');
@@ -787,6 +821,61 @@
           console.warn('[Poll] Status error:', err.message);
         }
       }, 2500);
+    }
+
+    let safetyTimerInterval = null;
+    let safetySecondsRemaining = 90;
+
+    function startSafetyTimer(phone, code, med, price) {
+      if (safetyTimerInterval) clearInterval(safetyTimerInterval);
+      safetySecondsRemaining = 90;
+
+      const timerBox = document.getElementById('safetyTimerBox');
+      const timerDisplay = document.getElementById('safetyCountdownDisplay');
+      const dialCard = document.getElementById('safetyDirectDialCard');
+      const callBtn = document.getElementById('safetyCallBtn');
+      const callBtnText = document.getElementById('safetyCallBtnText');
+      const scriptCode = document.getElementById('safetyScriptCode');
+      const scriptMed = document.getElementById('safetyScriptMed');
+      const scriptPrice = document.getElementById('safetyScriptPrice');
+
+      if (timerBox) timerBox.classList.remove('hidden');
+      if (dialCard) dialCard.classList.add('hidden');
+      if (timerDisplay) timerDisplay.innerText = '01:30';
+
+      if (callBtn) callBtn.href = `tel:${phone}`;
+      if (callBtnText) callBtnText.innerText = `📞 Call Pharmacy Counter Now (${phone})`;
+      if (scriptCode) scriptCode.innerText = `#${code}`;
+      if (scriptMed) scriptMed.innerText = med;
+      if (scriptPrice) scriptPrice.innerText = `${price}`;
+
+      safetyTimerInterval = setInterval(() => {
+        safetySecondsRemaining--;
+        const mins = Math.floor(safetySecondsRemaining / 60);
+        const secs = safetySecondsRemaining % 60;
+        if (timerDisplay) {
+          timerDisplay.innerText = `${mins < 10 ? '0' + mins : mins}:${secs < 10 ? '0' + secs : secs}`;
+        }
+
+        if (safetySecondsRemaining <= 0) {
+          clearInterval(safetyTimerInterval);
+          safetyTimerInterval = null;
+          if (timerBox) timerBox.classList.add('hidden');
+          if (dialCard) dialCard.classList.remove('hidden');
+          playAlertChime('cancel'); // Audible attention ping to notify patient to call
+        }
+      }, 1000);
+    }
+
+    function stopSafetyTimer() {
+      if (safetyTimerInterval) {
+        clearInterval(safetyTimerInterval);
+        safetyTimerInterval = null;
+      }
+      const timerBox = document.getElementById('safetyTimerBox');
+      const dialCard = document.getElementById('safetyDirectDialCard');
+      if (timerBox) timerBox.classList.add('hidden');
+      if (dialCard) dialCard.classList.add('hidden');
     }
 
     function findAnotherPharmacy() {
@@ -817,6 +906,7 @@
       document.getElementById('reservationModal').classList.add('hidden');
       if (countdownInterval) clearInterval(countdownInterval);
       if (pollReservationInterval) clearInterval(pollReservationInterval);
+      stopSafetyTimer();
       currentReservationCode = null;
     }
   </script>

@@ -1451,6 +1451,34 @@
           </div>
         </div>
 
+        <!-- 90-SECOND DIRECT-DIAL SAFETY VALVE -->
+        <div id="mainSafetyCheckSection" class="mt-2.5 space-y-2">
+          <div id="mainSafetyTimerBox" class="p-2.5 bg-amber-50/80 border border-amber-200 rounded-xl text-left flex items-center justify-between text-[11px] text-amber-900">
+            <div class="flex items-center gap-1.5 font-medium">
+              <i class="fa-solid fa-hourglass-half text-amber-600 animate-spin"></i>
+              <span>Waiting for Pharmacist:</span>
+            </div>
+            <span id="mainSafetyCountdownDisplay" class="font-mono font-bold bg-amber-200/80 text-amber-900 px-2 py-0.5 rounded-md text-[10px]">01:30</span>
+          </div>
+
+          <div id="mainSafetyDirectDialCard" class="hidden p-3 bg-rose-50 border-2 border-rose-300 rounded-2xl text-left space-y-2 animate-in fade-in">
+            <div class="flex items-center gap-2 text-rose-900 font-extrabold text-xs">
+              <i class="fa-solid fa-phone-volume text-rose-600 text-sm animate-bounce"></i>
+              <span>Pharmacist hasn't checked yet!</span>
+            </div>
+            <p class="text-[11px] text-rose-800 leading-snug">
+              Their counter phone or tablet may be in their pocket. Call the pharmacist directly now to ensure the medicine is in hand before traveling:
+            </p>
+            <a id="mainSafetyCallBtn" href="tel:" class="flex items-center justify-center gap-2 w-full py-2.5 bg-rose-600 hover:bg-rose-700 active:scale-95 text-white rounded-xl text-xs font-black shadow-md transition">
+              <i class="fa-solid fa-phone"></i>
+              <span id="mainSafetyCallBtnText">📞 Call Pharmacy Counter Now</span>
+            </a>
+            <div class="bg-white/90 p-2 rounded-xl text-[10px] text-slate-600 border border-rose-200 leading-tight">
+              💡 <strong>Quick Call Script:</strong> "Selam, I just placed hold <span id="mainSafetyScriptCode" class="font-bold text-slate-900">#...</span> on MedFinder for <span id="mainSafetyScriptMed" class="font-bold text-slate-900">...</span> at <span id="mainSafetyScriptPrice" class="font-bold text-slate-900">...</span> ETB. Can you hold it for me?"
+            </div>
+          </div>
+        </div>
+
         <!-- LARGE 4-DIGIT CODE -->
         <div id="mainResCodeBox" class="mt-3 p-4 rounded-2xl bg-slate-900 text-white shadow-inner transition-all">
           <span class="text-xs text-emerald-400 font-bold uppercase tracking-wider block">Reservation Hold Code</span>
@@ -2462,6 +2490,9 @@
         if (typeof mainPollResInterval !== 'undefined' && mainPollResInterval) {
           clearInterval(mainPollResInterval);
           mainPollResInterval = null;
+        }
+        if (typeof stopMainSafetyTimer === 'function') {
+          stopMainSafetyTimer();
         }
         if (typeof currentMainResCode !== 'undefined') {
           currentMainResCode = null;
@@ -4227,6 +4258,7 @@
 
           if (r.status === 'CANCELLED') {
             clearInterval(mainPollResInterval);
+            stopMainSafetyTimer();
             playMainChime('cancel');
 
             // Header -> Alert Red
@@ -4256,6 +4288,7 @@
             document.getElementById('mainResCloseBtn').innerText = 'Dismiss';
           } else if (r.pharmacistAcknowledged && r.status === 'ACTIVE') {
             clearInterval(mainPollResInterval);
+            stopMainSafetyTimer();
             playMainChime('confirm');
 
             document.getElementById('mainResModalHeader').className = 'p-6 text-center bg-gradient-to-b from-emerald-50 to-white border-b border-emerald-200 transition-all';
@@ -4277,6 +4310,61 @@
           console.warn('[Poll] Status error:', err.message);
         }
       }, 2500);
+    }
+
+    let mainSafetyTimerInterval = null;
+    let mainSafetySecondsRemaining = 90;
+
+    function startMainSafetyTimer(phone, code, med, price) {
+      if (mainSafetyTimerInterval) clearInterval(mainSafetyTimerInterval);
+      mainSafetySecondsRemaining = 90;
+
+      const timerBox = document.getElementById('mainSafetyTimerBox');
+      const timerDisplay = document.getElementById('mainSafetyCountdownDisplay');
+      const dialCard = document.getElementById('mainSafetyDirectDialCard');
+      const callBtn = document.getElementById('mainSafetyCallBtn');
+      const callBtnText = document.getElementById('mainSafetyCallBtnText');
+      const scriptCode = document.getElementById('mainSafetyScriptCode');
+      const scriptMed = document.getElementById('mainSafetyScriptMed');
+      const scriptPrice = document.getElementById('mainSafetyScriptPrice');
+
+      if (timerBox) timerBox.classList.remove('hidden');
+      if (dialCard) dialCard.classList.add('hidden');
+      if (timerDisplay) timerDisplay.innerText = '01:30';
+
+      if (callBtn) callBtn.href = `tel:${phone}`;
+      if (callBtnText) callBtnText.innerText = `📞 Call Pharmacy Counter Now (${phone})`;
+      if (scriptCode) scriptCode.innerText = `#${code}`;
+      if (scriptMed) scriptMed.innerText = med;
+      if (scriptPrice) scriptPrice.innerText = `${price}`;
+
+      mainSafetyTimerInterval = setInterval(() => {
+        mainSafetySecondsRemaining--;
+        const mins = Math.floor(mainSafetySecondsRemaining / 60);
+        const secs = mainSafetySecondsRemaining % 60;
+        if (timerDisplay) {
+          timerDisplay.innerText = `${mins < 10 ? '0' + mins : mins}:${secs < 10 ? '0' + secs : secs}`;
+        }
+
+        if (mainSafetySecondsRemaining <= 0) {
+          clearInterval(mainSafetyTimerInterval);
+          mainSafetyTimerInterval = null;
+          if (timerBox) timerBox.classList.add('hidden');
+          if (dialCard) dialCard.classList.remove('hidden');
+          playMainChime('cancel');
+        }
+      }, 1000);
+    }
+
+    function stopMainSafetyTimer() {
+      if (mainSafetyTimerInterval) {
+        clearInterval(mainSafetyTimerInterval);
+        mainSafetyTimerInterval = null;
+      }
+      const timerBox = document.getElementById('mainSafetyTimerBox');
+      const dialCard = document.getElementById('mainSafetyDirectDialCard');
+      if (timerBox) timerBox.classList.add('hidden');
+      if (dialCard) dialCard.classList.add('hidden');
     }
 
     // --- ANTI-SCAM: PRICE LOCK RESERVATIONS ---
@@ -4325,6 +4413,9 @@
 
           document.getElementById('mainResFindAnotherBtn').classList.add('hidden');
           document.getElementById('mainResCloseBtn').innerText = "I'm Heading to the Pharmacy Now";
+
+          // Start 90-second direct-dial safety valve
+          startMainSafetyTimer(resv.phone, resv.reservationCode, resv.medicineName, resv.lockedPriceETB);
 
           // Start polling
           startMainReservationPolling(resv.reservationCode);
