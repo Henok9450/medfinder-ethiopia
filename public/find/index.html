@@ -264,8 +264,8 @@
         <span class="text-[10px] text-slate-400 font-medium">RESERVATION HOLD CODE</span>
         <div id="voucherCodeDisplay" class="text-2xl font-mono font-black tracking-widest text-emerald-400">#HLD-0000</div>
         <div class="text-[10px] text-slate-400 flex items-center justify-center gap-1 font-mono">
-          <i class="fa-regular fa-clock text-amber-400"></i>
-          <span>Expires in: <strong id="voucherCountdown" class="text-amber-300">59:59</strong></span>
+          <i id="voucherTimerIcon" class="fa-regular fa-clock text-amber-400"></i>
+          <span id="voucherCountdownWrapper">Expires in: <strong id="voucherCountdown" class="text-amber-300">59:59</strong></span>
         </div>
       </div>
 
@@ -288,6 +288,12 @@
           <a id="voucherPhoneLink" href="tel:" class="font-mono text-emerald-700 font-bold hover:underline">+251...</a>
         </div>
       </div>
+
+      <!-- TURN-BY-TURN NAVIGATION BUTTON -->
+      <a id="voucherDirectionsBtn" href="#" target="_blank" class="flex items-center justify-center gap-2 w-full py-3 px-3 bg-emerald-600 hover:bg-emerald-700 active:scale-98 text-white rounded-xl text-xs font-bold transition shadow-md">
+        <i class="fa-solid fa-diamond-turn-right text-base text-white animate-pulse"></i>
+        <span id="voucherDirectionsBtnText">🗺️ Open Turn-by-Turn Navigation (አቅጣጫ አሳየኝ)</span>
+      </a>
 
       <!-- TELEGRAM NOTIFICATION DEEP-LINK BUTTON -->
       <a id="voucherTelegramLink" href="https://t.me/MedFinder_ET_bot" target="_blank" class="flex items-center justify-center gap-2 w-full py-2.5 px-3 bg-[#229ED9] hover:bg-[#1e8bc0] active:scale-98 text-white rounded-xl text-xs font-bold transition shadow-sm">
@@ -621,7 +627,7 @@
               <i class="fa-solid fa-phone text-emerald-600 text-[11px]"></i>
               <span>Call Counter</span>
             </a>
-            <button onclick="createPriceLockHold('${p.id}', '${p.name.replace(/'/g, "\\'")}', '${drugName}', ${p.priceETB || 380}, '${p.phone || '+251911223344'}')" class="bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold py-2 px-3 rounded-xl flex items-center justify-center space-x-1.5 shadow-xs transition">
+            <button onclick="createPriceLockHold('${p.id}', '${p.name.replace(/'/g, "\\'")}', '${drugName}', ${p.priceETB || 380}, '${p.phone || '+251911223344'}', ${p.latitude || 'null'}, ${p.longitude || 'null'}, '${(p.subCity || '').replace(/'/g, "\\'")}')" class="bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold py-2 px-3 rounded-xl flex items-center justify-center space-x-1.5 shadow-xs transition">
               <i class="fa-solid fa-lock text-[11px]"></i>
               <span>Lock Price</span>
             </button>
@@ -667,9 +673,22 @@
       }
     }
 
+    function updateVoucherDirections(lat, lng, pharmacyName, subCity) {
+      const dirBtn = document.getElementById('voucherDirectionsBtn');
+      if (!dirBtn) return;
+      if (lat && lng && !isNaN(Number(lat)) && !isNaN(Number(lng))) {
+        dirBtn.href = `https://www.google.com/maps/dir/?api=1&destination=${lat},${lng}`;
+      } else {
+        const q = encodeURIComponent(`${pharmacyName || 'Pharmacy'} ${subCity || ''} Addis Ababa`);
+        dirBtn.href = `https://www.google.com/maps/search/?api=1&query=${q}`;
+      }
+    }
+
     // 6. Anti-Gouging 60-Minute Price Lock Reservation
-    async function createPriceLockHold(pharmacyId, pharmacyName, medicineName, lockedPriceETB, phone) {
+    async function createPriceLockHold(pharmacyId, pharmacyName, medicineName, lockedPriceETB, phone, lat = null, lng = null, subCity = '') {
       try {
+        updateVoucherDirections(lat, lng, pharmacyName, subCity);
+
         const patientUserId = 'patient_' + Math.floor(100000 + Math.random() * 900000);
         const res = await fetch('/api/reservation/create', {
           method: 'POST',
@@ -685,7 +704,16 @@
         const data = await res.json();
         if (data.success && data.reservation) {
           const r = data.reservation;
+          const ph = data.pharmacy || {};
           currentReservationCode = r.reservationCode;
+
+          // Configure turn-by-turn navigation link
+          updateVoucherDirections(
+            r.latitude || ph.latitude || lat,
+            r.longitude || ph.longitude || lng,
+            r.pharmacyName || pharmacyName,
+            r.subCity || ph.subCity || subCity
+          );
 
           // Reset modal UI to pending state
           document.getElementById('voucherModalIcon').className = 'w-14 h-14 bg-gradient-to-tr from-emerald-600 to-teal-500 text-white rounded-2xl mx-auto flex items-center justify-center text-2xl shadow-lg shadow-emerald-600/30 transition-all';
@@ -711,6 +739,17 @@
           document.getElementById('voucherCodeDisplay').className = 'text-2xl font-mono font-black tracking-widest text-emerald-400';
           document.getElementById('voucherCodeDisplay').innerText = `#${r.reservationCode}`;
 
+          // Reset Countdown Display
+          const timerIcon = document.getElementById('voucherTimerIcon');
+          if (timerIcon) timerIcon.className = 'fa-regular fa-clock text-amber-400';
+          const countdownWrapper = document.getElementById('voucherCountdownWrapper');
+          if (countdownWrapper) countdownWrapper.innerHTML = 'Expires in: <strong id="voucherCountdown" class="text-amber-300">59:59</strong>';
+
+          const dirBtn = document.getElementById('voucherDirectionsBtn');
+          if (dirBtn) {
+            dirBtn.className = 'flex items-center justify-center gap-2 w-full py-3 px-3 bg-emerald-600 hover:bg-emerald-700 active:scale-98 text-white rounded-xl text-xs font-bold transition shadow-md';
+          }
+
           document.getElementById('voucherMedicineName').innerText = r.medicineName;
           document.getElementById('voucherPrice').innerText = `${r.lockedPriceETB} ETB`;
           document.getElementById('voucherPharmacyName').innerText = r.pharmacyName || pharmacyName;
@@ -734,7 +773,7 @@
           startSafetyTimer(phone, r.reservationCode, r.medicineName, r.lockedPriceETB);
 
           // Start fast status polling
-          startReservationPolling(r.reservationCode);
+          startReservationPolling(r.reservationCode, lat, lng, pharmacyName, subCity);
 
           document.getElementById('reservationModal').classList.remove('hidden');
         } else {
@@ -745,7 +784,7 @@
       }
     }
 
-    function startReservationPolling(code) {
+    function startReservationPolling(code, origLat, origLng, origName, origSubCity) {
       if (pollReservationInterval) clearInterval(pollReservationInterval);
 
       pollReservationInterval = setInterval(async () => {
@@ -756,9 +795,19 @@
           const data = await res.json();
           if (!data.success || !data.reservation) return;
           const r = data.reservation;
+          const ph = data.pharmacy || {};
+
+          // Keep directions link fresh with latest coordinates
+          updateVoucherDirections(
+            r.latitude || ph.latitude || origLat,
+            r.longitude || ph.longitude || origLng,
+            r.pharmacyName || origName,
+            r.subCity || ph.subCity || origSubCity
+          );
 
           if (r.status === 'CANCELLED') {
             clearInterval(pollReservationInterval);
+            if (countdownInterval) { clearInterval(countdownInterval); countdownInterval = null; }
             stopSafetyTimer();
             playAlertChime('cancel');
 
@@ -789,12 +838,46 @@
             codeBox.className = 'bg-slate-800 text-white p-4 rounded-2xl space-y-1.5 shadow-inner opacity-80';
             document.getElementById('voucherCodeDisplay').className = 'text-2xl font-mono font-black tracking-widest text-rose-300 line-through';
 
+            const countdownWrapper = document.getElementById('voucherCountdownWrapper');
+            if (countdownWrapper) countdownWrapper.innerHTML = 'Status: <strong class="text-rose-400 font-bold">CANCELLED (ተሰርዟል)</strong>';
+
             // Prominent "Find Another" button
             document.getElementById('voucherFindAnotherBtn').classList.remove('hidden');
             document.getElementById('voucherCloseBtn').innerText = 'Dismiss';
-          } else if (r.pharmacistAcknowledged && r.status === 'ACTIVE') {
-            // Confirmed & Held!
+          } else if (r.status === 'FULFILLED') {
+            // Fulfilled & Dispensed at Counter!
             clearInterval(pollReservationInterval);
+            if (countdownInterval) { clearInterval(countdownInterval); countdownInterval = null; }
+            stopSafetyTimer();
+            playAlertChime('confirm');
+
+            const iconBox = document.getElementById('voucherModalIcon');
+            iconBox.className = 'w-14 h-14 bg-gradient-to-tr from-emerald-600 to-teal-500 text-white rounded-2xl mx-auto flex items-center justify-center text-2xl shadow-lg shadow-emerald-600/30 transition-all';
+            document.getElementById('voucherModalIconI').className = 'fa-solid fa-circle-check';
+
+            const badge = document.getElementById('voucherBadge');
+            badge.className = 'text-[10px] font-bold uppercase tracking-wider text-emerald-800 bg-emerald-100 px-2.5 py-0.5 rounded-full border border-emerald-300';
+            badge.innerText = '✅ Dispensed & Completed (ተረክበዋል)';
+
+            document.getElementById('voucherModalTitle').innerText = 'Medicine Dispensed Successfully!';
+            document.getElementById('voucherModalSubtitle').innerText = 'The pharmacist has verified your voucher code and completed the transaction.';
+
+            const banner = document.getElementById('voucherStatusBanner');
+            banner.className = 'p-3 rounded-2xl text-xs font-semibold flex items-center gap-2.5 bg-emerald-100 text-emerald-950 border border-emerald-400 text-left transition-all';
+            document.getElementById('voucherStatusIcon').className = 'fa-solid fa-circle-check text-emerald-700 text-base shrink-0';
+            document.getElementById('voucherStatusDesc').innerHTML = `
+              <strong class="block text-emerald-900">Voucher Verified & Dispensed (ተረክበዋል)</strong>
+              <span class="text-[11px] text-emerald-800 font-normal">Your medicine was successfully handed over at the counter.</span>
+            `;
+
+            const timerIcon = document.getElementById('voucherTimerIcon');
+            if (timerIcon) timerIcon.className = 'fa-solid fa-circle-check text-emerald-400';
+            const countdownWrapper = document.getElementById('voucherCountdownWrapper');
+            if (countdownWrapper) countdownWrapper.innerHTML = 'Status: <strong class="text-emerald-300 font-bold">CLAIMED & COMPLETED (ተረክበዋል)</strong>';
+          } else if (r.pharmacistAcknowledged && r.status === 'ACTIVE') {
+            // Confirmed & Held! Stop countdown and show confirmed state
+            clearInterval(pollReservationInterval);
+            if (countdownInterval) { clearInterval(countdownInterval); countdownInterval = null; }
             stopSafetyTimer();
             playAlertChime('confirm');
 
@@ -813,9 +896,21 @@
             banner.className = 'p-3 rounded-2xl text-xs font-semibold flex items-center gap-2.5 bg-emerald-50 text-emerald-900 border border-emerald-300 text-left transition-all';
             document.getElementById('voucherStatusIcon').className = 'fa-solid fa-box-archive text-emerald-600 text-base shrink-0';
             document.getElementById('voucherStatusDesc').innerHTML = `
-              <strong class="block text-emerald-800">Physically Set Aside at Counter</strong>
-              <span class="text-[11px] text-emerald-700 font-normal">Counter is waiting for you. Present code #${r.reservationCode} upon arrival.</span>
+              <strong class="block text-emerald-800">Physically Set Aside at Counter (ተይዞልዎታል)</strong>
+              <span class="text-[11px] text-emerald-700 font-normal">Counter is waiting for you. Tap the green Turn-by-Turn Navigation button below to guide you there!</span>
             `;
+
+            // STOP COUNTDOWN & SHOW CONFIRMED
+            const timerIcon = document.getElementById('voucherTimerIcon');
+            if (timerIcon) timerIcon.className = 'fa-solid fa-circle-check text-emerald-400';
+            const countdownWrapper = document.getElementById('voucherCountdownWrapper');
+            if (countdownWrapper) countdownWrapper.innerHTML = 'Status: <strong class="text-emerald-300 font-bold">CONFIRMED & HELD (ተይዞልዎታል)</strong>';
+
+            // Prominent Turn-by-Turn directions button
+            const dirBtn = document.getElementById('voucherDirectionsBtn');
+            if (dirBtn) {
+              dirBtn.className = 'flex items-center justify-center gap-2 w-full py-3.5 px-4 bg-emerald-600 hover:bg-emerald-700 active:scale-98 text-white rounded-xl text-xs font-black transition shadow-lg ring-4 ring-emerald-400/40 animate-pulse';
+            }
           }
         } catch (err) {
           console.warn('[Poll] Status error:', err.message);

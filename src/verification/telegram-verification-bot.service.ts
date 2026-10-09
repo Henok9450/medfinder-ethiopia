@@ -1010,6 +1010,19 @@ export class TelegramVerificationBotService {
     const ep = this.patientBot.token ? this.patientBot : this.pharmacyBot;
     if (!ep.token || !hold.patientUserId) return false;
 
+    // Fetch coordinates if missing from hold
+    let lat = hold.latitude;
+    let lng = hold.longitude;
+    if ((!lat || !lng) && hold.pharmacyId) {
+      try {
+        const ph = await this.repo.getPharmacyById(hold.pharmacyId);
+        if (ph) {
+          lat = ph.latitude;
+          lng = ph.longitude;
+        }
+      } catch (e) {}
+    }
+
     const expTime = new Date(hold.expiresAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
     const text = `🎉 **መልካም ዜና! ፋርማሲው መድኃኒቱን በካውንተር እንዳስቀመጠ አረጋግጧል!**
 **Stock Confirmed & Held on Counter!**
@@ -1024,10 +1037,26 @@ export class TelegramVerificationBotService {
 📍 **ፋርማሲስቱ መድኃኒቱን አዘጋጅቶ እየጠበቀዎት ስለሆነ አሁን መሄድ ይችላሉ!**
 ካውንተር ላይ ኮድ \`#${hold.reservationCode}\` በማሳየት በ ${hold.lockedPriceETB} ETB ይረከቡ።`;
 
+    const navUrl = (lat && lng)
+      ? `https://www.google.com/maps/dir/?api=1&destination=${lat},${lng}`
+      : `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(hold.pharmacyName + ' Addis Ababa')}`;
+
+    const inlineKeyboard: Array<Array<{ text: string; url?: string; callback_data?: string }>> = [
+      [
+        { text: '🗺️ አቅጣጫ አሳየኝ / Open Navigation', url: navUrl },
+      ],
+    ];
+    if (hold.phone) {
+      inlineKeyboard.push([
+        { text: '📞 ደውል / Call Pharmacy', url: `tel:${hold.phone.replace(/[^0-9+]/g, '')}` },
+      ]);
+    }
+
     await this.sendRealTelegramReply(hold.patientUserId, {
       chatId: hold.patientUserId,
       replyText: text,
       quickReplies: ['/start', '💊 አዲስ ፍለጋ'],
+      inlineKeyboard,
     }, ep);
 
     return true;

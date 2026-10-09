@@ -216,6 +216,10 @@ export class PostgresRepository implements IDatabaseRepository {
       pharmacistAcknowledged: false,
       createdAt: now.toISOString(),
       expiresAt,
+      latitude: pharmacy.latitude,
+      longitude: pharmacy.longitude,
+      subCity: pharmacy.subCity,
+      address: pharmacy.address,
     };
   }
 
@@ -225,7 +229,15 @@ export class PostgresRepository implements IDatabaseRepository {
 
     const cleanCode = code.trim().replace(/^#/, '');
     const res = await pool.query(
-      `SELECT * FROM reservations WHERE UPPER(reservation_code) = UPPER($1) OR reservation_code = $1`,
+      `SELECT 
+        r.*,
+        p.sub_city AS "subCity",
+        p.address,
+        ST_Y(p.location::geometry) AS latitude,
+        ST_X(p.location::geometry) AS longitude
+       FROM reservations r
+       LEFT JOIN pharmacies p ON r.pharmacy_id = p.id
+       WHERE UPPER(r.reservation_code) = UPPER($1) OR r.reservation_code = $1`,
       [cleanCode]
     );
 
@@ -244,6 +256,10 @@ export class PostgresRepository implements IDatabaseRepository {
       acknowledgedAt: r.acknowledged_at ? new Date(r.acknowledged_at).toISOString() : undefined,
       createdAt: new Date(r.created_at).toISOString(),
       expiresAt: new Date(r.expires_at).toISOString(),
+      latitude: r.latitude != null ? parseFloat(r.latitude) : undefined,
+      longitude: r.longitude != null ? parseFloat(r.longitude) : undefined,
+      subCity: r.subCity || undefined,
+      address: r.address || undefined,
     };
   }
 

@@ -488,10 +488,26 @@ app.post('/api/reservation/create', async (req: Request, res: Response) => {
     }).catch((err: any) => console.warn('[Reservation] Telegram alert to pharmacy failed:', err.message));
   }
 
+  if (pharmacy) {
+    hold.latitude = pharmacy.latitude;
+    hold.longitude = pharmacy.longitude;
+    hold.subCity = hold.subCity || pharmacy.subCity;
+    hold.address = hold.address || pharmacy.address;
+  }
+
   res.json({
     success: true,
     message: `Price locked at ${hold.lockedPriceETB} ETB for 60 minutes.`,
     reservation: hold,
+    pharmacy: pharmacy ? {
+      id: pharmacy.id,
+      name: pharmacy.name,
+      subCity: pharmacy.subCity,
+      phone: pharmacy.phone,
+      address: pharmacy.address,
+      latitude: pharmacy.latitude,
+      longitude: pharmacy.longitude,
+    } : undefined,
   });
 });
 
@@ -575,9 +591,29 @@ app.get('/api/reservation/status/:code', async (req: Request, res: Response) => 
     hold.status = 'EXPIRED';
   }
 
+  let pharmacy = null;
+  if (hold.pharmacyId && (!hold.latitude || !hold.longitude)) {
+    pharmacy = await dbRepo.getPharmacyById(hold.pharmacyId);
+    if (pharmacy) {
+      hold.latitude = pharmacy.latitude;
+      hold.longitude = pharmacy.longitude;
+      hold.subCity = hold.subCity || pharmacy.subCity;
+      hold.address = hold.address || pharmacy.address;
+    }
+  }
+
   res.json({
     success: true,
     reservation: hold,
+    pharmacy: pharmacy || (hold.pharmacyId ? {
+      id: hold.pharmacyId,
+      name: hold.pharmacyName,
+      subCity: hold.subCity,
+      phone: hold.phone,
+      address: hold.address,
+      latitude: hold.latitude,
+      longitude: hold.longitude,
+    } : undefined),
   });
 });
 

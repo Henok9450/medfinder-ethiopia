@@ -85,6 +85,10 @@ export interface ReservationHold {
   acknowledgedAt?: string;
   createdAt: string;
   expiresAt: string;
+  latitude?: number;
+  longitude?: number;
+  subCity?: string;
+  address?: string;
 }
 
 export interface PharmacyVerificationApplication {
@@ -278,6 +282,10 @@ export class InMemoryDatabase {
       pharmacistAcknowledged: false,
       createdAt: now.toISOString(),
       expiresAt,
+      latitude: pharmacy.latitude,
+      longitude: pharmacy.longitude,
+      subCity: pharmacy.subCity,
+      address: pharmacy.address,
     };
 
     this.reservations.set(randomCode, hold);

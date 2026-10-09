@@ -1505,6 +1505,12 @@
           <strong id="resPharmPhone" class="text-slate-900">—</strong>
         </div>
 
+        <!-- TURN-BY-TURN NAVIGATION BUTTON -->
+        <a id="mainResDirectionsBtn" href="#" target="_blank" class="flex items-center justify-center gap-2 w-full py-3 px-4 bg-emerald-600 hover:bg-emerald-700 active:scale-98 text-white rounded-xl text-xs font-bold transition shadow-md">
+          <i class="fa-solid fa-diamond-turn-right text-base text-white animate-pulse"></i>
+          <span id="mainResDirectionsBtnText">🗺️ Open Turn-by-Turn Navigation (አቅጣጫ አሳየኝ)</span>
+        </a>
+
         <!-- TELEGRAM NOTIFICATION DEEP-LINK BUTTON -->
         <a id="mainResTelegramLink" href="https://t.me/MedFinder_ET_bot" target="_blank" class="flex items-center justify-center gap-2 w-full py-2.5 px-3 bg-[#229ED9] hover:bg-[#1e8bc0] text-white rounded-xl text-xs font-bold transition shadow-sm">
           <i class="fa-brands fa-telegram text-base"></i>
@@ -4205,7 +4211,7 @@
       if (!p) return;
       const patientUserId = document.getElementById('patientUserId').value || 'patient_addis_001';
       const medicineName = document.getElementById('medicineInput').value || 'Insulin';
-      requestPriceLockHold(patientUserId, p.id, p.name, medicineName, p.priceETB);
+      requestPriceLockHold(patientUserId, p.id, p.name, medicineName, p.priceETB, p.latitude, p.longitude, p.subCity);
     }
 
     function handleReportClick(idx) {
@@ -4250,7 +4256,18 @@
       }
     }
 
-    function startMainReservationPolling(code) {
+    function updateMainResDirections(lat, lng, pharmacyName, subCity) {
+      const dirBtn = document.getElementById('mainResDirectionsBtn');
+      if (!dirBtn) return;
+      if (lat && lng && !isNaN(Number(lat)) && !isNaN(Number(lng))) {
+        dirBtn.href = `https://www.google.com/maps/dir/?api=1&destination=${lat},${lng}`;
+      } else {
+        const q = encodeURIComponent(`${pharmacyName || 'Pharmacy'} ${subCity || ''} Addis Ababa`);
+        dirBtn.href = `https://www.google.com/maps/search/?api=1&query=${q}`;
+      }
+    }
+
+    function startMainReservationPolling(code, origLat, origLng, origName, origSubCity) {
       if (mainPollResInterval) clearInterval(mainPollResInterval);
       currentMainResCode = code;
 
@@ -4262,6 +4279,15 @@
           const data = await res.json();
           if (!data.success || !data.reservation) return;
           const r = data.reservation;
+          const ph = data.pharmacy || {};
+
+          // Keep directions URL updated with latest coordinates
+          updateMainResDirections(
+            r.latitude || ph.latitude || origLat,
+            r.longitude || ph.longitude || origLng,
+            r.pharmacyName || origName,
+            r.subCity || ph.subCity || origSubCity
+          );
 
           if (r.status === 'CANCELLED') {
             clearInterval(mainPollResInterval);
@@ -4290,9 +4316,35 @@
             codeBox.className = 'mt-3 p-4 rounded-2xl bg-slate-800 text-white shadow-inner opacity-80 transition-all';
             document.getElementById('resCodeDisplay').className = 'text-4xl font-extrabold tracking-widest text-rose-300 line-through mt-1';
 
+            const countdownSubtext = document.getElementById('mainResCountdownSubtext');
+            if (countdownSubtext) countdownSubtext.innerHTML = '❌ <span class="text-rose-400 font-bold">CANCELLED (ተሰርዟል)</span>';
+
             // Show "Search Another" button prominently
             document.getElementById('mainResFindAnotherBtn').classList.remove('hidden');
             document.getElementById('mainResCloseBtn').innerText = 'Dismiss';
+          } else if (r.status === 'FULFILLED') {
+            // Dispensed & Fulfilled
+            clearInterval(mainPollResInterval);
+            stopMainSafetyTimer();
+            playMainChime('confirm');
+
+            document.getElementById('mainResModalHeader').className = 'p-6 text-center bg-gradient-to-b from-emerald-50 to-white border-b border-emerald-200 transition-all';
+            document.getElementById('mainResIconBox').className = 'w-14 h-14 mx-auto rounded-full bg-emerald-600 text-white flex items-center justify-center text-2xl shadow-lg mb-3 transition-all';
+            document.getElementById('mainResIconI').className = 'fa-solid fa-circle-check';
+
+            document.getElementById('mainResTitle').innerText = 'Medicine Dispensed Successfully!';
+            document.getElementById('mainResSubtitle').innerText = 'The pharmacist has verified your voucher code and handed over your medicine.';
+
+            const banner = document.getElementById('mainResStatusBanner');
+            banner.className = 'mt-3 p-3 rounded-2xl text-xs font-semibold flex items-center gap-2.5 bg-emerald-100 text-emerald-950 border border-emerald-400 text-left transition-all';
+            document.getElementById('mainResStatusIcon').className = 'fa-solid fa-circle-check text-emerald-700 text-base shrink-0';
+            document.getElementById('mainResStatusDesc').innerHTML = `
+              <strong class="block text-emerald-900">Voucher Verified & Fulfilled (ተረክበዋል)</strong>
+              <span class="text-[11px] text-emerald-800 font-normal">Medicine collected at pharmacy counter. Thank you!</span>
+            `;
+
+            const countdownSubtext = document.getElementById('mainResCountdownSubtext');
+            if (countdownSubtext) countdownSubtext.innerHTML = '✅ <strong class="text-emerald-400 font-bold">CLAIMED & COMPLETED (ተረክበዋል)</strong>';
           } else if (r.pharmacistAcknowledged && r.status === 'ACTIVE') {
             clearInterval(mainPollResInterval);
             stopMainSafetyTimer();
@@ -4309,9 +4361,18 @@
             banner.className = 'mt-3 p-3 rounded-2xl text-xs font-semibold flex items-center gap-2.5 bg-emerald-50 text-emerald-900 border border-emerald-300 text-left transition-all';
             document.getElementById('mainResStatusIcon').className = 'fa-solid fa-box-archive text-emerald-600 text-base shrink-0';
             document.getElementById('mainResStatusDesc').innerHTML = `
-              <strong class="block text-emerald-800">Physically Set Aside at Counter</strong>
-              <span class="text-[11px] text-emerald-700 font-normal">The counter is expecting you. Show code #${r.reservationCode} upon arrival.</span>
+              <strong class="block text-emerald-800">Physically Set Aside at Counter (ተይዞልዎታል)</strong>
+              <span class="text-[11px] text-emerald-700 font-normal">The counter is expecting you. Tap Turn-by-Turn Navigation below to guide your way!</span>
             `;
+
+            const countdownSubtext = document.getElementById('mainResCountdownSubtext');
+            if (countdownSubtext) countdownSubtext.innerHTML = '✅ <strong class="text-emerald-400 font-bold">STOCK CONFIRMED & HELD (ተይዞልዎታል)</strong>';
+
+            // Highlight directions button
+            const dirBtn = document.getElementById('mainResDirectionsBtn');
+            if (dirBtn) {
+              dirBtn.className = 'flex items-center justify-center gap-2 w-full py-3.5 px-4 bg-emerald-600 hover:bg-emerald-700 active:scale-98 text-white rounded-xl text-xs font-black transition shadow-lg ring-4 ring-emerald-400/40 animate-pulse';
+            }
           }
         } catch (err) {
           console.warn('[Poll] Status error:', err.message);
@@ -4375,8 +4436,10 @@
     }
 
     // --- ANTI-SCAM: PRICE LOCK RESERVATIONS ---
-    async function requestPriceLockHold(patientUserId, pharmacyId, pharmacyName, medicineName, lockedPriceETB) {
+    async function requestPriceLockHold(patientUserId, pharmacyId, pharmacyName, medicineName, lockedPriceETB, lat = null, lng = null, subCity = '') {
       try {
+        updateMainResDirections(lat, lng, pharmacyName, subCity);
+
         const res = await fetch('/api/reservation/create', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -4385,7 +4448,15 @@
         const data = await res.json();
         if (data.success) {
           const resv = data.reservation;
+          const ph = data.pharmacy || {};
           currentMainResCode = resv.reservationCode;
+
+          updateMainResDirections(
+            resv.latitude || ph.latitude || lat,
+            resv.longitude || ph.longitude || lng,
+            resv.pharmacyName || pharmacyName,
+            resv.subCity || ph.subCity || subCity
+          );
 
           // Reset UI
           document.getElementById('mainResModalHeader').className = 'p-6 text-center bg-gradient-to-b from-emerald-50 to-white border-b border-emerald-100 transition-all';
@@ -4407,6 +4478,14 @@
           document.getElementById('resCodeDisplay').className = 'text-4xl font-extrabold tracking-widest text-white mt-1';
           document.getElementById('resCodeDisplay').innerText = `#${resv.reservationCode}`;
 
+          const countdownSubtext = document.getElementById('mainResCountdownSubtext');
+          if (countdownSubtext) countdownSubtext.innerHTML = '⏱️ Valid for next 60 Minutes';
+
+          const dirBtn = document.getElementById('mainResDirectionsBtn');
+          if (dirBtn) {
+            dirBtn.className = 'flex items-center justify-center gap-2 w-full py-3 px-4 bg-emerald-600 hover:bg-emerald-700 active:scale-98 text-white rounded-xl text-xs font-bold transition shadow-md';
+          }
+
           document.getElementById('resMedName').innerText = resv.medicineName;
           document.getElementById('resPrice').innerText = `${resv.lockedPriceETB} ETB`;
           document.getElementById('resPharmName').innerText = resv.pharmacyName;
@@ -4425,7 +4504,7 @@
           startMainSafetyTimer(resv.phone, resv.reservationCode, resv.medicineName, resv.lockedPriceETB);
 
           // Start polling
-          startMainReservationPolling(resv.reservationCode);
+          startMainReservationPolling(resv.reservationCode, lat, lng, pharmacyName, subCity);
 
           document.getElementById('reservationModal').classList.remove('hidden');
         } else {
