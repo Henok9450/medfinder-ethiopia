@@ -137,6 +137,14 @@ export async function runMigrations(): Promise<{ success: boolean; message: stri
         const accId = `acc-${crypto.randomBytes(4).toString('hex')}`;
         const pId = row.approved_pharmacy_id || `pharm-${(row.sub_city || 'bole').toLowerCase().replace(/[^a-z]/g, '')}-${Math.floor(1000 + Math.random() * 9000)}`;
 
+        // Ensure parent pharmacy record exists in pharmacies table to satisfy foreign key constraint
+        await p.query(
+          `INSERT INTO pharmacies (id, name, sub_city, phone, efda_license_number, tin_number, is_verified, location)
+           VALUES ($1, $2, $3, $4, $5, $6, TRUE, ST_SetSRID(ST_MakePoint(38.7880, 8.9950), 4326))
+           ON CONFLICT (id) DO UPDATE SET name = EXCLUDED.name, is_verified = TRUE`,
+          [pId, row.pharmacy_name, row.sub_city || 'Bole', row.phone, row.efda_license_number || 'EFDA/PH/2026', 'TIN-00000000']
+        );
+
         await p.query(
           `INSERT INTO pharmacy_portal_accounts (
              id, pharmacy_id, pharmacy_name, sub_city, phone, username,
