@@ -1434,16 +1434,25 @@
   <!-- MODAL 4: 1-HOUR PRICE-LOCK RESERVATION TICKET                  -->
   <!-- ============================================================== -->
   <div id="reservationModal" class="hidden fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4">
-    <div class="bg-white rounded-3xl max-w-md w-full shadow-2xl overflow-hidden border border-emerald-500/30">
-      <div class="p-6 text-center bg-gradient-to-b from-emerald-50 to-white border-b border-emerald-100">
-        <div class="w-14 h-14 mx-auto rounded-full bg-emerald-600 text-white flex items-center justify-center text-2xl shadow-lg mb-3">
-          <i class="fa-solid fa-lock"></i>
+    <div class="bg-white rounded-3xl max-w-md w-full shadow-2xl overflow-hidden border border-emerald-500/30 transition-all">
+      <div id="mainResModalHeader" class="p-6 text-center bg-gradient-to-b from-emerald-50 to-white border-b border-emerald-100 transition-all">
+        <div id="mainResIconBox" class="w-14 h-14 mx-auto rounded-full bg-emerald-600 text-white flex items-center justify-center text-2xl shadow-lg mb-3 transition-all">
+          <i id="mainResIconI" class="fa-solid fa-lock"></i>
         </div>
-        <h3 class="text-base font-bold text-slate-900">Price-Lock Reservation Confirmed</h3>
-        <p class="text-xs text-slate-500 mt-1">Present this code at the pharmacy counter. The stated price is legally locked for 60 minutes.</p>
+        <h3 id="mainResTitle" class="text-base font-bold text-slate-900">Price-Lock Reservation Confirmed</h3>
+        <p id="mainResSubtitle" class="text-xs text-slate-500 mt-1">Present this code at the pharmacy counter. The stated price is legally locked for 60 minutes.</p>
         
+        <!-- LIVE COUNTER STATUS BANNER -->
+        <div id="mainResStatusBanner" class="mt-3 p-3 rounded-2xl text-xs font-semibold flex items-center gap-2.5 bg-amber-50 text-amber-900 border border-amber-200 text-left transition-all">
+          <i id="mainResStatusIcon" class="fa-solid fa-spinner fa-spin text-amber-600 text-base shrink-0"></i>
+          <div id="mainResStatusDesc" class="leading-tight">
+            <strong class="block text-amber-800">Checking Pharmacy Shelf...</strong>
+            <span class="text-[11px] text-amber-700 font-normal">Alert sent to pharmacy counter. Verifying physical stock now.</span>
+          </div>
+        </div>
+
         <!-- LARGE 4-DIGIT CODE -->
-        <div class="mt-4 p-4 rounded-2xl bg-slate-900 text-white shadow-inner">
+        <div id="mainResCodeBox" class="mt-3 p-4 rounded-2xl bg-slate-900 text-white shadow-inner transition-all">
           <span class="text-xs text-emerald-400 font-bold uppercase tracking-wider block">Reservation Hold Code</span>
           <div id="resCodeDisplay" class="text-4xl font-extrabold tracking-widest text-white mt-1">#8492</div>
           <span class="text-[11px] text-slate-400 mt-1 block">⏱️ Valid for next 60 Minutes</span>
@@ -1468,14 +1477,24 @@
           <strong id="resPharmPhone" class="text-slate-900">—</strong>
         </div>
 
+        <!-- TELEGRAM NOTIFICATION DEEP-LINK BUTTON -->
+        <a id="mainResTelegramLink" href="https://t.me/MedFinder_ET_bot" target="_blank" class="flex items-center justify-center gap-2 w-full py-2.5 px-3 bg-[#229ED9] hover:bg-[#1e8bc0] text-white rounded-xl text-xs font-bold transition shadow-sm">
+          <i class="fa-brands fa-telegram text-base"></i>
+          <span>Get Real-Time Updates on Telegram</span>
+        </a>
+
         <div class="p-3 bg-amber-50 border border-amber-200 rounded-xl text-amber-900 text-[11px] flex items-center space-x-2">
           <i class="fa-solid fa-shield-halved text-base text-amber-600"></i>
           <span>If the pharmacy attempts to increase this price, use the "Report Issue" button for immediate strike action.</span>
         </div>
       </div>
 
-      <div class="p-4 border-t border-slate-100 bg-slate-50 flex justify-end">
-        <button onclick="closeModal('reservationModal')" class="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-2.5 rounded-xl text-xs shadow-md transition">
+      <div class="p-4 border-t border-slate-100 bg-slate-50 space-y-2">
+        <button id="mainResFindAnotherBtn" onclick="closeModal('reservationModal')" class="hidden w-full bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-2.5 rounded-xl text-xs shadow-md transition flex items-center justify-center gap-1.5">
+          <i class="fa-solid fa-magnifying-glass"></i>
+          <span>Search Another Pharmacy Nearby (ሌላ ፈልግ)</span>
+        </button>
+        <button id="mainResCloseBtn" onclick="closeModal('reservationModal')" class="w-full bg-slate-900 hover:bg-black text-white font-bold py-2.5 rounded-xl text-xs shadow-md transition">
           I'm Heading to the Pharmacy Now
         </button>
       </div>
@@ -2439,6 +2458,15 @@
 
     function closeModal(id) {
       document.getElementById(id).classList.add('hidden');
+      if (id === 'reservationModal') {
+        if (typeof mainPollResInterval !== 'undefined' && mainPollResInterval) {
+          clearInterval(mainPollResInterval);
+          mainPollResInterval = null;
+        }
+        if (typeof currentMainResCode !== 'undefined') {
+          currentMainResCode = null;
+        }
+      }
     }
 
     // --- FETCH POLICY AT STARTUP ---
@@ -4149,6 +4177,108 @@
       openReportModal(p.id, p.name, medicineName);
     }
 
+    let mainPollResInterval = null;
+    let currentMainResCode = null;
+
+    function playMainChime(type) {
+      try {
+        const AudioCtx = window.AudioContext || window.webkitAudioContext;
+        if (!AudioCtx) return;
+        const ctx = new AudioCtx();
+        const osc = ctx.createOscillator();
+        const gain = ctx.createGain();
+        osc.connect(gain);
+        gain.connect(ctx.destination);
+
+        if (type === 'cancel') {
+          osc.type = 'sawtooth';
+          osc.frequency.setValueAtTime(340, ctx.currentTime);
+          osc.frequency.setValueAtTime(220, ctx.currentTime + 0.15);
+          gain.gain.setValueAtTime(0.3, ctx.currentTime);
+          gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.45);
+          osc.start();
+          osc.stop(ctx.currentTime + 0.45);
+        } else if (type === 'confirm') {
+          osc.type = 'sine';
+          osc.frequency.setValueAtTime(587.33, ctx.currentTime);
+          osc.frequency.setValueAtTime(880, ctx.currentTime + 0.12);
+          gain.gain.setValueAtTime(0.25, ctx.currentTime);
+          gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.4);
+          osc.start();
+          osc.stop(ctx.currentTime + 0.4);
+        }
+      } catch (e) {
+        console.warn('[Audio] Chime failed:', e);
+      }
+    }
+
+    function startMainReservationPolling(code) {
+      if (mainPollResInterval) clearInterval(mainPollResInterval);
+      currentMainResCode = code;
+
+      mainPollResInterval = setInterval(async () => {
+        try {
+          if (!currentMainResCode) return;
+          const res = await fetch(`/api/reservation/status/${currentMainResCode}`);
+          if (!res.ok) return;
+          const data = await res.json();
+          if (!data.success || !data.reservation) return;
+          const r = data.reservation;
+
+          if (r.status === 'CANCELLED') {
+            clearInterval(mainPollResInterval);
+            playMainChime('cancel');
+
+            // Header -> Alert Red
+            document.getElementById('mainResModalHeader').className = 'p-6 text-center bg-gradient-to-b from-rose-50 to-white border-b border-rose-200 transition-all';
+            document.getElementById('mainResIconBox').className = 'w-14 h-14 mx-auto rounded-full bg-rose-600 text-white flex items-center justify-center text-2xl shadow-lg mb-3 transition-all';
+            document.getElementById('mainResIconI').className = 'fa-solid fa-triangle-exclamation';
+
+            document.getElementById('mainResTitle').innerText = 'Out of Stock at Pharmacy Counter';
+            document.getElementById('mainResSubtitle').innerText = 'The pharmacist physically checked their counter shelf and reported this medicine has sold out.';
+
+            // Status Banner -> Alert Red
+            const banner = document.getElementById('mainResStatusBanner');
+            banner.className = 'mt-3 p-3 rounded-2xl text-xs font-semibold flex items-center gap-2.5 bg-rose-50 text-rose-900 border border-rose-300 text-left transition-all';
+            document.getElementById('mainResStatusIcon').className = 'fa-solid fa-circle-xmark text-rose-600 text-base shrink-0';
+            document.getElementById('mainResStatusDesc').innerHTML = `
+              <strong class="block text-rose-800">Declined by Pharmacist (Out of Stock)</strong>
+              <span class="text-[11px] text-rose-700 font-normal">Your hold was cancelled so you do not travel in vain. Please search another nearby pharmacy.</span>
+            `;
+
+            // Dim code box
+            const codeBox = document.getElementById('mainResCodeBox');
+            codeBox.className = 'mt-3 p-4 rounded-2xl bg-slate-800 text-white shadow-inner opacity-80 transition-all';
+            document.getElementById('resCodeDisplay').className = 'text-4xl font-extrabold tracking-widest text-rose-300 line-through mt-1';
+
+            // Show "Search Another" button prominently
+            document.getElementById('mainResFindAnotherBtn').classList.remove('hidden');
+            document.getElementById('mainResCloseBtn').innerText = 'Dismiss';
+          } else if (r.pharmacistAcknowledged && r.status === 'ACTIVE') {
+            clearInterval(mainPollResInterval);
+            playMainChime('confirm');
+
+            document.getElementById('mainResModalHeader').className = 'p-6 text-center bg-gradient-to-b from-emerald-50 to-white border-b border-emerald-200 transition-all';
+            document.getElementById('mainResIconBox').className = 'w-14 h-14 mx-auto rounded-full bg-emerald-600 text-white flex items-center justify-center text-2xl shadow-lg mb-3 transition-all';
+            document.getElementById('mainResIconI').className = 'fa-solid fa-circle-check';
+
+            document.getElementById('mainResTitle').innerText = 'Stock Confirmed & Held at Counter!';
+            document.getElementById('mainResSubtitle').innerText = 'The pharmacist has set aside your medicine. Head to the pharmacy counter now.';
+
+            const banner = document.getElementById('mainResStatusBanner');
+            banner.className = 'mt-3 p-3 rounded-2xl text-xs font-semibold flex items-center gap-2.5 bg-emerald-50 text-emerald-900 border border-emerald-300 text-left transition-all';
+            document.getElementById('mainResStatusIcon').className = 'fa-solid fa-box-archive text-emerald-600 text-base shrink-0';
+            document.getElementById('mainResStatusDesc').innerHTML = `
+              <strong class="block text-emerald-800">Physically Set Aside at Counter</strong>
+              <span class="text-[11px] text-emerald-700 font-normal">The counter is expecting you. Show code #${r.reservationCode} upon arrival.</span>
+            `;
+          }
+        } catch (err) {
+          console.warn('[Poll] Status error:', err.message);
+        }
+      }, 2500);
+    }
+
     // --- ANTI-SCAM: PRICE LOCK RESERVATIONS ---
     async function requestPriceLockHold(patientUserId, pharmacyId, pharmacyName, medicineName, lockedPriceETB) {
       try {
@@ -4160,11 +4290,45 @@
         const data = await res.json();
         if (data.success) {
           const resv = data.reservation;
+          currentMainResCode = resv.reservationCode;
+
+          // Reset UI
+          document.getElementById('mainResModalHeader').className = 'p-6 text-center bg-gradient-to-b from-emerald-50 to-white border-b border-emerald-100 transition-all';
+          document.getElementById('mainResIconBox').className = 'w-14 h-14 mx-auto rounded-full bg-emerald-600 text-white flex items-center justify-center text-2xl shadow-lg mb-3 transition-all';
+          document.getElementById('mainResIconI').className = 'fa-solid fa-lock';
+          document.getElementById('mainResTitle').innerText = 'Price-Lock Reservation Confirmed';
+          document.getElementById('mainResSubtitle').innerText = 'Present this code at the pharmacy counter. The stated price is legally locked for 60 minutes.';
+
+          const banner = document.getElementById('mainResStatusBanner');
+          banner.className = 'mt-3 p-3 rounded-2xl text-xs font-semibold flex items-center gap-2.5 bg-amber-50 text-amber-900 border border-amber-200 text-left transition-all';
+          document.getElementById('mainResStatusIcon').className = 'fa-solid fa-spinner fa-spin text-amber-600 text-base shrink-0';
+          document.getElementById('mainResStatusDesc').innerHTML = `
+            <strong class="block text-amber-800">Checking Pharmacy Shelf...</strong>
+            <span class="text-[11px] text-amber-700 font-normal">Alert sent to pharmacy counter. Verifying physical stock now.</span>
+          `;
+
+          const codeBox = document.getElementById('mainResCodeBox');
+          codeBox.className = 'mt-3 p-4 rounded-2xl bg-slate-900 text-white shadow-inner transition-all';
+          document.getElementById('resCodeDisplay').className = 'text-4xl font-extrabold tracking-widest text-white mt-1';
           document.getElementById('resCodeDisplay').innerText = `#${resv.reservationCode}`;
+
           document.getElementById('resMedName').innerText = resv.medicineName;
           document.getElementById('resPrice').innerText = `${resv.lockedPriceETB} ETB`;
           document.getElementById('resPharmName').innerText = resv.pharmacyName;
           document.getElementById('resPharmPhone').innerText = resv.phone;
+
+          // Telegram Deep Link
+          const tgLink = document.getElementById('mainResTelegramLink');
+          if (tgLink) {
+            tgLink.href = `https://t.me/MedFinder_ET_bot?start=hold_${resv.reservationCode}`;
+          }
+
+          document.getElementById('mainResFindAnotherBtn').classList.add('hidden');
+          document.getElementById('mainResCloseBtn').innerText = "I'm Heading to the Pharmacy Now";
+
+          // Start polling
+          startMainReservationPolling(resv.reservationCode);
+
           document.getElementById('reservationModal').classList.remove('hidden');
         } else {
           alert('Could not create hold: ' + (data.error || 'Unknown error'));

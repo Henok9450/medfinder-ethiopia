@@ -546,6 +546,53 @@ app.post('/api/reservation/reject', async (req: Request, res: Response) => {
   res.json(result);
 });
 
+// 2E. Real-time Reservation Status Inquiry (Polling & Deep Linking for Web & Telegram)
+app.get('/api/reservation/status/:code', async (req: Request, res: Response) => {
+  const code = String(req.params.code || '').trim();
+  if (!code) return res.status(400).json({ success: false, error: 'code is required' });
+
+  const hold = await dbRepo.getReservationHold(code);
+  if (!hold) {
+    return res.status(404).json({ success: false, error: 'Reservation code not found' });
+  }
+
+  // Check if expired dynamically
+  if (hold.status === 'ACTIVE' && new Date() > new Date(hold.expiresAt)) {
+    hold.status = 'EXPIRED';
+  }
+
+  res.json({
+    success: true,
+    reservation: hold,
+  });
+});
+
+// 2F. Link Telegram Chat ID to a Web-initiated Reservation
+app.post('/api/reservation/link-telegram', async (req: Request, res: Response) => {
+  const { reservationCode, chatId } = req.body;
+  if (!reservationCode || !chatId) {
+    return res.status(400).json({ success: false, error: 'reservationCode and chatId are required' });
+  }
+
+  const updated = await dbRepo.linkReservationPatientChatId(String(reservationCode), String(chatId));
+  if (!updated) {
+    return res.status(404).json({ success: false, error: 'Reservation not found' });
+  }
+
+  // If already confirmed or cancelled, alert immediately on link
+  if (updated.status === 'CANCELLED') {
+    telegramBotService.notifyPatientStockUnavailable(updated).catch(() => {});
+  } else if (updated.pharmacistAcknowledged) {
+    telegramBotService.notifyPatientStockConfirmed(updated).catch(() => {});
+  }
+
+  res.json({
+    success: true,
+    message: 'Telegram notifications linked to reservation voucher.',
+    reservation: updated,
+  });
+});
+
 // 3. Patient reports violation (Price Gouging, Phantom Stock, Expired Drug)
 app.post('/api/report/violation', async (req: Request, res: Response) => {
   const { patientUserId, pharmacyId, medicineName, issueType, description } = req.body;

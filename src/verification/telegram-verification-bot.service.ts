@@ -1097,6 +1097,68 @@ export class TelegramVerificationBotService {
     // DEDICATED PATIENT BOT FLOW (sourceBotType: PATIENT)
     // ==========================================
     if (sourceBotType === 'PATIENT') {
+      // 0. Telegram Deep Link & Status Checker for Price-Lock Voucher (Web Handoff / Bot Hold Tracking)
+      const holdMatch = cleanText.match(/^\/start\s+(?:hold_)?([A-Za-z0-9_-]+)/i) || 
+                        cleanText.match(/^check_hold_([A-Za-z0-9_-]+)/i) ||
+                        cleanText.match(/^\/hold_status\s*([A-Za-z0-9_-]+)?/i);
+
+      if (holdMatch && holdMatch[1]) {
+        session.mode = 'PATIENT';
+        const code = holdMatch[1].replace(/^#/, '').toUpperCase();
+        await this.repo.linkReservationPatientChatId(code, chatId);
+        const hold = await this.repo.getReservationHold(code);
+
+        if (!hold) {
+          return {
+            chatId,
+            replyText: `⚠️ **የማስያዣ ኮድ #${code} አልተገኘም (Voucher not found)**\n\nኮዱ የተሳሳተ ወይም ጊዜው ያለፈበት ሊሆን ይችላል። አዲስ ፍለጋ ለማድረግ /start ብለው ይጻፉ።`,
+            quickReplies: ['/start', '💊 Insulin', '💊 Augmentin'],
+            sessionStep: 'PATIENT_SEARCH',
+          };
+        }
+
+        const expTime = new Date(hold.expiresAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+        let statusBadge = '⏳ **በመጠባበቅ ላይ (Awaiting Pharmacist Check)**\nፋርማሲስቱ መድኃኒቱን በካውንተር እንዳለ እስኪያረጋግጥ እየተጠበቀ ነው። ፋርማሲስቱ እንዳረጋገጠ ወይም እንዳለቀ እንዳሳወቀ በቅጽበት መልእክት ይደርስዎታል!';
+        let statusEmoji = '⏳';
+        if (hold.status === 'CANCELLED') {
+          statusEmoji = '❌';
+          statusBadge = '❌ **ማስያዣው ተሰርዟል / አልቋል (Out of Stock / Sold Out)**\nይቅርታ፣ ፋርማሲው መድኃኒቱ በካውንተር ላይ እንዳለቀ አረጋግጧል። አላስፈላጊ ጉዞ እንዳያደርጉ ማስያዣው ተሰርዟል። እባክዎ በአቅራቢያዎ የሚገኝ ሌላ ፋርማሲ ይፈልጉ።';
+        } else if (hold.pharmacistAcknowledged) {
+          statusEmoji = '✅';
+          statusBadge = '✅ **የተረጋገጠ (Shelf Stock Confirmed & Held at Counter!)**\nፋርማሲስቱ መድኃኒቱን አዘጋጅቶ በካውንተር እያስቀመጠ ስለሆነ አሁን መሄድ ይችላሉ!';
+        } else if (hold.status === 'FULFILLED') {
+          statusEmoji = '🎉';
+          statusBadge = '🎉 **የተረከቡት (Claimed & Fulfilled)**\nመድኃኒቱን በካውንተር ተረክበዋል!';
+        } else if (hold.status === 'EXPIRED') {
+          statusEmoji = '⏱️';
+          statusBadge = '⏱️ **ጊዜው ያለፈበት (Expired)**\nየ60 ደቂቃው ዋጋ ማስያዣ ጊዜ አብቅቷል።';
+        }
+
+        return {
+          chatId,
+          replyText: `📲 **ቴሌግራምዎ ከማስያዣ ቫውቸር #${hold.reservationCode} ጋር ተገናኝቷል!**
+**Telegram Push Alerts Active for Voucher #${hold.reservationCode}**
+━━━━━━━━━━━━━━━━━━━━━━━━━━
+🏥 **ፋርማሲ፦** ${hold.pharmacyName}
+💊 **መድኃኒት፦** ${hold.medicineName}
+💰 **የተቆለፈ ዋጋ፦** ${hold.lockedPriceETB} ETB (ለ60 ደቂቃ በህግ የተረጋገጠ)
+🔐 **የቫውቸር ኮድ፦** \`#${hold.reservationCode}\`
+⏳ **የሚያበቃበት ሰዓት፦** እስከ ${expTime}
+📞 **ስልክ፦** \`${hold.phone}\`
+━━━━━━━━━━━━━━━━━━━━━━━━━━
+${statusEmoji} **የአሁኑ ሁኔታ (Current Status):**
+${statusBadge}
+━━━━━━━━━━━━━━━━━━━━━━━━━━
+🔔 ፋርማሲስቱ የሰጠው ምላሽ በቅጽበት እዚህ ቴሌግራም ላይ ይደርስዎታል።`,
+          quickReplies: [`check_hold_${hold.reservationCode}`, '/start', '💊 አዲስ ፍለጋ'],
+          inlineKeyboard: [
+            [{ text: '🔄 ሁኔታውን በድጋሚ ፈትሽ (Refresh Status)', callback_data: `check_hold_${hold.reservationCode}` }],
+            [{ text: '🌐 Web App (/find)', url: this.getPatientPwaUrl() }]
+          ],
+          sessionStep: 'PATIENT_SEARCH',
+        };
+      }
+
       // 1. Patient Welcome Screen
       if (cleanText === '/start' || cleanText.toLowerCase() === 'reset') {
         session.mode = 'PATIENT';

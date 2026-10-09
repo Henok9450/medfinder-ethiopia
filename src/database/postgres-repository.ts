@@ -223,9 +223,10 @@ export class PostgresRepository implements IDatabaseRepository {
     const pool = getDbPool();
     if (!pool) return null;
 
+    const cleanCode = code.trim().replace(/^#/, '');
     const res = await pool.query(
-      `SELECT * FROM reservations WHERE reservation_code = $1`,
-      [code]
+      `SELECT * FROM reservations WHERE UPPER(reservation_code) = UPPER($1) OR reservation_code = $1`,
+      [cleanCode]
     );
 
     if (res.rows.length === 0) return null;
@@ -244,6 +245,18 @@ export class PostgresRepository implements IDatabaseRepository {
       createdAt: new Date(r.created_at).toISOString(),
       expiresAt: new Date(r.expires_at).toISOString(),
     };
+  }
+
+  public async linkReservationPatientChatId(code: string, chatId: string): Promise<ReservationHold | null> {
+    const pool = getDbPool();
+    if (!pool) return null;
+
+    const cleanCode = code.trim().replace(/^#/, '');
+    await pool.query(
+      `UPDATE reservations SET patient_user_id = $1 WHERE UPPER(reservation_code) = UPPER($2) OR reservation_code = $2`,
+      [chatId, cleanCode]
+    );
+    return this.getReservationHold(cleanCode);
   }
 
   public async getActiveReservationsByPharmacy(pharmacyId: string): Promise<ReservationHold[]> {
@@ -285,9 +298,10 @@ export class PostgresRepository implements IDatabaseRepository {
       return { success: false, message: 'Reservation is no longer active or has expired' };
     }
 
+    const cleanCode = code.trim().replace(/^#/, '');
     await pool.query(
-      `UPDATE reservations SET pharmacist_acknowledged = TRUE, acknowledged_at = NOW() WHERE reservation_code = $1`,
-      [code]
+      `UPDATE reservations SET pharmacist_acknowledged = TRUE, acknowledged_at = NOW() WHERE UPPER(reservation_code) = UPPER($1) OR reservation_code = $1`,
+      [cleanCode]
     );
     hold.pharmacistAcknowledged = true;
     hold.acknowledgedAt = new Date().toISOString();
@@ -309,9 +323,10 @@ export class PostgresRepository implements IDatabaseRepository {
     const hold = await this.getReservationHold(code);
     if (!hold) return { success: false, message: 'Reservation not found' };
 
+    const cleanCode = code.trim().replace(/^#/, '');
     await pool.query(
-      `UPDATE reservations SET status = 'CANCELLED' WHERE reservation_code = $1`,
-      [code]
+      `UPDATE reservations SET status = 'CANCELLED' WHERE UPPER(reservation_code) = UPPER($1) OR reservation_code = $1`,
+      [cleanCode]
     );
     hold.status = 'CANCELLED';
 

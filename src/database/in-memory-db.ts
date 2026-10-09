@@ -284,6 +284,23 @@ export class InMemoryDatabase {
     return hold;
   }
 
+  public getReservationHold(code: string): ReservationHold | null {
+    const cleanCode = code.trim().replace(/^#/, '').toUpperCase();
+    for (const [k, v] of this.reservations.entries()) {
+      if (k.toUpperCase() === cleanCode || k.replace(/^#/, '').toUpperCase() === cleanCode) {
+        return v;
+      }
+    }
+    return null;
+  }
+
+  public linkReservationPatientChatId(code: string, chatId: string): ReservationHold | null {
+    const hold = this.getReservationHold(code);
+    if (!hold) return null;
+    hold.patientUserId = chatId;
+    return hold;
+  }
+
   public getActiveReservationsByPharmacy(pharmacyId: string): ReservationHold[] {
     const list: ReservationHold[] = [];
     for (const r of this.reservations.values()) {
@@ -295,7 +312,7 @@ export class InMemoryDatabase {
   }
 
   public confirmReservationHold(reservationCode: string): { success: boolean; message: string; reservation?: ReservationHold } {
-    const hold = this.reservations.get(reservationCode);
+    const hold = this.getReservationHold(reservationCode);
     if (!hold) return { success: false, message: 'Reservation code not found' };
     if (hold.status !== 'ACTIVE' || new Date() > new Date(hold.expiresAt)) {
       return { success: false, message: 'Reservation is no longer active or expired' };
@@ -306,14 +323,14 @@ export class InMemoryDatabase {
   }
 
   public rejectReservationHold(reservationCode: string, reason?: string): { success: boolean; message: string; reservation?: ReservationHold } {
-    const hold = this.reservations.get(reservationCode);
+    const hold = this.getReservationHold(reservationCode);
     if (!hold) return { success: false, message: 'Reservation code not found' };
     hold.status = 'CANCELLED';
     return { success: true, message: reason || 'Reservation cancelled by pharmacist (Out of stock / Sold out).', reservation: hold };
   }
 
   public verifyAndFulfillReservation(reservationCode: string): { success: boolean; message: string; reservation?: ReservationHold } {
-    const hold = this.reservations.get(reservationCode);
+    const hold = this.getReservationHold(reservationCode);
     if (!hold) return { success: false, message: 'Reservation code not found' };
 
     if (new Date() > new Date(hold.expiresAt)) {

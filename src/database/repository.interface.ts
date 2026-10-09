@@ -72,6 +72,14 @@ export interface IDatabaseRepository {
   ): Promise<{ success: boolean; message: string; reservation?: ReservationHold }>;
 
   /**
+   * Link Telegram chat ID or user ID to an existing reservation voucher
+   */
+  linkReservationPatientChatId(
+    code: string,
+    chatId: string
+  ): Promise<ReservationHold | null>;
+
+  /**
    * Update pharmacy GPS location & sub-city
    */
   updatePharmacyLocation(

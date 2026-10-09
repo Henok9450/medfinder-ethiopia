@@ -76,7 +76,11 @@ export class InMemoryRepository implements IDatabaseRepository {
   }
 
   public async getReservationHold(code: string): Promise<ReservationHold | null> {
-    return this.db.reservations.get(code) || null;
+    return this.db.getReservationHold(code);
+  }
+
+  public async linkReservationPatientChatId(code: string, chatId: string): Promise<ReservationHold | null> {
+    return this.db.linkReservationPatientChatId(code, chatId);
   }
 
   public async verifyAndFulfillReservation(
