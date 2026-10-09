@@ -12,6 +12,7 @@ import { InMemoryDatabase, MASTER_MEDICINE_CATALOG, AdminRole, AdminPrivileges }
 import { TelegramVerificationBotService } from './verification/telegram-verification-bot.service';
 import { getDatabaseRepository, initDatabase, closePostgresPool, isPostgresConnected, getDbPool } from './database';
 import { PrescriptionVisionService } from './prescription/prescription-vision.service';
+import { MedicalFuzzyMatcher } from './matching/medical-fuzzy-matcher';
 
 dotenv.config();
 
@@ -131,6 +132,8 @@ app.post('/api/search', async (req: Request, res: Response) => {
   });
 
   if (directMatches.length > 0) {
+    const parsedQuery = MedicalFuzzyMatcher.parseQuery(medicineName);
+
     return res.json({
       success: true,
       mode: 'INSTANT_CATALOG_MATCH',
@@ -139,7 +142,22 @@ app.post('/api/search', async (req: Request, res: Response) => {
       remainingFreeSearches: access.remainingFreeSearches,
       resultsCount: directMatches.length,
       pharmacies: directMatches.map((m) => {
-        const invItem = m.pharmacy.inventory.find(i => i.name.toLowerCase().includes(medicineName.toLowerCase()));
+        // Find matching inventory item using fuzzy matcher
+        let matchedInvItem = m.pharmacy.inventory.find(i => i.name.toLowerCase().includes(medicineName.toLowerCase()));
+        if (!matchedInvItem && m.pharmacy.inventory) {
+          for (const item of m.pharmacy.inventory) {
+            const match = MedicalFuzzyMatcher.matchItem(item.name, parsedQuery);
+            if (match.matched) {
+              matchedInvItem = item;
+              break;
+            }
+          }
+        }
+
+        const matchedName = matchedInvItem ? matchedInvItem.name : (
+          m.pharmacy.inStockItems?.find(it => MedicalFuzzyMatcher.matchItem(it, parsedQuery).matched) || medicineName
+        );
+
         return {
           id: m.pharmacy.id,
           name: m.pharmacy.name,
@@ -151,8 +169,9 @@ app.post('/api/search', async (req: Request, res: Response) => {
           tinNumber: m.pharmacy.tinNumber,
           trustScore: m.pharmacy.trustScore,
           strikeCount: m.pharmacy.strikeCount,
-          priceETB: invItem ? invItem.priceETB : 380,
-          freshness: invItem ? 'FRESH_TODAY' : 'VERIFIED_RECENTLY',
+          matchedDrugName: matchedName,
+          priceETB: matchedInvItem ? matchedInvItem.priceETB : 380,
+          freshness: matchedInvItem ? 'FRESH_TODAY' : 'VERIFIED_RECENTLY',
         };
       }),
     });

@@ -10,6 +10,7 @@ import {
   InMemoryDatabase,
 } from './in-memory-db';
 import { UserSubscription } from '../monetization/subscription.types';
+import { MedicalFuzzyMatcher } from '../matching/medical-fuzzy-matcher';
 
 export class PostgresRepository implements IDatabaseRepository {
   private hashPassword(password: string): string {
@@ -91,17 +92,29 @@ export class PostgresRepository implements IDatabaseRepository {
     const values: any[] = [userLng, userLat, radiusMeters];
 
     if (cleanMedicine) {
-      values.push(`%${cleanMedicine}%`);
-      query += ` AND (
-        EXISTS (
-          SELECT 1 FROM unnest(in_stock_items) item 
-          WHERE LOWER(item) LIKE $${values.length}
-        )
-        OR EXISTS (
-          SELECT 1 FROM jsonb_array_elements(inventory) inv
-          WHERE LOWER(inv->>'name') LIKE $${values.length}
-        )
-      )`;
+      const parsed = MedicalFuzzyMatcher.parseQuery(cleanMedicine);
+      const searchTerms = parsed.allSearchTerms; // e.g. ["ventolin evohaler 100mcg", "ventolin", "salbutamol"]
+
+      const matchClauses: string[] = [];
+      for (const term of searchTerms) {
+        if (!term) continue;
+        values.push(`%${term}%`);
+        const idx = values.length;
+        matchClauses.push(`
+          EXISTS (
+            SELECT 1 FROM unnest(in_stock_items) item 
+            WHERE LOWER(item) LIKE $${idx} OR $${idx} LIKE '%' || LOWER(item) || '%'
+          )
+          OR EXISTS (
+            SELECT 1 FROM jsonb_array_elements(inventory) inv
+            WHERE LOWER(inv->>'name') LIKE $${idx} OR $${idx} LIKE '%' || LOWER(inv->>'name') || '%'
+          )
+        `);
+      }
+
+      if (matchClauses.length > 0) {
+        query += ` AND (${matchClauses.join(' OR ')})`;
+      }
     }
 
     query += ` ORDER BY "trustScore" DESC, "distanceKm" ASC LIMIT 25;`;

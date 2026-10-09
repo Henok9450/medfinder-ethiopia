@@ -8,6 +8,7 @@ import {
   AdminUser,
 } from './in-memory-db';
 import { UserSubscription } from '../monetization/subscription.types';
+import { MedicalFuzzyMatcher } from '../matching/medical-fuzzy-matcher';
 
 export class InMemoryRepository implements IDatabaseRepository {
   private db: InMemoryDatabase;
@@ -37,6 +38,7 @@ export class InMemoryRepository implements IDatabaseRepository {
     radiusKm: number = 5
   ): Promise<Array<Pharmacy & { distanceKm: number }>> {
     const query = medicineName.trim().toLowerCase();
+    const parsedQuery = query ? MedicalFuzzyMatcher.parseQuery(query) : null;
     const results: Array<Pharmacy & { distanceKm: number }> = [];
 
     for (const pharmacy of this.db.pharmacies) {
@@ -44,9 +46,30 @@ export class InMemoryRepository implements IDatabaseRepository {
       const distanceKm = this.calculateDistanceKm(userLat, userLng, pharmacy.latitude, pharmacy.longitude);
 
       if (distanceKm <= radiusKm) {
-        const matchesMedicine =
-          !query ||
-          pharmacy.inStockItems.some((item) => item.includes(query) || query.includes(item));
+        let matchesMedicine = !query;
+
+        if (parsedQuery && !matchesMedicine) {
+          // Check inStockItems quick list
+          for (const item of pharmacy.inStockItems) {
+            const match = MedicalFuzzyMatcher.matchItem(item, parsedQuery);
+            if (match.matched) {
+              matchesMedicine = true;
+              break;
+            }
+          }
+
+          // Check structured inventory if not yet matched
+          if (!matchesMedicine && pharmacy.inventory) {
+            for (const item of pharmacy.inventory) {
+              const match = MedicalFuzzyMatcher.matchItem(item.name, parsedQuery);
+              if (match.matched) {
+                matchesMedicine = true;
+                break;
+              }
+            }
+          }
+        }
+
         if (matchesMedicine) {
           results.push({ ...pharmacy, distanceKm });
         }

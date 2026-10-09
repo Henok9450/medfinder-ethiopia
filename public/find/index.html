@@ -725,6 +725,13 @@
               <p class="text-xs text-slate-500 mt-0.5">
                 📍 ${p.subCity}, Addis Ababa • <strong class="text-emerald-700">${p.distanceKm || 1.2} km away</strong>
               </p>
+              ${p.matchedDrugName && p.matchedDrugName.toLowerCase() !== drugName.toLowerCase() ? `
+              <div class="mt-1">
+                <span class="inline-flex items-center gap-1 text-[10px] font-semibold bg-sky-50 text-sky-800 border border-sky-200 px-2 py-0.5 rounded-full">
+                  <i class="fa-solid fa-circle-check text-[9px] text-sky-600"></i> In Stock: <strong>${p.matchedDrugName}</strong>
+                </span>
+              </div>
+              ` : ''}
             </div>
             <div class="text-right">
               <span class="text-[10px] text-slate-400 uppercase font-bold">Locked Price</span>

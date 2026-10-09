@@ -2,6 +2,7 @@ import { v4 as uuidv4 } from 'uuid';
 import { DynamicConfigService } from '../config/dynamic-config.service';
 import { InMemoryDatabase, Pharmacy, BroadcastRequest } from '../database/in-memory-db';
 import { getDatabaseRepository } from '../database';
+import { MedicalFuzzyMatcher } from './medical-fuzzy-matcher';
 
 export class BroadcastMatchingService {
   private configService = DynamicConfigService.getInstance();
@@ -60,14 +61,35 @@ export class BroadcastMatchingService {
     const policy = this.configService.getPolicy();
     const radius = policy.geoMatching.initialRadiusKm;
     const query = params.medicineName.trim().toLowerCase();
+    const parsedQuery = query ? MedicalFuzzyMatcher.parseQuery(query) : null;
 
     const matches: Array<{ pharmacy: Pharmacy; distanceKm: number }> = [];
 
     for (const pharmacy of this.db.pharmacies) {
-      if (pharmacy.isPermanentlyBanned) continue;
+      if (pharmacy.isPermanentlyBanned || pharmacy.isShadowBanned) continue;
       const distance = this.calculateDistanceKm(params.userLat, params.userLng, pharmacy.latitude, pharmacy.longitude);
       if (distance <= radius) {
-        const hasItem = pharmacy.inStockItems.some((item) => item.includes(query) || query.includes(item));
+        let hasItem = !query;
+
+        if (parsedQuery && !hasItem) {
+          for (const item of pharmacy.inStockItems) {
+            const match = MedicalFuzzyMatcher.matchItem(item, parsedQuery);
+            if (match.matched) {
+              hasItem = true;
+              break;
+            }
+          }
+          if (!hasItem && pharmacy.inventory) {
+            for (const item of pharmacy.inventory) {
+              const match = MedicalFuzzyMatcher.matchItem(item.name, parsedQuery);
+              if (match.matched) {
+                hasItem = true;
+                break;
+              }
+            }
+          }
+        }
+
         if (hasItem) {
           matches.push({ pharmacy, distanceKm: distance });
         }
