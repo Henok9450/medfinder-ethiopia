@@ -4484,12 +4484,13 @@
           body: JSON.stringify({ reservationCode: code })
         });
         const data = await res.json();
-        if (data.success) {
-          alert(`✅ Verified & Fulfilled!\n\nPatient: ${data.reservation.patientUserId}\nMedicine: ${data.reservation.medicineName}\nLocked Price: ${data.reservation.lockedPriceETB} ETB\n\nPharmacy Trust Score rewarded +1%!`);
+        const r = data.reservation || data.hold;
+        if (data.success && r) {
+          alert(`✅ Verified & Fulfilled!\n\nPatient: ${r.phone || r.patientUserId || 'Counter Customer'}\nMedicine: ${r.medicineName}\nLocked Price: ${r.lockedPriceETB} ETB\n\nPharmacy Trust Score rewarded +1%!`);
           document.getElementById('counterCodeInput').value = '';
           loadPharmacyInventory();
         } else {
-          alert(`❌ Check-In Error: ${data.message}`);
+          alert(`❌ Check-In Error: ${data.message || data.error || 'Voucher not found or expired.'}`);
         }
       } catch (err) {
         alert('Verification error: ' + err.message);

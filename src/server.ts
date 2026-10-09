@@ -497,10 +497,24 @@ app.post('/api/reservation/create', async (req: Request, res: Response) => {
 
 // 2. Counter verification by pharmacist when patient arrives
 app.post('/api/reservation/verify', async (req: Request, res: Response) => {
-  const { reservationCode } = req.body;
-  if (!reservationCode) return res.status(400).json({ success: false, error: 'reservationCode is required' });
-  const result = await dbRepo.verifyAndFulfillReservation(String(reservationCode));
-  res.json(result);
+  const code = (req.body.reservationCode || req.body.code || '').toString().trim().replace(/^#/, '');
+  if (!code) return res.status(400).json({ success: false, error: 'reservationCode is required' });
+
+  const result = await dbRepo.verifyAndFulfillReservation(code);
+  const hold = result.reservation;
+
+  if (result.success && hold?.patientUserId && /^\d+$/.test(hold.patientUserId)) {
+    telegramBotService.notifyPatientVoucherFulfilled(hold).catch((err: any) =>
+      console.warn('[VoucherFulfill] Patient notify error:', err.message)
+    );
+  }
+
+  res.json({
+    ...result,
+    hold,
+    reservation: hold,
+    error: result.success ? undefined : (result.message || 'Voucher not found or expired'),
+  });
 });
 
 // 2B. Retrieve all active incoming reservations for a specific pharmacy counter

@@ -1411,36 +1411,45 @@
 
     // --- VOUCHER HOLD CODE VERIFICATION ---
     async function handleVoucherVerify(e) {
-      e.preventDefault();
-      const code = document.getElementById('voucherCodeInput').value.trim().replace('#', '');
+      if (e && e.preventDefault) e.preventDefault();
+      const rawCode = document.getElementById('voucherCodeInput').value;
+      const code = (rawCode || '').trim().replace(/^#/, '').trim();
       const resultBox = document.getElementById('voucherResultBox');
+
+      if (!code) {
+        resultBox.className = 'p-4 rounded-xl text-xs bg-rose-50 border border-rose-200 text-rose-800';
+        resultBox.innerHTML = '<i class="fa-solid fa-circle-exclamation mr-1"></i> Please enter a 4-digit voucher hold code.';
+        resultBox.classList.remove('hidden');
+        return;
+      }
 
       try {
         const res = await fetch('/api/reservation/verify', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ reservationCode: code })
+          body: JSON.stringify({ reservationCode: code, code })
         });
         const data = await res.json();
 
-        if (data.success && data.hold) {
+        const hold = data.hold || data.reservation;
+        if (data.success && hold) {
           resultBox.className = 'p-4 rounded-xl text-xs space-y-2 bg-emerald-50 border border-emerald-200 text-emerald-900';
           resultBox.innerHTML = `
             <div class="flex items-center space-x-2 font-bold text-sm text-emerald-800">
               <i class="fa-solid fa-circle-check"></i>
-              <span>Voucher #${data.hold.reservationCode} Verified & Fulfilled!</span>
+              <span>Voucher #${hold.reservationCode} Verified & Fulfilled!</span>
             </div>
             <div class="space-y-1 pt-1 border-t border-emerald-200">
-              <p>Medicine: <strong>${data.hold.medicineName}</strong></p>
-              <p>Locked Counter Price: <strong>${data.hold.lockedPriceETB} ETB</strong> (Price-Gouging Protected)</p>
-              <p>Patient Contact: <strong>${data.hold.phone}</strong></p>
-              <p>Status: <span class="bg-emerald-200 text-emerald-900 px-2 py-0.5 rounded font-bold uppercase text-[10px]">${data.hold.status}</span></p>
+              <p>Medicine: <strong>${hold.medicineName}</strong></p>
+              <p>Locked Counter Price: <strong>${hold.lockedPriceETB} ETB</strong> (Price-Gouging Protected)</p>
+              <p>Patient Contact: <strong>${hold.phone || hold.patientUserId || 'N/A'}</strong></p>
+              <p>Status: <span class="bg-emerald-200 text-emerald-900 px-2 py-0.5 rounded font-bold uppercase text-[10px]">${hold.status || 'FULFILLED'}</span></p>
             </div>
           `;
           resultBox.classList.remove('hidden');
         } else {
           resultBox.className = 'p-4 rounded-xl text-xs bg-rose-50 border border-rose-200 text-rose-800';
-          resultBox.innerHTML = `<i class="fa-solid fa-circle-exclamation mr-1"></i> ${data.error || 'Voucher not found or expired.'}`;
+          resultBox.innerHTML = `<i class="fa-solid fa-circle-exclamation mr-1"></i> ${data.error || data.message || 'Voucher not found or expired.'}`;
           resultBox.classList.remove('hidden');
         }
       } catch (err) {

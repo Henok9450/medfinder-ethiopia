@@ -330,12 +330,17 @@ export class InMemoryDatabase {
   }
 
   public verifyAndFulfillReservation(reservationCode: string): { success: boolean; message: string; reservation?: ReservationHold } {
-    const hold = this.getReservationHold(reservationCode);
+    const cleanCode = reservationCode.trim().replace(/^#/, '');
+    const hold = this.getReservationHold(cleanCode);
     if (!hold) return { success: false, message: 'Reservation code not found' };
 
     if (new Date() > new Date(hold.expiresAt)) {
       hold.status = 'EXPIRED';
       return { success: false, message: 'This reservation hold has expired (60-minute limit exceeded)' };
+    }
+
+    if (hold.status === 'CANCELLED') {
+      return { success: false, message: 'This reservation hold was previously cancelled or marked out of stock.' };
     }
 
     hold.status = 'FULFILLED';
@@ -348,7 +353,7 @@ export class InMemoryDatabase {
 
     return {
       success: true,
-      message: `Reservation #${reservationCode} verified successfully. Price locked at ${hold.lockedPriceETB} ETB.`,
+      message: `Reservation #${cleanCode} verified successfully. Price locked at ${hold.lockedPriceETB} ETB.`,
       reservation: hold,
     };
   }

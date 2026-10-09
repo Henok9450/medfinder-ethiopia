@@ -343,15 +343,26 @@ export class PostgresRepository implements IDatabaseRepository {
     const pool = getDbPool();
     if (!pool) return { success: false, message: 'Database offline' };
 
-    const hold = await this.getReservationHold(code);
+    const cleanCode = code.trim().replace(/^#/, '');
+    const hold = await this.getReservationHold(cleanCode);
     if (!hold) return { success: false, message: 'Reservation code not found' };
 
     if (new Date() > new Date(hold.expiresAt)) {
-      await pool.query(`UPDATE reservations SET status = 'EXPIRED' WHERE reservation_code = $1`, [code]);
+      await pool.query(
+        `UPDATE reservations SET status = 'EXPIRED' WHERE UPPER(reservation_code) = UPPER($1) OR reservation_code = $1`,
+        [cleanCode]
+      );
       return { success: false, message: 'This reservation hold has expired (60-minute limit exceeded)' };
     }
 
-    await pool.query(`UPDATE reservations SET status = 'FULFILLED' WHERE reservation_code = $1`, [code]);
+    if (hold.status === 'CANCELLED') {
+      return { success: false, message: 'This reservation hold was previously cancelled or marked out of stock.' };
+    }
+
+    await pool.query(
+      `UPDATE reservations SET status = 'FULFILLED' WHERE UPPER(reservation_code) = UPPER($1) OR reservation_code = $1`,
+      [cleanCode]
+    );
     hold.status = 'FULFILLED';
 
     // Boost pharmacy trust score slightly on fulfillment
@@ -362,7 +373,7 @@ export class PostgresRepository implements IDatabaseRepository {
 
     return {
       success: true,
-      message: `Reservation #${code} verified successfully. Price locked at ${hold.lockedPriceETB} ETB.`,
+      message: `Reservation #${cleanCode} verified successfully. Price locked at ${hold.lockedPriceETB} ETB.`,
       reservation: hold,
     };
   }

@@ -1061,6 +1061,33 @@ export class TelegramVerificationBotService {
   }
 
   /**
+   * Real-time push alert dispatched to patient when counter check-in / fulfillment succeeds
+   */
+  public async notifyPatientVoucherFulfilled(hold: ReservationHold): Promise<boolean> {
+    const ep = this.patientBot.token ? this.patientBot : this.pharmacyBot;
+    if (!ep.token || !hold.patientUserId) return false;
+
+    const text = `🎉 **እንኳን ደስ አለዎት! ቫውቸርዎ በተሳካ ሁኔታ ተፈጽሟል!**
+**Voucher Claimed & Dispensed!**
+━━━━━━━━━━━━━━━━━━━━━━━━━━
+🏥 **ፋርማሲ፦** ${hold.pharmacyName}
+💊 **መድኃኒት፦** ${hold.medicineName}
+💰 **የተከፈለው ዋጋ፦** ${hold.lockedPriceETB} ETB
+🔐 **የቫውቸር ቁጥር፦** \`#${hold.reservationCode}\`
+━━━━━━━━━━━━━━━━━━━━━━━━━━
+✅ መድኃኒቱ በህጋዊው ዋጋ ተረክቧል። ጤናና ፈውስ እንመኝልዎታለን!
+MedFinder Ethiopia ን ስለተጠቀሙ እናመሰግናለን።`;
+
+    await this.sendRealTelegramReply(hold.patientUserId, {
+      chatId: hold.patientUserId,
+      replyText: text,
+      quickReplies: ['/start', '💊 አዲስ ፍለጋ'],
+    }, ep);
+
+    return true;
+  }
+
+  /**
    * Conversational state machine with Dedicated Dual-Bot Routing (Roadmap 2)
    */
   public async handleIncomingMessage(
