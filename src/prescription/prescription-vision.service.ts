@@ -1,6 +1,7 @@
 import fs from 'fs';
 import path from 'path';
 import { MASTER_MEDICINE_CATALOG } from '../database/in-memory-db';
+import { DynamicConfigService } from '../config/dynamic-config.service';
 
 export interface DetectedMedicine {
   name: string;
@@ -202,12 +203,13 @@ export class PrescriptionVisionService {
         };
       }
 
-      // 2. Attempt Tier 1: Google Gemini Multimodal Vision API (if GEMINI_API_KEY / GOOGLE_API_KEY is present)
-      const geminiApiKey = process.env.GEMINI_API_KEY || process.env.GOOGLE_API_KEY;
+      // 2. Attempt Tier 1: Google Gemini Multimodal Vision API
+      const policyApiKey = DynamicConfigService.getInstance().getPolicy()?.features?.geminiApiKey;
+      const geminiApiKey = policyApiKey || process.env.GEMINI_API_KEY || process.env.GOOGLE_API_KEY;
       if (geminiApiKey) {
         try {
           const geminiResult = await this.callGeminiVision(base64, mime, geminiApiKey);
-          if (geminiResult && geminiResult.medicines.length > 0) {
+          if (geminiResult) {
             return geminiResult;
           }
         } catch (geminiErr: any) {
@@ -220,7 +222,7 @@ export class PrescriptionVisionService {
       if (openaiApiKey) {
         try {
           const openaiResult = await this.callOpenAiVision(base64, mime, openaiApiKey);
-          if (openaiResult && openaiResult.medicines.length > 0) {
+          if (openaiResult) {
             return openaiResult;
           }
         } catch (openAiErr: any) {
@@ -230,7 +232,7 @@ export class PrescriptionVisionService {
 
       // 4. Tier 3: Autonomous Built-In Medical Heuristic & Pharmacopeia OCR Engine
       // Resilient fallback: performs medical string extraction, pattern recognition, and catalog fuzzy matching
-      return this.analyzeWithBuiltInMedicalEngine(base64, mime);
+      return this.analyzeWithBuiltInMedicalEngine(base64, mime, Boolean(geminiApiKey || openaiApiKey));
     } catch (err: any) {
       console.error('[PrescriptionVision] General analysis error:', err);
       return {
@@ -251,10 +253,15 @@ export class PrescriptionVisionService {
    */
   private async callGeminiVision(base64: string, mimeType: string, apiKey: string): Promise<PrescriptionScanResult | null> {
     const prompt = `You are a Senior Pharmacist and Clinical Handwriting Specialist in Ethiopia working with EFDA (Ethiopian Food and Drug Authority).
-Analyze this image, which is either:
-1) A doctor's handwritten or printed medical prescription slip / clinic note.
-2) A photograph of an actual medicine box, blister pack foil, or medicine bottle that a patient has at hand.
 
+CRITICAL FIRST STEP - MEDICAL RELEVANCE VALIDATION:
+Check if the image is an actual medical item:
+- A doctor's handwritten or printed prescription slip / hospital discharge summary / clinic note.
+- An actual pharmaceutical medicine box, bottle, syrup, blister pack foil, ampoule, or inhaler.
+
+If the image is NOT a medical prescription or medicine (for example: a computer keyboard, laptop screen, desk, chair, animal, food, clothing, landscape, selfie, or blurry random object), you MUST set "isMedicalImage": false and provide a polite rejection reason in "rejectionReason". Do NOT invent or hallucinate medicine names.
+
+If it IS a valid medical prescription or medicine:
 Carefully read and decipher:
 - Doctor's handwriting, cursive script, and shorthand (e.g. Rx, tab, cap, po, bid, tid, qid, prn, stat, od, hs).
 - Trade brand names (e.g. Augmentin, Ventolin, Humulin, Panadol, Losec, Eltroxin, Brufen, Glucophage).
@@ -265,7 +272,9 @@ Carefully read and decipher:
 
 Return ONLY a pure JSON object (no markdown, no backticks, no other text) with this exact schema:
 {
-  "imageType": "HANDWRITTEN_PRESCRIPTION" | "PRINTED_PRESCRIPTION" | "MEDICINE_PACKAGING",
+  "isMedicalImage": true or false,
+  "rejectionReason": "Explanation if not a medical image, or empty string",
+  "imageType": "HANDWRITTEN_PRESCRIPTION" | "PRINTED_PRESCRIPTION" | "MEDICINE_PACKAGING" | "UNKNOWN",
   "rawExtractedText": "exact text deciphered from the document or packaging",
   "clinicalNotes": "any relevant doctor instructions or warnings",
   "medicines": [
@@ -323,6 +332,21 @@ Return ONLY a pure JSON object (no markdown, no backticks, no other text) with t
         const cleanJson = rawJsonText.replace(/^```json/i, '').replace(/```$/i, '').trim();
         const parsed = JSON.parse(cleanJson);
 
+        // Explicit rejection if non-medical image detected
+        if (parsed.isMedicalImage === false) {
+          return {
+            success: false,
+            imageType: 'UNKNOWN',
+            medicines: [],
+            primarySearchTerm: '',
+            confidenceScore: 0,
+            rawExtractedText: parsed.rawExtractedText || '',
+            clinicalNotes: '',
+            disclaimer: 'EFDA Advisory: Please provide a valid medical prescription slip or medicine packaging.',
+            error: parsed.rejectionReason || 'No prescription or medicine identified in the image. Please take a clear picture of a doctor prescription slip or medicine packaging.',
+          };
+        }
+
         const medicines: DetectedMedicine[] = (parsed.medicines || []).map((m: any) => {
           const matchedCatalog = this.matchAgainstEthiopiaCatalog(m.name, m.genericName);
           return {
@@ -336,7 +360,19 @@ Return ONLY a pure JSON object (no markdown, no backticks, no other text) with t
           };
         });
 
-        if (medicines.length === 0) continue;
+        if (medicines.length === 0) {
+          return {
+            success: false,
+            imageType: 'UNKNOWN',
+            medicines: [],
+            primarySearchTerm: '',
+            confidenceScore: 0,
+            rawExtractedText: parsed.rawExtractedText || '',
+            clinicalNotes: '',
+            disclaimer: 'EFDA Advisory: Please provide a valid prescription or medicine packaging.',
+            error: 'No readable prescription or medicine detected in the image. Please take a clear photo or type the name manually.',
+          };
+        }
 
         const primarySearchTerm = medicines[0].name.replace(/\s+(tablet|capsule|inj|vial|syr|inh).*$/i, '').trim();
 
@@ -437,7 +473,7 @@ Return valid JSON only adhering to:
    * Tier 3 Autonomous Built-In Medical Heuristic & Pharmacopeia OCR Engine
    * Ensures zero downtime and immediate out-of-the-box operation even without external API keys.
    */
-  private analyzeWithBuiltInMedicalEngine(base64: string, _mimeType: string): PrescriptionScanResult {
+  private analyzeWithBuiltInMedicalEngine(base64: string, _mimeType: string, hadApiKeyAttempt: boolean): PrescriptionScanResult {
     // Decode sample ASCII/UTF-8 byte streams from the image data for embedded EXIF/text markers
     let rawTextSample = '';
     try {
@@ -472,19 +508,22 @@ Return valid JSON only adhering to:
       }
     }
 
-    // Default high-probability clinical match from essential catalog if zero image text matched
+    // Never return fake default Augmentin fallback! If zero matches found, reject with clear error.
     if (foundMatches.length === 0) {
-      // Pick first catalog essential entry as baseline detected candidate
-      const def = ETHIOPIA_PHARMACOPEIA_DICTIONARY[0]; // Augmentin
-      foundMatches.push({
-        name: def.canonicalSearchTerm,
-        genericName: def.genericName,
-        strength: def.commonStrengths[0],
-        form: 'Tablet',
-        dosageInstructions: '1 tablet twice daily with food (1x2 po bid)',
-        matchedCatalogItem: def.canonicalSearchTerm,
-        confidence: 0.88,
-      });
+      const errorMsg = hadApiKeyAttempt
+        ? 'Could not decipher handwritten prescription or medicine packaging. Please ensure good lighting and clear camera focus, or type the medicine name.'
+        : 'AI Vision Key not configured or no prescription detected. To activate high-accuracy handwriting reading, configure a free Google Gemini Vision API Key in Tab 3 (Admin Center), or type the medicine name manually.';
+
+      return {
+        success: false,
+        imageType: 'UNKNOWN',
+        medicines: [],
+        primarySearchTerm: '',
+        confidenceScore: 0,
+        rawExtractedText: '',
+        disclaimer: 'EFDA Advisory: Take a photo of an official doctor prescription or medicine packaging.',
+        error: errorMsg,
+      };
     }
 
     return {

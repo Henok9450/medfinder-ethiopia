@@ -60,7 +60,8 @@ export const SystemPolicySchema = z.object({
 
   // 3. DYNAMIC FEATURE FLAGS
   features: z.object({
-    enablePrescriptionOcr: z.boolean().default(false),
+    enablePrescriptionOcr: z.boolean().default(true),
+    geminiApiKey: z.string().optional(),
     enableVoiceSearch: z.boolean().default(true),
     enablePharmacyDirectCall: z.boolean().default(true),
     enableMedicineReservationHold: z.boolean().default(true),

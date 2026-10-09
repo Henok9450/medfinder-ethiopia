@@ -848,6 +848,39 @@
             <button onclick="saveGeoSettings()" class="w-full bg-sky-600 hover:bg-sky-700 text-white text-xs font-semibold py-2 rounded-lg transition">Update Geo Rules</button>
           </div>
 
+          <!-- AI VISION SCANNER CONFIGURATION -->
+          <div class="p-5 rounded-xl border border-purple-200 bg-purple-50/50 space-y-4">
+            <h3 class="font-bold text-sm text-purple-900 flex items-center justify-between">
+              <span class="flex items-center space-x-2">
+                <i class="fa-solid fa-wand-magic-sparkles text-purple-600"></i>
+                <span>Google Gemini AI Vision Key</span>
+              </span>
+              <span class="text-[10px] bg-emerald-100 text-emerald-800 font-bold px-2 py-0.5 rounded-full">100% Free Tier</span>
+            </h3>
+            <p class="text-xs text-slate-600 leading-relaxed">
+              Enables high-accuracy reading of handwritten prescriptions and phone photos of medicine boxes using Google Gemini Vision (1,500 free requests/day).
+            </p>
+            <div>
+              <label class="block text-xs font-medium text-slate-700 mb-1">Gemini API Key</label>
+              <div class="relative">
+                <input type="password" id="adminGeminiApiKeyInput" placeholder="AIzaSy..." class="w-full text-xs px-3 py-2 border border-slate-300 rounded-lg pr-14 font-mono bg-white">
+                <button type="button" onclick="toggleVisionKeyVis()" class="absolute right-2 top-2 text-[10px] text-slate-400 hover:text-slate-600 px-1 font-medium">Show</button>
+              </div>
+              <p class="text-[10px] text-slate-500 mt-1">Get a free key instantly at <a href="https://aistudio.google.com/app/apikey" target="_blank" class="text-purple-600 underline font-semibold">aistudio.google.com</a> ($0 cost).</p>
+            </div>
+            <div id="adminVisionKeyStatus" class="hidden p-2.5 rounded-lg text-xs"></div>
+            <div class="grid grid-cols-2 gap-2">
+              <button onclick="testGeminiVisionKey()" id="adminTestVisionBtn" class="bg-purple-100 hover:bg-purple-200 text-purple-900 text-xs font-bold py-2 rounded-lg transition flex items-center justify-center gap-1">
+                <i class="fa-solid fa-vial text-[11px]"></i>
+                <span>Test Key</span>
+              </button>
+              <button onclick="saveGeminiVisionKey()" id="adminSaveVisionBtn" class="bg-purple-700 hover:bg-purple-800 text-white text-xs font-bold py-2 rounded-lg transition flex items-center justify-center gap-1 shadow-xs">
+                <i class="fa-solid fa-floppy-disk text-[11px]"></i>
+                <span>Save Key</span>
+              </button>
+            </div>
+          </div>
+
         </div>
 
         <!-- REGULATORY COMPLIANCE & EFDA VERIFICATION DESK -->
@@ -2675,12 +2708,15 @@
             document.getElementById('mainDetectedConfidenceBadge').innerText = `${Math.round((med.confidence || 0.95) * 100)}% Match`;
 
             resultCard.classList.remove('hidden');
+            errorCard.classList.add('hidden');
           } else {
+            resultCard.classList.add('hidden');
             document.getElementById('mainPrescriptionErrorMsg').innerText = data.error || 'Could not decipher handwritten text or packaging. Please retry with clearer focus.';
             errorCard.classList.remove('hidden');
           }
         } catch (err) {
           scanningOverlay.classList.add('hidden');
+          resultCard.classList.add('hidden');
           document.getElementById('mainPrescriptionErrorMsg').innerText = 'Network error: ' + err.message;
           errorCard.classList.remove('hidden');
         }
@@ -3511,6 +3547,9 @@
       document.getElementById('adminInitialRadius').value = currentPolicy.geoMatching.initialRadiusKm;
       document.getElementById('adminExpandedRadius').value = currentPolicy.geoMatching.expandedRadiusKm;
       document.getElementById('adminMaxPing').value = currentPolicy.geoMatching.maxPharmaciesPinged;
+      if (document.getElementById('adminGeminiApiKeyInput') && currentPolicy.features?.geminiApiKey) {
+        document.getElementById('adminGeminiApiKeyInput').value = currentPolicy.features.geminiApiKey;
+      }
     }
 
     // --- TELEGRAM VERIFICATION BOT & SIMULATOR LOGIC (CHANNEL B) ---
@@ -4383,6 +4422,112 @@
         fetchPolicy();
       } else {
         alert(data.error || 'Failed to update geo settings');
+      }
+    }
+
+    function toggleVisionKeyVis() {
+      const input = document.getElementById('adminGeminiApiKeyInput');
+      const btn = event?.currentTarget;
+      if (input.type === 'password') {
+        input.type = 'text';
+        if (btn) btn.innerText = 'Hide';
+      } else {
+        input.type = 'password';
+        if (btn) btn.innerText = 'Show';
+      }
+    }
+
+    async function testGeminiVisionKey() {
+      const input = document.getElementById('adminGeminiApiKeyInput');
+      const apiKey = input ? input.value.trim() : '';
+      const statusBox = document.getElementById('adminVisionKeyStatus');
+      const testBtn = document.getElementById('adminTestVisionBtn');
+
+      if (!apiKey) {
+        alert('Please enter a Google Gemini API Key to test.');
+        if (input) input.focus();
+        return;
+      }
+
+      testBtn.disabled = true;
+      testBtn.innerHTML = `<i class="fa-solid fa-circle-notch fa-spin text-[11px]"></i> <span>Testing...</span>`;
+
+      try {
+        const res = await fetch('/api/admin/config/test-vision-key', {
+          method: 'POST',
+          headers: getAdminAuthHeaders(),
+          body: JSON.stringify({ apiKey })
+        });
+
+        const data = await res.json();
+        testBtn.disabled = false;
+        testBtn.innerHTML = `<i class="fa-solid fa-vial text-[11px]"></i> <span>Test Key</span>`;
+
+        statusBox.classList.remove('hidden');
+        if (data.success) {
+          statusBox.className = 'p-2.5 rounded-lg text-xs bg-emerald-50 border border-emerald-300 text-emerald-800 space-y-1';
+          statusBox.innerHTML = `<strong>✅ Verification Succeeded!</strong><br><span class="text-[11px]">${data.message}</span>`;
+        } else {
+          statusBox.className = 'p-2.5 rounded-lg text-xs bg-rose-50 border border-rose-300 text-rose-800 space-y-1';
+          statusBox.innerHTML = `<strong>❌ Verification Failed</strong><br><span class="text-[11px]">${data.error}</span>`;
+        }
+      } catch (err) {
+        testBtn.disabled = false;
+        testBtn.innerHTML = `<i class="fa-solid fa-vial text-[11px]"></i> <span>Test Key</span>`;
+        statusBox.classList.remove('hidden');
+        statusBox.className = 'p-2.5 rounded-lg text-xs bg-rose-50 border border-rose-300 text-rose-800';
+        statusBox.innerText = 'Network error while testing key: ' + err.message;
+      }
+    }
+
+    async function saveGeminiVisionKey() {
+      const input = document.getElementById('adminGeminiApiKeyInput');
+      const apiKey = input ? input.value.trim() : '';
+      const saveBtn = document.getElementById('adminSaveVisionBtn');
+      const statusBox = document.getElementById('adminVisionKeyStatus');
+
+      saveBtn.disabled = true;
+      saveBtn.innerHTML = `<i class="fa-solid fa-circle-notch fa-spin text-[11px]"></i> <span>Saving...</span>`;
+
+      try {
+        const res = await fetch('/api/admin/config', {
+          method: 'POST',
+          headers: getAdminAuthHeaders(),
+          body: JSON.stringify({
+            features: {
+              ...currentPolicy.features,
+              geminiApiKey: apiKey
+            }
+          })
+        });
+
+        saveBtn.disabled = false;
+        saveBtn.innerHTML = `<i class="fa-solid fa-floppy-disk text-[11px]"></i> <span>Save Key</span>`;
+
+        if (res.status === 401) {
+          alert('Administrator authentication required.');
+          switchTab('admin');
+          return;
+        }
+        if (res.status === 403) {
+          const err = await res.json().catch(() => ({}));
+          alert(err.error || 'Access denied: Insufficient privileges.');
+          return;
+        }
+
+        const data = await res.json();
+        if (data.success) {
+          statusBox.classList.remove('hidden');
+          statusBox.className = 'p-2.5 rounded-lg text-xs bg-emerald-50 border border-emerald-300 text-emerald-800';
+          statusBox.innerHTML = `<strong>✅ Saved!</strong> Gemini Vision AI key active for real-time handwriting and box scanning.`;
+          fetchPolicy();
+        } else {
+          alert(data.error || 'Failed to save Gemini API key');
+        }
+      } catch (err) {
+        saveBtn.disabled = false;
+        saveBtn.innerHTML = `<i class="fa-solid fa-floppy-disk text-[11px]"></i> <span>Save Key</span>`;
+        alert('Error saving key: ' + err.message);
       }
     }
 

@@ -987,6 +987,7 @@ app.delete('/api/admin/users/:id', requireAdminAuth, requirePrivilege('canManage
 app.get('/api/admin/config', adminController.getConfig);
 app.post('/api/admin/config', requireAdminAuth, requirePrivilege('canManagePolicies'), adminController.updateConfig);
 app.post('/api/admin/config/set-free-period', requireAdminAuth, requirePrivilege('canManagePolicies'), adminController.setFreePeriod);
+app.post('/api/admin/config/test-vision-key', requireAdminAuth, requirePrivilege('canManagePolicies'), adminController.testVisionKey);
 app.get('/api/admin/stats', adminController.getStats);
 
 // 6. REGULATORY COMPLIANCE & PHARMACY VERIFICATION DESK

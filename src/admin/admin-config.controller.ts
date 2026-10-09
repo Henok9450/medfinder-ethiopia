@@ -57,6 +57,53 @@ export class AdminConfigController {
   };
 
   /**
+   * POST /api/admin/config/test-vision-key
+   * Test a Google Gemini API key by calling the models API
+   */
+  public testVisionKey = async (req: Request, res: Response) => {
+    const { apiKey } = req.body;
+    const keyToTest = apiKey || this.configService.getPolicy()?.features?.geminiApiKey || process.env.GEMINI_API_KEY || process.env.GOOGLE_API_KEY;
+
+    if (!keyToTest) {
+      return res.status(400).json({
+        success: false,
+        error: 'No Gemini API key provided to test. Please supply an API key.',
+      });
+    }
+
+    try {
+      const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${keyToTest.trim()}`;
+      const response = await fetch(url, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          contents: [{ parts: [{ text: 'Respond with exactly: PONG' }] }],
+          generationConfig: { maxOutputTokens: 10 },
+        }),
+        signal: AbortSignal.timeout(10000),
+      });
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        return res.status(400).json({
+          success: false,
+          error: `Google API rejected the key (${response.status}): ${errorText}`,
+        });
+      }
+
+      return res.json({
+        success: true,
+        message: 'Google Gemini Vision API key verified successfully! High-accuracy prescription and medicine scanner is active.',
+      });
+    } catch (err: any) {
+      return res.status(500).json({
+        success: false,
+        error: `Failed to connect to Google Gemini API: ${err.message}`,
+      });
+    }
+  };
+
+  /**
    * GET /api/admin/stats
    * Monitor platform usage and revenue
    */

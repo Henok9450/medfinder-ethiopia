@@ -1203,12 +1203,15 @@
             document.getElementById('detectedConfidenceBadge').innerText = `${Math.round((med.confidence || 0.95) * 100)}% Match`;
 
             resultCard.classList.remove('hidden');
+            errorCard.classList.add('hidden');
           } else {
+            resultCard.classList.add('hidden');
             document.getElementById('prescriptionErrorMsg').innerText = data.error || 'Could not decipher handwritten text or packaging. Please retry with clearer focus.';
             errorCard.classList.remove('hidden');
           }
         } catch (err) {
           scanningOverlay.classList.add('hidden');
+          resultCard.classList.add('hidden');
           document.getElementById('prescriptionErrorMsg').innerText = 'Network error: ' + err.message;
           errorCard.classList.remove('hidden');
         }
