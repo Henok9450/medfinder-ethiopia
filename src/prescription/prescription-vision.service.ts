@@ -205,7 +205,8 @@ export class PrescriptionVisionService {
 
       // 2. Attempt Tier 1: Google Gemini Multimodal Vision API
       const policyApiKey = DynamicConfigService.getInstance().getPolicy()?.features?.geminiApiKey;
-      const geminiApiKey = policyApiKey || process.env.GEMINI_API_KEY || process.env.GOOGLE_API_KEY;
+      const rawGeminiKey = policyApiKey || process.env.GEMINI_API_KEY || process.env.GOOGLE_API_KEY;
+      const geminiApiKey = rawGeminiKey ? rawGeminiKey.trim().replace(/^["']|["']$/g, '') : undefined;
       if (geminiApiKey) {
         try {
           const geminiResult = await this.callGeminiVision(base64, mime, geminiApiKey);
