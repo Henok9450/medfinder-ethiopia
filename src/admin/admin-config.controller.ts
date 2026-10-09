@@ -72,28 +72,41 @@ export class AdminConfigController {
     }
 
     try {
-      const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${keyToTest.trim()}`;
-      const response = await fetch(url, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          contents: [{ parts: [{ text: 'Respond with exactly: PONG' }] }],
-          generationConfig: { maxOutputTokens: 10 },
-        }),
-        signal: AbortSignal.timeout(10000),
-      });
+      const modelsToTest = ['gemini-3.8-flash', 'gemini-2.5-flash', 'gemini-2.0-flash', 'gemini-1.5-flash'];
+      let lastError = '';
+      let succeeded = false;
 
-      if (!response.ok) {
-        const errorText = await response.text();
-        return res.status(400).json({
-          success: false,
-          error: `Google API rejected the key (${response.status}): ${errorText}`,
-        });
+      for (const model of modelsToTest) {
+        try {
+          const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${keyToTest.trim()}`;
+          const response = await fetch(url, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              contents: [{ parts: [{ text: 'Respond with PONG' }] }],
+              generationConfig: { maxOutputTokens: 10 },
+            }),
+            signal: AbortSignal.timeout(8000),
+          });
+
+          if (response.ok) {
+            succeeded = true;
+            return res.json({
+              success: true,
+              message: `Google Gemini Vision API key verified successfully using ${model}! Prescription scanner is live.`,
+              modelUsed: model,
+            });
+          } else {
+            lastError = await response.text();
+          }
+        } catch (err: any) {
+          lastError = err.message;
+        }
       }
 
-      return res.json({
-        success: true,
-        message: 'Google Gemini Vision API key verified successfully! High-accuracy prescription and medicine scanner is active.',
+      return res.status(400).json({
+        success: false,
+        error: `Google API rejected the key: ${lastError}`,
       });
     } catch (err: any) {
       return res.status(500).json({

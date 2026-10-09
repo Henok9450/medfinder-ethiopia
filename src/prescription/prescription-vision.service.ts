@@ -290,8 +290,15 @@ Return ONLY a pure JSON object (no markdown, no backticks, no other text) with t
   ]
 }`;
 
-    // Try Gemini 1.5 Flash first, then Gemini 2.0 Flash
-    const models = ['gemini-1.5-flash', 'gemini-2.0-flash', 'gemini-1.5-pro'];
+    // Try latest models including gemini-3.8-flash, gemini-2.5-flash, gemini-2.0-flash, and fallback
+    const models = [
+      'gemini-3.8-flash',
+      'gemini-2.5-flash',
+      'gemini-2.5-pro',
+      'gemini-2.0-flash',
+      'gemini-1.5-flash',
+      'gemini-1.5-pro',
+    ];
     for (const model of models) {
       try {
         const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`;
