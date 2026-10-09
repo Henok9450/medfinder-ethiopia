@@ -458,13 +458,36 @@ app.post('/api/reservation/create', async (req: Request, res: Response) => {
   if (!patientUserId || !pharmacyId || !medicineName || lockedPriceETB === undefined) {
     return res.status(400).json({ success: false, error: 'Missing required reservation fields' });
   }
+
   const hold = await dbRepo.createReservationHold({
     patientUserId,
     pharmacyId,
     medicineName,
     lockedPriceETB: Number(lockedPriceETB),
   });
-  if (!hold) return res.status(404).json({ success: false, error: 'Pharmacy not found or banned' });
+
+  if (!hold) {
+    return res.status(400).json({
+      success: false,
+      error: 'Could not create reservation hold. Either the pharmacy is unrecognized/banned, or you have reached the maximum quota of 2 active reservations.',
+    });
+  }
+
+  // Push immediate real-time alert to the pharmacy's Telegram counter bot
+  const pharmacy = await dbRepo.getPharmacyById(pharmacyId);
+  if (pharmacy?.telegramChatId) {
+    const expTime = new Date(hold.expiresAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    telegramBotService.notifyPharmacyReservationHold({
+      pharmacyChatId: pharmacy.telegramChatId,
+      pharmacyName: pharmacy.name,
+      drugName: medicineName,
+      priceETB: hold.lockedPriceETB,
+      reservationCode: hold.reservationCode,
+      expiresAt: expTime,
+      patientChatId: patientUserId,
+    }).catch((err: any) => console.warn('[Reservation] Telegram alert to pharmacy failed:', err.message));
+  }
+
   res.json({
     success: true,
     message: `Price locked at ${hold.lockedPriceETB} ETB for 60 minutes.`,
@@ -477,6 +500,49 @@ app.post('/api/reservation/verify', async (req: Request, res: Response) => {
   const { reservationCode } = req.body;
   if (!reservationCode) return res.status(400).json({ success: false, error: 'reservationCode is required' });
   const result = await dbRepo.verifyAndFulfillReservation(String(reservationCode));
+  res.json(result);
+});
+
+// 2B. Retrieve all active incoming reservations for a specific pharmacy counter
+app.get('/api/reservation/active/:pharmacyId', async (req: Request, res: Response) => {
+  const pharmacyId = String(req.params.pharmacyId);
+  const reservations = await dbRepo.getActiveReservationsByPharmacy(pharmacyId);
+  res.json({
+    success: true,
+    count: reservations.length,
+    reservations,
+  });
+});
+
+// 2C. Pharmacist two-way acknowledgment of shelf stock
+app.post('/api/reservation/confirm', async (req: Request, res: Response) => {
+  const { reservationCode } = req.body;
+  if (!reservationCode) return res.status(400).json({ success: false, error: 'reservationCode is required' });
+
+  const result = await dbRepo.confirmReservationHold(String(reservationCode));
+  if (result.success && result.reservation) {
+    if (result.reservation.patientUserId && /^\d+$/.test(result.reservation.patientUserId)) {
+      telegramBotService.notifyPatientStockConfirmed(result.reservation).catch((err: any) =>
+        console.warn('[ReservationConfirm] Patient alert failed:', err.message)
+      );
+    }
+  }
+  res.json(result);
+});
+
+// 2D. Pharmacist rejection of hold (Out of stock at counter)
+app.post('/api/reservation/reject', async (req: Request, res: Response) => {
+  const { reservationCode, reason } = req.body;
+  if (!reservationCode) return res.status(400).json({ success: false, error: 'reservationCode is required' });
+
+  const result = await dbRepo.rejectReservationHold(String(reservationCode), reason);
+  if (result.success && result.reservation) {
+    if (result.reservation.patientUserId && /^\d+$/.test(result.reservation.patientUserId)) {
+      telegramBotService.notifyPatientStockUnavailable(result.reservation).catch((err: any) =>
+        console.warn('[ReservationReject] Patient alert failed:', err.message)
+      );
+    }
+  }
   res.json(result);
 });
 

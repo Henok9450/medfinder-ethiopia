@@ -81,6 +81,8 @@ export interface ReservationHold {
   lockedPriceETB: number;
   phone: string;
   status: 'ACTIVE' | 'FULFILLED' | 'CANCELLED' | 'DISPUTED' | 'EXPIRED';
+  pharmacistAcknowledged?: boolean;
+  acknowledgedAt?: string;
   createdAt: string;
   expiresAt: string;
 }
@@ -246,6 +248,18 @@ export class InMemoryDatabase {
     const pharmacy = this.pharmacies.find((p) => p.id === params.pharmacyId);
     if (!pharmacy || pharmacy.isPermanentlyBanned) return null;
 
+    // Anti-Ghosting Quota: max 2 active holds per patient
+    let activeCount = 0;
+    for (const r of this.reservations.values()) {
+      if (r.patientUserId === params.patientUserId && r.status === 'ACTIVE' && new Date() < new Date(r.expiresAt)) {
+        activeCount++;
+      }
+    }
+    if (activeCount >= 2) {
+      console.warn(`[AntiGhosting] Patient ${params.patientUserId} exceeded active reservation quota (${activeCount}/2)`);
+      return null;
+    }
+
     // Generate readable 4-digit code e.g. "#7492"
     const randomCode = Math.floor(1000 + Math.random() * 9000).toString();
     const duration = params.durationMinutes || 60;
@@ -261,12 +275,41 @@ export class InMemoryDatabase {
       lockedPriceETB: params.lockedPriceETB,
       phone: pharmacy.phone,
       status: 'ACTIVE',
+      pharmacistAcknowledged: false,
       createdAt: now.toISOString(),
       expiresAt,
     };
 
     this.reservations.set(randomCode, hold);
     return hold;
+  }
+
+  public getActiveReservationsByPharmacy(pharmacyId: string): ReservationHold[] {
+    const list: ReservationHold[] = [];
+    for (const r of this.reservations.values()) {
+      if (r.pharmacyId === pharmacyId && r.status === 'ACTIVE' && new Date() < new Date(r.expiresAt)) {
+        list.push(r);
+      }
+    }
+    return list.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+  }
+
+  public confirmReservationHold(reservationCode: string): { success: boolean; message: string; reservation?: ReservationHold } {
+    const hold = this.reservations.get(reservationCode);
+    if (!hold) return { success: false, message: 'Reservation code not found' };
+    if (hold.status !== 'ACTIVE' || new Date() > new Date(hold.expiresAt)) {
+      return { success: false, message: 'Reservation is no longer active or expired' };
+    }
+    hold.pharmacistAcknowledged = true;
+    hold.acknowledgedAt = new Date().toISOString();
+    return { success: true, message: 'Shelf stock physically confirmed and held at counter.', reservation: hold };
+  }
+
+  public rejectReservationHold(reservationCode: string, reason?: string): { success: boolean; message: string; reservation?: ReservationHold } {
+    const hold = this.reservations.get(reservationCode);
+    if (!hold) return { success: false, message: 'Reservation code not found' };
+    hold.status = 'CANCELLED';
+    return { success: true, message: reason || 'Reservation cancelled by pharmacist (Out of stock / Sold out).', reservation: hold };
   }
 
   public verifyAndFulfillReservation(reservationCode: string): { success: boolean; message: string; reservation?: ReservationHold } {

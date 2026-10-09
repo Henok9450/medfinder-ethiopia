@@ -167,6 +167,17 @@ export class PostgresRepository implements IDatabaseRepository {
     const pharmacy = await this.getPharmacyById(holdData.pharmacyId);
     if (!pharmacy || pharmacy.isPermanentlyBanned) return null;
 
+    // Anti-Ghosting Quota: Limit each patient to max 2 active holds
+    const countRes = await pool.query(
+      `SELECT COUNT(*) FROM reservations WHERE patient_user_id = $1 AND status = 'ACTIVE' AND expires_at > NOW()`,
+      [holdData.patientUserId]
+    );
+    const activeCount = parseInt(countRes.rows[0]?.count || '0', 10);
+    if (activeCount >= 2) {
+      console.warn(`[AntiGhosting] Patient ${holdData.patientUserId} exceeded active reservation quota (${activeCount}/2)`);
+      return null;
+    }
+
     const randomCode = Math.floor(1000 + Math.random() * 9000).toString();
     const duration = holdData.durationMinutes || 60;
     const now = new Date();
@@ -202,6 +213,7 @@ export class PostgresRepository implements IDatabaseRepository {
       lockedPriceETB: holdData.lockedPriceETB,
       phone: pharmacy.phone,
       status: 'ACTIVE',
+      pharmacistAcknowledged: false,
       createdAt: now.toISOString(),
       expiresAt,
     };
@@ -227,8 +239,86 @@ export class PostgresRepository implements IDatabaseRepository {
       lockedPriceETB: parseFloat(r.locked_price_etb),
       phone: r.phone,
       status: r.status,
+      pharmacistAcknowledged: Boolean(r.pharmacist_acknowledged),
+      acknowledgedAt: r.acknowledged_at ? new Date(r.acknowledged_at).toISOString() : undefined,
       createdAt: new Date(r.created_at).toISOString(),
       expiresAt: new Date(r.expires_at).toISOString(),
+    };
+  }
+
+  public async getActiveReservationsByPharmacy(pharmacyId: string): Promise<ReservationHold[]> {
+    const pool = getDbPool();
+    if (!pool) return [];
+
+    const res = await pool.query(
+      `SELECT * FROM reservations 
+       WHERE pharmacy_id = $1 AND status = 'ACTIVE' AND expires_at > NOW() 
+       ORDER BY created_at DESC`,
+      [pharmacyId]
+    );
+
+    return res.rows.map((r) => ({
+      reservationCode: r.reservation_code,
+      patientUserId: r.patient_user_id,
+      pharmacyId: r.pharmacy_id,
+      pharmacyName: r.pharmacy_name,
+      medicineName: r.medicine_name,
+      lockedPriceETB: parseFloat(r.locked_price_etb),
+      phone: r.phone,
+      status: r.status,
+      pharmacistAcknowledged: Boolean(r.pharmacist_acknowledged),
+      acknowledgedAt: r.acknowledged_at ? new Date(r.acknowledged_at).toISOString() : undefined,
+      createdAt: new Date(r.created_at).toISOString(),
+      expiresAt: new Date(r.expires_at).toISOString(),
+    }));
+  }
+
+  public async confirmReservationHold(
+    code: string
+  ): Promise<{ success: boolean; message: string; reservation?: ReservationHold }> {
+    const pool = getDbPool();
+    if (!pool) return { success: false, message: 'Database offline' };
+
+    const hold = await this.getReservationHold(code);
+    if (!hold) return { success: false, message: 'Reservation not found' };
+    if (hold.status !== 'ACTIVE' || new Date() > new Date(hold.expiresAt)) {
+      return { success: false, message: 'Reservation is no longer active or has expired' };
+    }
+
+    await pool.query(
+      `UPDATE reservations SET pharmacist_acknowledged = TRUE, acknowledged_at = NOW() WHERE reservation_code = $1`,
+      [code]
+    );
+    hold.pharmacistAcknowledged = true;
+    hold.acknowledgedAt = new Date().toISOString();
+
+    return {
+      success: true,
+      message: 'Shelf stock physically confirmed and held at counter.',
+      reservation: hold,
+    };
+  }
+
+  public async rejectReservationHold(
+    code: string,
+    reason?: string
+  ): Promise<{ success: boolean; message: string; reservation?: ReservationHold }> {
+    const pool = getDbPool();
+    if (!pool) return { success: false, message: 'Database offline' };
+
+    const hold = await this.getReservationHold(code);
+    if (!hold) return { success: false, message: 'Reservation not found' };
+
+    await pool.query(
+      `UPDATE reservations SET status = 'CANCELLED' WHERE reservation_code = $1`,
+      [code]
+    );
+    hold.status = 'CANCELLED';
+
+    return {
+      success: true,
+      message: reason || 'Reservation cancelled by pharmacist (Out of stock / Sold out).',
+      reservation: hold,
     };
   }
 

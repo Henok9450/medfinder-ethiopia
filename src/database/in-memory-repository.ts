@@ -85,6 +85,23 @@ export class InMemoryRepository implements IDatabaseRepository {
     return this.db.verifyAndFulfillReservation(code);
   }
 
+  public async getActiveReservationsByPharmacy(pharmacyId: string): Promise<ReservationHold[]> {
+    return this.db.getActiveReservationsByPharmacy(pharmacyId);
+  }
+
+  public async confirmReservationHold(
+    code: string
+  ): Promise<{ success: boolean; message: string; reservation?: ReservationHold }> {
+    return this.db.confirmReservationHold(code);
+  }
+
+  public async rejectReservationHold(
+    code: string,
+    reason?: string
+  ): Promise<{ success: boolean; message: string; reservation?: ReservationHold }> {
+    return this.db.rejectReservationHold(code, reason);
+  }
+
   public async updatePharmacyLocation(
     pharmacyId: string,
     lat: number,

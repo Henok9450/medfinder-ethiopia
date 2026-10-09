@@ -79,6 +79,12 @@ export async function runMigrations(): Promise<{ success: boolean; message: stri
     await p.query(sql);
     console.log('[PostgreSQL] ✅ PostGIS extensions and tables created successfully!');
 
+    // Ensure reservation acknowledgment columns exist
+    await p.query(`
+      ALTER TABLE reservations ADD COLUMN IF NOT EXISTS pharmacist_acknowledged BOOLEAN DEFAULT FALSE;
+      ALTER TABLE reservations ADD COLUMN IF NOT EXISTS acknowledged_at TIMESTAMPTZ;
+    `);
+
     // Ensure default master admin exists
     const defaultUsername = 'admin';
     const defaultPassword = process.env.ADMIN_DEFAULT_PASSWORD || 'Admin@MedFinder2026!';

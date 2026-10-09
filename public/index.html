@@ -509,6 +509,33 @@
           </div>
         </div>
 
+        <!-- ACTIVE INCOMING HOLDS LIVE FEED & AUDIO CHIME -->
+        <div class="pt-4 border-t border-slate-100 space-y-3">
+          <div class="flex flex-wrap items-center justify-between gap-2">
+            <div class="flex items-center gap-2">
+              <span class="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse"></span>
+              <h3 class="text-sm font-bold text-slate-900 flex items-center gap-2">
+                <i class="fa-solid fa-bell text-amber-500"></i>
+                <span>Active 60-Minute Counter Holds</span>
+                <span id="activeHoldsBadge" class="text-xs bg-amber-100 text-amber-900 px-2 py-0.5 rounded-full font-bold">0 Active</span>
+              </h3>
+            </div>
+            <div class="flex items-center gap-2">
+              <button onclick="toggleSoundAlerts()" id="soundAlertBtn" class="text-[11px] font-semibold px-2.5 py-1 rounded-lg border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 transition flex items-center gap-1.5 shadow-sm">
+                <i class="fa-solid fa-volume-high text-emerald-600"></i> Sound Alerts: ON
+              </button>
+              <button onclick="loadActiveReservations()" class="text-[11px] font-semibold px-2.5 py-1 rounded-lg border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 transition flex items-center gap-1 shadow-sm">
+                <i class="fa-solid fa-arrows-rotate"></i> Refresh
+              </button>
+            </div>
+          </div>
+          <div id="activeHoldsContainer" class="space-y-2">
+            <div class="p-3 text-center text-slate-400 text-xs bg-slate-50 rounded-xl border border-dashed border-slate-200">
+              <i class="fa-solid fa-clock-rotate-left mr-1"></i> No active holds. Real-time patient reservations will appear here with an audible chime.
+            </div>
+          </div>
+        </div>
+
         <!-- CURRENT INVENTORY TABLE -->
         <div class="pt-4 border-t border-slate-100 space-y-4">
           <div class="flex flex-wrap items-center justify-between gap-2">
@@ -2754,6 +2781,9 @@
             ? '<i class="fa-solid fa-shield-halved text-[10px]"></i> EFDA Verified'
             : '<i class="fa-solid fa-triangle-exclamation text-[10px]"></i> Unverified / Revoked';
         }
+
+        // Also fetch active holds for this pharmacy
+        loadActiveReservations();
       } catch (err) {
         console.error('Error loading inventory:', err);
       }
@@ -4203,6 +4233,172 @@
         alert('Verification error: ' + err.message);
       }
     }
+
+    // --- LIVE COUNTER HOLDS & WEB AUDIO CHIME SYSTEM ---
+    let soundAlertsEnabled = true;
+    let knownReservationCodes = new Set();
+
+    function toggleSoundAlerts() {
+      soundAlertsEnabled = !soundAlertsEnabled;
+      const btn = document.getElementById('soundAlertBtn');
+      if (btn) {
+        btn.innerHTML = soundAlertsEnabled
+          ? '<i class="fa-solid fa-volume-high text-emerald-600"></i> Sound Alerts: ON'
+          : '<i class="fa-solid fa-volume-xmark text-slate-400"></i> Sound Alerts: OFF';
+      }
+    }
+
+    function playCounterChime() {
+      if (!soundAlertsEnabled) return;
+      try {
+        const AudioCtx = window.AudioContext || window.webkitAudioContext;
+        if (!AudioCtx) return;
+        const ctx = new AudioCtx();
+        const now = ctx.currentTime;
+
+        // Two-tone bell: High clarity pleasant counter alert (880Hz then 1320Hz)
+        const osc1 = ctx.createOscillator();
+        const gain1 = ctx.createGain();
+        osc1.type = 'sine';
+        osc1.frequency.setValueAtTime(880, now);
+        gain1.gain.setValueAtTime(0.3, now);
+        gain1.gain.exponentialRampToValueAtTime(0.001, now + 0.5);
+        osc1.connect(gain1);
+        gain1.connect(ctx.destination);
+        osc1.start(now);
+        osc1.stop(now + 0.5);
+
+        const osc2 = ctx.createOscillator();
+        const gain2 = ctx.createGain();
+        osc2.type = 'triangle';
+        osc2.frequency.setValueAtTime(1320, now + 0.15);
+        gain2.gain.setValueAtTime(0.35, now + 0.15);
+        gain2.gain.exponentialRampToValueAtTime(0.001, now + 0.85);
+        osc2.connect(gain2);
+        gain2.connect(ctx.destination);
+        osc2.start(now + 0.15);
+        osc2.stop(now + 0.85);
+      } catch (e) {
+        console.warn('Web Audio Chime error:', e);
+      }
+    }
+
+    async function loadActiveReservations() {
+      const select = document.getElementById('actingPharmacySelect');
+      const pharmId = select ? select.value : (currentPharmacy?.id || '');
+      if (!pharmId) return;
+
+      try {
+        const res = await fetch(`/api/reservation/active/${encodeURIComponent(pharmId)}`);
+        const data = await res.json();
+        if (!data.success) return;
+
+        const list = data.reservations || [];
+        const badge = document.getElementById('activeHoldsBadge');
+        if (badge) badge.innerText = `${list.length} Active`;
+
+        let hasNew = false;
+        list.forEach(h => {
+          if (!knownReservationCodes.has(h.reservationCode)) {
+            knownReservationCodes.add(h.reservationCode);
+            hasNew = true;
+          }
+        });
+
+        if (hasNew && list.length > 0) {
+          playCounterChime();
+        }
+
+        const container = document.getElementById('activeHoldsContainer');
+        if (!container) return;
+
+        if (list.length === 0) {
+          container.innerHTML = `
+            <div class="p-3 text-center text-slate-400 text-xs bg-slate-50 rounded-xl border border-dashed border-slate-200">
+              <i class="fa-solid fa-clock-rotate-left mr-1"></i> No active holds. Real-time patient reservations will appear here with an audible chime.
+            </div>`;
+          return;
+        }
+
+        container.innerHTML = list.map(h => {
+          const expMinutes = Math.max(0, Math.round((new Date(h.expiresAt).getTime() - Date.now()) / 60000));
+          const isAck = h.pharmacistAcknowledged;
+          return `
+            <div class="p-3 rounded-xl border ${isAck ? 'border-emerald-300 bg-emerald-50/60' : 'border-amber-300 bg-amber-50/70'} flex flex-col md:flex-row md:items-center justify-between gap-3 shadow-sm transition">
+              <div class="space-y-1">
+                <div class="flex flex-wrap items-center gap-2">
+                  <span class="font-mono font-black text-xs bg-slate-900 text-white px-2 py-0.5 rounded-lg shadow-inner">#${h.reservationCode}</span>
+                  <span class="font-bold text-slate-900 text-xs">${h.medicineName}</span>
+                  <span class="text-xs font-black text-emerald-700 bg-emerald-100 px-2 py-0.5 rounded-md">${h.lockedPriceETB} ETB</span>
+                  <span class="text-[10px] font-semibold text-slate-500 bg-white border border-slate-200 px-2 py-0.5 rounded-md">⏳ ${expMinutes}m left</span>
+                </div>
+                <div class="text-[11px] text-slate-600 flex items-center gap-2">
+                  <span>Patient ID: <b class="font-mono">${h.patientUserId}</b></span>
+                  <span>• Status: <b class="${isAck ? 'text-emerald-700' : 'text-amber-700'}">${isAck ? '🟢 Stock Held at Counter' : '🟡 Waiting Stock Confirmation'}</b></span>
+                </div>
+              </div>
+              <div class="flex items-center gap-1.5 shrink-0">
+                ${!isAck ? `
+                  <button onclick="confirmHoldAction('${h.reservationCode}')" class="px-2.5 py-1.5 text-xs font-bold rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white transition flex items-center gap-1 shadow-sm">
+                    <i class="fa-solid fa-check"></i> Confirm Stock
+                  </button>
+                  <button onclick="rejectHoldAction('${h.reservationCode}')" class="px-2.5 py-1.5 text-xs font-bold rounded-lg bg-rose-600 hover:bg-rose-700 text-white transition flex items-center gap-1 shadow-sm">
+                    <i class="fa-solid fa-xmark"></i> Sold Out
+                  </button>
+                ` : `
+                  <button onclick="fulfillFromQueue('${h.reservationCode}')" class="px-3 py-1.5 text-xs font-bold rounded-lg bg-slate-900 hover:bg-slate-800 text-white transition flex items-center gap-1 shadow-sm">
+                    <i class="fa-solid fa-circle-check text-emerald-400"></i> Fulfill & Check-In
+                  </button>
+                `}
+              </div>
+            </div>`;
+        }).join('');
+      } catch (err) {
+        console.warn('Error loading active holds:', err);
+      }
+    }
+
+    async function confirmHoldAction(code) {
+      try {
+        const res = await fetch('/api/reservation/confirm', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ reservationCode: code })
+        });
+        const d = await res.json();
+        if (d.success) {
+          loadActiveReservations();
+        } else {
+          alert('Could not confirm hold: ' + (d.message || d.error));
+        }
+      } catch (e) { alert('Error: ' + e.message); }
+    }
+
+    async function rejectHoldAction(code) {
+      if (!confirm(`Mark reservation #${code} as Out of Stock? Patient will be immediately notified so they do not travel.`)) return;
+      try {
+        const res = await fetch('/api/reservation/reject', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ reservationCode: code, reason: 'Sold out at physical counter' })
+        });
+        const d = await res.json();
+        if (d.success) {
+          loadActiveReservations();
+        } else {
+          alert('Could not reject hold: ' + (d.message || d.error));
+        }
+      } catch (e) { alert('Error: ' + e.message); }
+    }
+
+    async function fulfillFromQueue(code) {
+      document.getElementById('counterCodeInput').value = code;
+      await verifyCounterReservation();
+      loadActiveReservations();
+    }
+
+    // Auto-poll active counter reservations every 10 seconds
+    setInterval(loadActiveReservations, 10000);
 
     // Init on load
     fetchPolicy();

@@ -1,7 +1,7 @@
 import https from 'https';
 import fs from 'fs';
 import path from 'path';
-import { InMemoryDatabase, TelegramBotSession, PharmacyVerificationApplication, Pharmacy, MASTER_MEDICINE_CATALOG } from '../database/in-memory-db';
+import { InMemoryDatabase, TelegramBotSession, PharmacyVerificationApplication, Pharmacy, MASTER_MEDICINE_CATALOG, ReservationHold } from '../database/in-memory-db';
 import { getDatabaseRepository, IDatabaseRepository } from '../database';
 import { BroadcastMatchingService } from '../matching/broadcast-matching.service';
 
@@ -985,18 +985,76 @@ export class TelegramVerificationBotService {
 
     const inlineKeyboard = [
       [
-        { text: '✅ ደርሶኛል / እሺ ተይዟል (Acknowledge)', callback_data: `ack_hold_${params.reservationCode}` },
+        { text: '✅ አረጋግጥ & በካውንተር ያዝ (Confirm Stock)', callback_data: `ack_hold_${params.reservationCode}` },
+        { text: '❌ አልቋል / አሁን የለም (Out of Stock)', callback_data: `reject_hold_${params.reservationCode}` },
       ],
       [
-        { text: '📋 የማመልከቻ ሁኔታ ፈትሽ (/status)', callback_data: '/status' },
+        { text: '📋 ሁኔታ ፈትሽ (/status)', callback_data: '/status' },
       ]
     ];
 
     await this.sendRealTelegramReply(params.pharmacyChatId, {
       chatId: params.pharmacyChatId,
       replyText: alertText,
-      quickReplies: ['✅ ደርሶኛል (Acknowledged)', '/status', '/start'],
+      quickReplies: ['✅ አረጋግጥ (Confirm)', '❌ አልቋል (Out of Stock)', '/status'],
       inlineKeyboard,
+    }, ep);
+
+    return true;
+  }
+
+  /**
+   * Real-time push alert dispatched to patient when pharmacist confirms stock is held
+   */
+  public async notifyPatientStockConfirmed(hold: ReservationHold): Promise<boolean> {
+    const ep = this.patientBot.token ? this.patientBot : this.pharmacyBot;
+    if (!ep.token || !hold.patientUserId) return false;
+
+    const expTime = new Date(hold.expiresAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    const text = `🎉 **መልካም ዜና! ፋርማሲው መድኃኒቱን በካውንተር እንዳስቀመጠ አረጋግጧል!**
+**Stock Confirmed & Held on Counter!**
+━━━━━━━━━━━━━━━━━━━━━━━━━━
+🏥 **ፋርማሲ፦** ${hold.pharmacyName}
+💊 **መድኃኒት፦** ${hold.medicineName}
+💰 **የተቆለፈ ዋጋ፦** ${hold.lockedPriceETB} ETB (በህግ የተረጋገጠ)
+🔐 **የማስያዣ ቫውቸር ኮድ፦** \`#${hold.reservationCode}\`
+⏳ **የሚቆይበት ጊዜ፦** እስከ ${expTime}
+📞 **የፋርማሲ ስልክ፦** \`${hold.phone}\`
+━━━━━━━━━━━━━━━━━━━━━━━━━━
+📍 **ፋርማሲስቱ መድኃኒቱን አዘጋጅቶ እየጠበቀዎት ስለሆነ አሁን መሄድ ይችላሉ!**
+ካውንተር ላይ ኮድ \`#${hold.reservationCode}\` በማሳየት በ ${hold.lockedPriceETB} ETB ይረከቡ።`;
+
+    await this.sendRealTelegramReply(hold.patientUserId, {
+      chatId: hold.patientUserId,
+      replyText: text,
+      quickReplies: ['/start', '💊 አዲስ ፍለጋ'],
+    }, ep);
+
+    return true;
+  }
+
+  /**
+   * Real-time push alert dispatched to patient when pharmacist marks stock unavailable
+   */
+  public async notifyPatientStockUnavailable(hold: ReservationHold): Promise<boolean> {
+    const ep = this.patientBot.token ? this.patientBot : this.pharmacyBot;
+    if (!ep.token || !hold.patientUserId) return false;
+
+    const text = `⚠️ **አስፈላጊ ማሳወቂያ፦ መድኃኒቱ በካውንተር ላይ አልቋል**
+**Stock Unavailable / Sold Out**
+━━━━━━━━━━━━━━━━━━━━━━━━━━
+🏥 **ፋርማሲ፦** ${hold.pharmacyName}
+💊 **መድኃኒት፦** ${hold.medicineName}
+━━━━━━━━━━━━━━━━━━━━━━━━━━
+ይቅርታ፣ ፋርማሲው መድኃኒቱ በካውንተር ላይ እንዳለቀ ስላሳወቀ አላስፈላጊ ጉዞ እንዳያደርጉ ማስያዣው (#${hold.reservationCode}) ተሰርዟል።
+
+እባክዎ በአቅራቢያዎ የሚገኝ ሌላ ፋርማሲ ይፈልጉ።
+👉 **/start** ብለው በመጻፍ አዲስ ፍለጋ ማካሄድ ይችላሉ።`;
+
+    await this.sendRealTelegramReply(hold.patientUserId, {
+      chatId: hold.patientUserId,
+      replyText: text,
+      quickReplies: ['/start', '💊 አዲስ ፍለጋ'],
     }, ep);
 
     return true;
@@ -1162,13 +1220,40 @@ export class TelegramVerificationBotService {
       // 1. Pharmacist Acknowledgment of Hold Reservation (Counter Notification)
       if (cleanText.startsWith('ack_hold_')) {
         const code = cleanText.replace(/^ack_hold_/, '');
+        const confRes = await this.repo.confirmReservationHold(code);
+        const hold = confRes.reservation || await this.repo.getReservationHold(code);
+
+        // Notify patient if booked via Telegram
+        if (hold && hold.patientUserId && /^\d+$/.test(hold.patientUserId)) {
+          this.notifyPatientStockConfirmed(hold).catch((e) => console.warn('[HoldAck] Failed to alert patient:', e.message));
+        }
+
         return {
           chatId,
-          replyText: `✅ **የትዕዛዝ ደረሰኝ ተረጋግጧል! (Hold Acknowledged)**\n━━━━━━━━━━━━━━━━━━━━━━━━━━\n🔐 የማስያዣ ኮድ፦ **#${code}**\n\nታካሚው በአንድ ሰዓት ውስጥ መጥቶ ይህን ኮድ በካውንተር ሲያሳይ መድኃኒቱን ያስረክቡ። እናመሰግናለን! 🏥`,
+          replyText: `✅ **መድኃኒቱ በካውንተር ላይ መያዙ ተረጋግጧል! (Stock Confirmed & Held)**\n━━━━━━━━━━━━━━━━━━━━━━━━━━\n🔐 የማስያዣ ኮድ፦ **#${code}**\n💊 መድኃኒት፦ **${hold?.medicineName || 'የታዘዘው መድኃኒት'}**\n\nታካሚው መድኃኒቱ መዘጋጀቱን የሚያረጋግጥ ማሳወቂያ ወዲያውኑ ደርሶታል። በአንድ ሰዓት ውስጥ ሲመጣ ያስረክቡ። እናመሰግናለን! 🏥`,
           quickReplies: ['/status', '/verify', '/help'],
           inlineKeyboard: [
             [{ text: '📋 የማመልከቻ ሁኔታ ፈትሽ (/status)', callback_data: '/status' }],
           ],
+          sessionStep: 'START',
+        };
+      }
+
+      // 1B. Pharmacist Rejection of Hold (Out of stock at counter)
+      if (cleanText.startsWith('reject_hold_')) {
+        const code = cleanText.replace(/^reject_hold_/, '');
+        const rejRes = await this.repo.rejectReservationHold(code, 'Out of Stock');
+        const hold = rejRes.reservation || await this.repo.getReservationHold(code);
+
+        // Notify patient immediately
+        if (hold && hold.patientUserId && /^\d+$/.test(hold.patientUserId)) {
+          this.notifyPatientStockUnavailable(hold).catch((e) => console.warn('[HoldRej] Failed to alert patient:', e.message));
+        }
+
+        return {
+          chatId,
+          replyText: `❌ **ማስያዣው ተሰርዟል (Reservation Cancelled)**\n━━━━━━━━━━━━━━━━━━━━━━━━━━\n🔐 የማስያዣ ኮድ፦ **#${code}**\n\nታካሚው አላስፈላጊ ጉዞ እንዳያደርግ መድኃኒቱ በካውንተር ላይ እንዳለቀ የሚገልጽ ማሳወቂያ ወዲያውኑ ተልኮለታል።`,
+          quickReplies: ['/status', '/verify', '/help'],
           sessionStep: 'START',
         };
       }
@@ -1684,14 +1769,39 @@ Type **/status** at any time to monitor progress.
     // Acknowledge hold by pharmacist
     if (cleanText.startsWith('ack_hold_')) {
       const code = cleanText.replace(/^ack_hold_/, '');
+      const confRes = await this.repo.confirmReservationHold(code);
+      const hold = confRes.reservation || await this.repo.getReservationHold(code);
+
+      if (hold && hold.patientUserId && /^\d+$/.test(hold.patientUserId)) {
+        this.notifyPatientStockConfirmed(hold).catch((e) => console.warn('[HoldAck] Failed to alert patient:', e.message));
+      }
+
       return {
         chatId,
-        replyText: `✅ **የትዕዛዝ ደረሰኝ ተረጋግጧል! (Hold Acknowledged)**\n━━━━━━━━━━━━━━━━━━━━━━━━━━\n🔐 የማስያዣ ኮድ፦ **#${code}**\n\nታካሚው በአንድ ሰዓት ውስጥ መጥቶ ይህን ኮድ በካውንተር ሲያሳይ መድኃኒቱን ያስረክቡ። እናመሰግናለን! 🏥`,
+        replyText: `✅ **መድኃኒቱ በካውንተር ላይ መያዙ ተረጋግጧል! (Stock Confirmed & Held)**\n━━━━━━━━━━━━━━━━━━━━━━━━━━\n🔐 የማስያዣ ኮድ፦ **#${code}**\n💊 መድኃኒት፦ **${hold?.medicineName || 'የታዘዘው መድኃኒት'}**\n\nታካሚው መድኃኒቱ መዘጋጀቱን የሚያረጋግጥ ማሳወቂያ ወዲያውኑ ደርሶታል። በአንድ ሰዓት ውስጥ ሲመጣ ያስረክቡ። እናመሰግናለን! 🏥`,
         quickReplies: ['📦 መደርደሪያዬ (/inventory)', '🖥️ Open Web Studio', '/start'],
         inlineKeyboard: [
           [{ text: '📦 መደርደሪያዬን እይ (/inventory)', callback_data: '/inventory' }],
         ],
         sessionStep: 'PHARMACY_INVENTORY',
+      };
+    }
+
+    // Rejection of hold by pharmacist
+    if (cleanText.startsWith('reject_hold_')) {
+      const code = cleanText.replace(/^reject_hold_/, '');
+      const rejRes = await this.repo.rejectReservationHold(code, 'Out of Stock');
+      const hold = rejRes.reservation || await this.repo.getReservationHold(code);
+
+      if (hold && hold.patientUserId && /^\d+$/.test(hold.patientUserId)) {
+        this.notifyPatientStockUnavailable(hold).catch((e) => console.warn('[HoldRej] Failed to alert patient:', e.message));
+      }
+
+      return {
+        chatId,
+        replyText: `❌ **ማስያዣው ተሰርዟል (Reservation Cancelled)**\n━━━━━━━━━━━━━━━━━━━━━━━━━━\n🔐 የማስያዣ ኮድ፦ **#${code}**\n\nታካሚው አላስፈላጊ ጉዞ እንዳያደርግ መድኃኒቱ በካውንተር ላይ እንዳለቀ የሚገልጽ ማሳወቂያ ወዲያውኑ ተልኮለታል።`,
+        quickReplies: ['/status', '/start'],
+        sessionStep: 'START',
       };
     }
 

@@ -52,6 +52,26 @@ export interface IDatabaseRepository {
   ): Promise<{ success: boolean; message: string; reservation?: ReservationHold }>;
 
   /**
+   * Retrieve active pending reservations for a specific pharmacy counter
+   */
+  getActiveReservationsByPharmacy(pharmacyId: string): Promise<ReservationHold[]>;
+
+  /**
+   * Pharmacist confirms shelf stock is physically held at counter
+   */
+  confirmReservationHold(
+    code: string
+  ): Promise<{ success: boolean; message: string; reservation?: ReservationHold }>;
+
+  /**
+   * Pharmacist rejects/cancels hold because stock is unavailable
+   */
+  rejectReservationHold(
+    code: string,
+    reason?: string
+  ): Promise<{ success: boolean; message: string; reservation?: ReservationHold }>;
+
+  /**
    * Update pharmacy GPS location & sub-city
    */
   updatePharmacyLocation(
