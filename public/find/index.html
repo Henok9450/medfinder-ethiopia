@@ -417,41 +417,31 @@
         </div>
       </div>
 
-      <!-- RESULT CARD -->
+      <!-- RESULT CARD (MULTI-MEDICINE BASKET CHECKLIST) -->
       <div id="prescriptionResultCard" class="hidden space-y-3 text-left">
-        <div class="p-3.5 bg-emerald-50 rounded-2xl border border-emerald-200 space-y-2">
-          <div class="flex items-start justify-between gap-2">
-            <div>
-              <span class="text-[9px] font-bold uppercase tracking-wider text-emerald-800 bg-emerald-200 px-2 py-0.5 rounded-full inline-flex items-center gap-1">
-                <i class="fa-solid fa-check"></i> Medicine Identified
-              </span>
-              <h4 id="detectedMedName" class="text-base font-black text-slate-900 mt-1">Augmentin 625mg</h4>
-              <p id="detectedGenericName" class="text-xs text-slate-600 font-medium">Amoxicillin + Clavulanic Acid</p>
-            </div>
-            <div id="detectedConfidenceBadge" class="text-right shrink-0">
-              <span class="text-[10px] font-bold text-emerald-700 bg-white px-2 py-1 rounded-lg border border-emerald-300">96% Match</span>
-            </div>
+        <div class="flex items-center justify-between pb-1 border-b border-slate-100">
+          <div class="flex items-center gap-1.5">
+            <span class="text-[10px] font-bold uppercase tracking-wider text-emerald-800 bg-emerald-100 px-2.5 py-0.5 rounded-full inline-flex items-center gap-1">
+              <i class="fa-solid fa-check-double text-[9px]"></i> <span id="prescriptionDetectedCountText">1 Medicine Detected</span>
+            </span>
           </div>
+          <button type="button" onclick="toggleAllPrescriptionChecklist(true)" class="text-[10px] text-emerald-700 hover:underline font-bold">Select All</button>
+        </div>
 
-          <div class="grid grid-cols-2 gap-2 pt-1 text-[11px] text-slate-600 border-t border-emerald-200/60">
-            <div>
-              <span class="text-[10px] text-slate-400 block">Form / Strength</span>
-              <strong id="detectedStrengthForm" class="text-slate-800">625mg Tablet</strong>
-            </div>
-            <div>
-              <span class="text-[10px] text-slate-400 block">Dosage / Frequency</span>
-              <strong id="detectedInstructions" class="text-slate-800">1x2 po bid</strong>
-            </div>
-          </div>
+        <p class="text-[11px] text-slate-500">Tick the medications you want to find nearby in Addis Ababa today:</p>
+
+        <!-- DYNAMIC CHECKLIST CONTAINER -->
+        <div id="prescriptionChecklistContainer" class="space-y-2 max-h-56 overflow-y-auto pr-1">
+          <!-- Dynamically populated per detected medicine -->
         </div>
 
         <!-- ACTIONS -->
-        <div class="space-y-2 pt-1">
+        <div class="space-y-2 pt-2 border-t border-slate-100">
           <button onclick="applyScanAndSearch()" class="w-full bg-emerald-600 hover:bg-emerald-700 active:scale-95 text-white text-xs font-black py-3 rounded-xl shadow-md transition flex items-center justify-center gap-2">
             <i class="fa-solid fa-magnifying-glass"></i>
-            <span>Search Pharmacies with Stock (በአቅራቢያ ፈልግ)</span>
+            <span id="prescriptionSearchBtnText">Search Selected Medicines (በአቅራቢያ ፈልግ)</span>
           </button>
-          <button onclick="triggerPrescriptionScan()" class="w-full bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-semibold py-2.5 rounded-xl transition flex items-center justify-center gap-1.5">
+          <button onclick="triggerPrescriptionScan()" class="w-full bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-semibold py-2 rounded-xl transition flex items-center justify-center gap-1.5">
             <i class="fa-solid fa-camera"></i>
             <span>Retake Another Photo (እንደገና አንሳ)</span>
           </button>
@@ -654,12 +644,20 @@
 
       try {
         const userId = 'patient_web_' + Math.floor(100000 + Math.random() * 900000);
+        let medicineNamesToSend = null;
+        if (activeFindPrescriptionBasket && activeFindPrescriptionBasket.length > 0 && medicineName === activeFindPrescriptionBasket.join(' + ')) {
+          medicineNamesToSend = activeFindPrescriptionBasket;
+        } else if (medicineName.includes('+')) {
+          medicineNamesToSend = medicineName.split('+').map(s => s.trim()).filter(Boolean);
+        }
+
         const res = await fetch('/api/search', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             userId,
             medicineName,
+            medicineNames: medicineNamesToSend,
             userLat,
             userLng,
             subCity,
@@ -672,8 +670,12 @@
         searchBtn.innerHTML = `<span>Search</span> <i class="fa-solid fa-arrow-right text-[10px]"></i>`;
 
         if (data.success && data.pharmacies && data.pharmacies.length > 0) {
-          document.getElementById('resultsCountText').innerText = `Found ${data.pharmacies.length} pharmacies with stock`;
-          renderPharmacies(data.pharmacies, medicineName);
+          if (data.isMultiItem) {
+            document.getElementById('resultsCountText').innerText = `Found ${data.pharmacies.length} pharmacies for prescription basket (${data.searchedMedicines.length} medicines)`;
+          } else {
+            document.getElementById('resultsCountText').innerText = `Found ${data.pharmacies.length} pharmacies with stock`;
+          }
+          renderPharmacies(data.pharmacies, medicineName, data.isMultiItem, data.searchedMedicines);
         } else if (data.mode === 'BROADCAST_PING_INITIATED') {
           document.getElementById('resultsCountText').innerText = `Broadcasting query live...`;
           container.innerHTML = `
@@ -683,7 +685,7 @@
               </div>
               <div>
                 <h4 class="font-bold text-sm text-slate-900">Broadcast Ping Sent to ${data.pingedCount || 10} Nearby Pharmacies</h4>
-                <p class="text-xs text-slate-500 mt-0.5">"${medicineName}" was pinged to pharmacists in ${subCity}. As they confirm stock, your radar updates.</p>
+                <p class="text-xs text-slate-500 mt-0.5">"${escapeHtml(medicineName)}" was pinged to pharmacists in ${subCity}. As they confirm stock, your radar updates.</p>
               </div>
               <a href="https://t.me/MedFinder_ET_bot" target="_blank" class="inline-flex items-center gap-1.5 bg-sky-600 text-white font-bold text-xs px-4 py-2 rounded-xl shadow-xs">
                 <i class="fa-brands fa-telegram"></i>
@@ -712,29 +714,53 @@
       }
     }
 
-    function renderPharmacies(pharmacies, drugName) {
+    function renderPharmacies(pharmacies, drugName, isMultiItem = false, searchedMedicines = []) {
       const container = document.getElementById('resultsContainer');
       container.innerHTML = pharmacies.map((p, idx) => `
-        <div class="bg-white p-4 rounded-3xl border border-slate-200 shadow-xs space-y-3 hover:border-emerald-400 transition">
+        <div class="bg-white p-4 rounded-3xl border ${p.isSingleStop ? 'border-emerald-300 ring-1 ring-emerald-200' : 'border-slate-200'} shadow-xs space-y-3 hover:border-emerald-400 transition">
           <div class="flex items-start justify-between gap-2">
             <div>
-              <div class="flex items-center gap-1.5">
-                <h3 class="font-black text-sm text-slate-900">${p.name}</h3>
+              <div class="flex items-center gap-1.5 flex-wrap">
+                <h3 class="font-black text-sm text-slate-900">${escapeHtml(p.name)}</h3>
                 ${p.isVerified ? '<span class="text-[10px] bg-emerald-100 text-emerald-800 font-bold px-1.5 py-0.2 rounded" title="EFDA Licensed"><i class="fa-solid fa-check"></i> Verified</span>' : ''}
+                ${isMultiItem ? (p.isSingleStop ? `
+                  <span class="text-[10px] bg-emerald-600 text-white font-bold px-2 py-0.5 rounded-full flex items-center gap-1 shadow-2xs">
+                    <i class="fa-solid fa-check-double text-[9px]"></i> Single-Stop (All ${p.totalRequested} In Stock)
+                  </span>
+                ` : `
+                  <span class="text-[10px] bg-amber-100 text-amber-800 font-bold px-2 py-0.5 rounded-full flex items-center gap-1">
+                    <i class="fa-solid fa-circle-half-stroke text-[9px]"></i> Partial (${p.basketSummaryText})
+                  </span>
+                `) : ''}
               </div>
               <p class="text-xs text-slate-500 mt-0.5">
                 📍 ${p.subCity}, Addis Ababa • <strong class="text-emerald-700">${p.distanceKm || 1.2} km away</strong>
               </p>
-              ${p.matchedDrugName && p.matchedDrugName.toLowerCase() !== drugName.toLowerCase() ? `
+              ${!isMultiItem && p.matchedDrugName && p.matchedDrugName.toLowerCase() !== drugName.toLowerCase() ? `
               <div class="mt-1">
                 <span class="inline-flex items-center gap-1 text-[10px] font-semibold bg-sky-50 text-sky-800 border border-sky-200 px-2 py-0.5 rounded-full">
-                  <i class="fa-solid fa-circle-check text-[9px] text-sky-600"></i> In Stock: <strong>${p.matchedDrugName}</strong>
+                  <i class="fa-solid fa-circle-check text-[9px] text-sky-600"></i> In Stock: <strong>${escapeHtml(p.matchedDrugName)}</strong>
                 </span>
               </div>
               ` : ''}
+
+              ${isMultiItem && p.matchedItems && p.matchedItems.length > 0 ? `
+              <div class="mt-2.5 p-2 bg-slate-50 rounded-xl border border-slate-200/80 space-y-1">
+                <span class="text-[9px] uppercase tracking-wider font-bold text-slate-500 block">Prescription Basket Breakdown:</span>
+                <div class="flex flex-wrap gap-1.5">
+                  ${p.matchedItems.map(item => `
+                    <span class="text-[11px] bg-white border border-slate-200 text-slate-700 px-2 py-0.5 rounded-lg flex items-center gap-1 shadow-2xs">
+                      <i class="fa-solid fa-circle-check text-emerald-600 text-[10px]"></i>
+                      <strong>${escapeHtml(item.matchedName)}</strong>
+                      <span class="text-emerald-700 font-semibold font-mono text-[10px]">(${item.priceETB} ETB)</span>
+                    </span>
+                  `).join('')}
+                </div>
+              </div>
+              ` : ''}
             </div>
-            <div class="text-right">
-              <span class="text-[10px] text-slate-400 uppercase font-bold">Locked Price</span>
+            <div class="text-right shrink-0">
+              <span class="text-[10px] text-slate-400 uppercase font-bold">${isMultiItem ? (p.isSingleStop ? 'Full Basket' : 'Partial Basket') : 'Locked Price'}</span>
               <div class="text-base font-black text-emerald-700">${p.priceETB || 380} ETB</div>
             </div>
           </div>
@@ -751,9 +777,9 @@
               <i class="fa-solid fa-phone text-emerald-600 text-[11px]"></i>
               <span>Call Counter</span>
             </a>
-            <button onclick="createPriceLockHold('${p.id}', '${p.name.replace(/'/g, "\\'")}', '${drugName}', ${p.priceETB || 380}, '${p.phone || '+251911223344'}', ${p.latitude || 'null'}, ${p.longitude || 'null'}, '${(p.subCity || '').replace(/'/g, "\\'")}')" class="bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold py-2 px-3 rounded-xl flex items-center justify-center space-x-1.5 shadow-xs transition">
+            <button onclick="createPriceLockHold('${p.id}', '${escapeJs(p.name)}', '${escapeJs(p.matchedDrugName || drugName)}', ${p.priceETB || 380}, '${escapeJs(p.phone || '+251911223344')}', ${p.latitude || 'null'}, ${p.longitude || 'null'}, '${escapeJs(p.subCity || '')}')" class="bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold py-2 px-3 rounded-xl flex items-center justify-center space-x-1.5 shadow-xs transition">
               <i class="fa-solid fa-lock text-[11px]"></i>
-              <span>Lock Price</span>
+              <span>${isMultiItem ? 'Lock Basket' : 'Lock Price'}</span>
             </button>
           </div>
         </div>
@@ -1156,6 +1182,18 @@
 
     // --- AI MEDICAL VISION: PRESCRIPTION & MEDICINE SCANNER ---
     let lastDetectedMedicineName = '';
+    let findDetectedMedicinesList = [];
+    let activeFindPrescriptionBasket = null;
+
+    function escapeHtml(str) {
+      if (!str) return '';
+      return String(str).replace(/[&<>"']/g, m => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[m]);
+    }
+
+    function escapeJs(str) {
+      if (!str) return '';
+      return String(str).replace(/\\/g, '\\\\').replace(/'/g, "\\'");
+    }
 
     function triggerPrescriptionScan() {
       const input = document.getElementById('prescriptionCameraInput');
@@ -1200,15 +1238,7 @@
           scanningOverlay.classList.add('hidden');
 
           if (data.success && data.medicines && data.medicines.length > 0) {
-            const med = data.medicines[0];
-            lastDetectedMedicineName = med.name;
-
-            document.getElementById('detectedMedName').innerText = med.name;
-            document.getElementById('detectedGenericName').innerText = med.genericName || 'EFDA Essential Drug';
-            document.getElementById('detectedStrengthForm').innerText = `${med.strength || ''} ${med.form || 'Tablet'}`.trim() || 'Standard';
-            document.getElementById('detectedInstructions').innerText = med.dosageInstructions || 'As Prescribed';
-            document.getElementById('detectedConfidenceBadge').innerText = `${Math.round((med.confidence || 0.95) * 100)}% Match`;
-
+            renderPrescriptionChecklist(data.medicines);
             resultCard.classList.remove('hidden');
             errorCard.classList.add('hidden');
           } else {
@@ -1226,12 +1256,76 @@
       reader.readAsDataURL(file);
     }
 
-    function applyScanAndSearch() {
-      if (lastDetectedMedicineName) {
-        const input = document.getElementById('medicineInput');
-        if (input) {
-          input.value = lastDetectedMedicineName;
+    function renderPrescriptionChecklist(medicines) {
+      findDetectedMedicinesList = medicines || [];
+      const container = document.getElementById('prescriptionChecklistContainer');
+      const countText = document.getElementById('prescriptionDetectedCountText');
+      if (!container) return;
+
+      countText.innerText = `${findDetectedMedicinesList.length} Medicine${findDetectedMedicinesList.length > 1 ? 's' : ''} Detected`;
+
+      container.innerHTML = findDetectedMedicinesList.map((med, idx) => `
+        <label class="flex items-start gap-3 p-3 bg-white rounded-xl border border-slate-200 hover:border-emerald-300 transition cursor-pointer select-none shadow-xs">
+          <input type="checkbox" data-index="${idx}" checked onchange="updatePrescriptionSelectedCount()" class="find-rx-checkbox mt-1 w-4 h-4 text-emerald-600 rounded focus:ring-emerald-500 border-slate-300">
+          <div class="flex-1 min-w-0">
+            <div class="flex items-start justify-between gap-1">
+              <div>
+                <h5 class="text-xs font-bold text-slate-900">${escapeHtml(med.name)}</h5>
+                <p class="text-[10px] text-slate-500">${escapeHtml(med.genericName || 'EFDA Essential Drug')}</p>
+              </div>
+              <span class="text-[9px] font-bold text-emerald-700 bg-emerald-50 px-1.5 py-0.5 rounded border border-emerald-200 shrink-0">
+                ${Math.round((med.confidence || 0.95) * 100)}% Match
+              </span>
+            </div>
+            <div class="flex items-center gap-2 mt-1 text-[10px] text-slate-600">
+              <span class="bg-slate-100 px-1.5 py-0.5 rounded"><strong>Form:</strong> ${escapeHtml(`${med.strength || ''} ${med.form || 'Tablet'}`.trim() || 'Standard')}</span>
+              <span class="bg-slate-100 px-1.5 py-0.5 rounded"><strong>Dose:</strong> ${escapeHtml(med.dosageInstructions || 'As prescribed')}</span>
+            </div>
+          </div>
+        </label>
+      `).join('');
+
+      updatePrescriptionSelectedCount();
+    }
+
+    function toggleAllPrescriptionChecklist(checked) {
+      const cbs = document.querySelectorAll('.find-rx-checkbox');
+      cbs.forEach(cb => cb.checked = checked);
+      updatePrescriptionSelectedCount();
+    }
+
+    function updatePrescriptionSelectedCount() {
+      const cbs = document.querySelectorAll('.find-rx-checkbox:checked');
+      const count = cbs.length;
+      const btnText = document.getElementById('prescriptionSearchBtnText');
+      if (btnText) {
+        if (count === 0) {
+          btnText.innerText = 'Select At Least 1 Medicine';
+        } else if (count === 1) {
+          btnText.innerText = 'Search Selected Medicine (በአቅራቢያ ፈልግ)';
+        } else {
+          btnText.innerText = `Search Selected Basket (${count} Medicines) በአቅራቢያ ፈልግ`;
         }
+      }
+    }
+
+    function applyScanAndSearch() {
+      const checkedBoxes = Array.from(document.querySelectorAll('.find-rx-checkbox:checked'));
+      if (checkedBoxes.length === 0) {
+        alert('Please select at least one medicine from your prescription to search.');
+        return;
+      }
+      const selectedMeds = checkedBoxes.map(cb => {
+        const idx = parseInt(cb.getAttribute('data-index'), 10);
+        return findDetectedMedicinesList[idx]?.name;
+      }).filter(Boolean);
+
+      activeFindPrescriptionBasket = selectedMeds;
+      lastDetectedMedicineName = selectedMeds.join(' + ');
+
+      const input = document.getElementById('medicineInput');
+      if (input) {
+        input.value = lastDetectedMedicineName;
       }
       closePrescriptionModal();
       executeMedicineSearch();

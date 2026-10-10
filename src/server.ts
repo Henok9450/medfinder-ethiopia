@@ -76,14 +76,22 @@ app.post('/api/prescription/scan', async (req: Request, res: Response) => {
 // 1. PATIENT / USER SEARCH ENDPOINT
 // ==========================================
 app.post('/api/search', async (req: Request, res: Response) => {
-  const { userId, medicineName, userLat, userLng, city = 'Addis Ababa', subCity, lang = 'am' } = req.body;
+  const { userId, medicineName, medicineNames, userLat, userLng, city = 'Addis Ababa', subCity, lang = 'am' } = req.body;
 
-  if (!userId || !medicineName || userLat === undefined || userLng === undefined) {
+  const rawItemList: string[] = Array.isArray(medicineNames) && medicineNames.length > 0
+    ? medicineNames.map((s: any) => String(s).trim()).filter(Boolean)
+    : (medicineName
+        ? (String(medicineName).includes('+') ? String(medicineName).split('+') : [String(medicineName)]).map((s: any) => String(s).trim()).filter(Boolean)
+        : []);
+
+  if (!userId || rawItemList.length === 0 || userLat === undefined || userLng === undefined) {
     return res.status(400).json({
       success: false,
-      error: 'userId, medicineName, userLat, and userLng are required.',
+      error: 'userId, medicineName (or medicineNames array), userLat, and userLng are required.',
     });
   }
+
+  const primaryMedicineName = rawItemList[0];
 
   // 1. Dynamic Monetization & Paywall Evaluation
   const access = monetizationService.evaluateAccess({ userId, city, subCity });
@@ -124,51 +132,119 @@ app.post('/api/search', async (req: Request, res: Response) => {
   // 2. Access is Allowed (Free promo period, active pass, or free quota)
   monetizationService.recordSearchUsage(userId);
 
-  // 3. Search direct indexed inventory using Repository (PostGIS or In-Memory)
-  const directMatches = await broadcastService.searchCatalogWithRepository({
-    medicineName,
-    userLat: Number(userLat),
-    userLng: Number(userLng),
+  // 3. Search direct indexed inventory for each medicine in the list
+  const allPharmacies = await dbRepo.getAllPharmacies();
+  const radius = configService.getPolicy().geoMatching.initialRadiusKm;
+
+  // Parse queries
+  const parsedQueries = rawItemList.map(item => ({
+    rawName: item,
+    parsed: MedicalFuzzyMatcher.parseQuery(item),
+  }));
+
+  // Log telemetry for each searched medicine in background
+  for (const q of parsedQueries) {
+    dbRepo.logSearchTelemetry({
+      query: q.rawName,
+      normalizedDrug: q.parsed.normalizedQuery,
+      coreBrandOrGeneric: q.parsed.coreBrandOrGeneric,
+      subCity: subCity || 'Bole',
+      city: city || 'Addis Ababa',
+      matchedCount: 0,
+      userId,
+    }).catch((err: any) => console.warn('[SearchTelemetry] Error:', err.message));
+  }
+
+  // Evaluate pharmacy stock across all searched medicines
+  const candidatePharmacies: Array<{
+    pharmacy: any;
+    distanceKm: number;
+    matchedItems: Array<{ queryName: string; matchedName: string; priceETB: number; inStock: boolean }>;
+    matchedCount: number;
+    totalRequested: number;
+    totalBasketPriceETB: number;
+    isSingleStop: boolean; // Has ALL items in stock
+  }> = [];
+
+  for (const pharmacy of allPharmacies) {
+    if (pharmacy.isPermanentlyBanned || pharmacy.isShadowBanned) continue;
+
+    const distance = broadcastService.calculateDistanceKm(
+      Number(userLat),
+      Number(userLng),
+      pharmacy.latitude,
+      pharmacy.longitude
+    );
+    if (distance > radius) continue;
+
+    const matchedItems: Array<{ queryName: string; matchedName: string; priceETB: number; inStock: boolean }> = [];
+    let basketPrice = 0;
+
+    for (const q of parsedQueries) {
+      let foundItem: any = null;
+      if (pharmacy.inventory) {
+        for (const item of pharmacy.inventory) {
+          if (MedicalFuzzyMatcher.matchItem(item.name, q.parsed).matched && item.inStock) {
+            foundItem = item;
+            break;
+          }
+        }
+      }
+      if (!foundItem && pharmacy.inStockItems) {
+        const foundStockName = pharmacy.inStockItems.find((it: string) => MedicalFuzzyMatcher.matchItem(it, q.parsed).matched);
+        if (foundStockName) {
+          foundItem = { name: foundStockName, priceETB: 350, inStock: true };
+        }
+      }
+
+      if (foundItem) {
+        matchedItems.push({
+          queryName: q.rawName,
+          matchedName: foundItem.name,
+          priceETB: foundItem.priceETB || 350,
+          inStock: true,
+        });
+        basketPrice += foundItem.priceETB || 350;
+      }
+    }
+
+    if (matchedItems.length > 0) {
+      candidatePharmacies.push({
+        pharmacy,
+        distanceKm: distance,
+        matchedItems,
+        matchedCount: matchedItems.length,
+        totalRequested: rawItemList.length,
+        totalBasketPriceETB: basketPrice,
+        isSingleStop: matchedItems.length === rawItemList.length,
+      });
+    }
+  }
+
+  // Sort candidate pharmacies:
+  // 1. Single-stop pharmacies (has all items) first
+  // 2. Highest matchedCount descending
+  // 3. Highest trustScore descending
+  // 4. Shortest distance ascending
+  candidatePharmacies.sort((a, b) => {
+    if (a.isSingleStop !== b.isSingleStop) return a.isSingleStop ? -1 : 1;
+    if (b.matchedCount !== a.matchedCount) return b.matchedCount - a.matchedCount;
+    if (b.pharmacy.trustScore !== a.pharmacy.trustScore) return b.pharmacy.trustScore - a.pharmacy.trustScore;
+    return a.distanceKm - b.distanceKm;
   });
 
-  const parsedQuery = MedicalFuzzyMatcher.parseQuery(medicineName);
-
-  // 3B. Background search telemetry logging for Demand Intelligence
-  dbRepo.logSearchTelemetry({
-    query: medicineName,
-    normalizedDrug: parsedQuery.normalizedQuery,
-    coreBrandOrGeneric: parsedQuery.coreBrandOrGeneric,
-    subCity: subCity || 'Bole',
-    city: city || 'Addis Ababa',
-    matchedCount: directMatches.length,
-    userId,
-  }).catch((err: any) => console.warn('[SearchTelemetry] Error:', err.message));
-
-  if (directMatches.length > 0) {
+  if (candidatePharmacies.length > 0) {
     return res.json({
       success: true,
       mode: 'INSTANT_CATALOG_MATCH',
       accessReason: access.reason,
       freeUntilDate: access.freeUntilDate,
       remainingFreeSearches: access.remainingFreeSearches,
-      resultsCount: directMatches.length,
-      pharmacies: directMatches.map((m) => {
-        // Find matching inventory item using fuzzy matcher
-        let matchedInvItem = m.pharmacy.inventory.find(i => i.name.toLowerCase().includes(medicineName.toLowerCase()));
-        if (!matchedInvItem && m.pharmacy.inventory) {
-          for (const item of m.pharmacy.inventory) {
-            const match = MedicalFuzzyMatcher.matchItem(item.name, parsedQuery);
-            if (match.matched) {
-              matchedInvItem = item;
-              break;
-            }
-          }
-        }
-
-        const matchedName = matchedInvItem ? matchedInvItem.name : (
-          m.pharmacy.inStockItems?.find(it => MedicalFuzzyMatcher.matchItem(it, parsedQuery).matched) || medicineName
-        );
-
+      resultsCount: candidatePharmacies.length,
+      isMultiItem: rawItemList.length > 1,
+      searchedMedicines: rawItemList,
+      pharmacies: candidatePharmacies.map((m) => {
+        const primaryMatched = m.matchedItems[0];
         return {
           id: m.pharmacy.id,
           name: m.pharmacy.name,
@@ -180,9 +256,17 @@ app.post('/api/search', async (req: Request, res: Response) => {
           tinNumber: m.pharmacy.tinNumber,
           trustScore: m.pharmacy.trustScore,
           strikeCount: m.pharmacy.strikeCount,
-          matchedDrugName: matchedName,
-          priceETB: matchedInvItem ? matchedInvItem.priceETB : 380,
-          freshness: matchedInvItem ? 'FRESH_TODAY' : 'VERIFIED_RECENTLY',
+          matchedDrugName: rawItemList.length > 1
+            ? `${m.matchedItems.map(i => i.matchedName).join(' + ')}`
+            : (primaryMatched?.matchedName || primaryMedicineName),
+          priceETB: rawItemList.length > 1 ? m.totalBasketPriceETB : (primaryMatched?.priceETB || 380),
+          freshness: 'FRESH_TODAY',
+          isSingleStop: m.isSingleStop,
+          matchedCount: m.matchedCount,
+          totalRequested: m.totalRequested,
+          matchedItems: m.matchedItems,
+          totalBasketPriceETB: m.totalBasketPriceETB,
+          basketSummaryText: `${m.matchedCount} of ${m.totalRequested} items in stock`,
         };
       }),
     });
@@ -191,7 +275,7 @@ app.post('/api/search', async (req: Request, res: Response) => {
   // 4. Not in direct index: Initiate Real-Time "Broadcast Ping" to nearby pharmacies
   const broadcastReq = broadcastService.createBroadcastRequest({
     userId,
-    medicineName,
+    medicineName: rawItemList.join(' + '),
     userLat: Number(userLat),
     userLng: Number(userLng),
   });
@@ -205,6 +289,8 @@ app.post('/api/search', async (req: Request, res: Response) => {
     requestId: broadcastReq.id,
     radiusKm: broadcastReq.currentRadiusKm,
     pingedCount: broadcastReq.pingedPharmacyIds.length,
+    isMultiItem: rawItemList.length > 1,
+    searchedMedicines: rawItemList,
   });
 });
 
