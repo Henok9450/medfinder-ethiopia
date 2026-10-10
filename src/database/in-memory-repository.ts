@@ -165,37 +165,60 @@ export class InMemoryRepository implements IDatabaseRepository {
     return this.db.reviewVerificationApplication(id, status, adminNotes, efdaLicenseNumber);
   }
 
-  public async authenticatePharmacy(
-    username: string,
-    password: string
-  ): Promise<{ success: boolean; account?: PharmacyPortalAccount; token?: string; error?: string }> {
-    return this.db.authenticatePharmacy(username, password);
+  public async magicLoginWithKey(
+    accessKey: string
+  ): Promise<{ success: boolean; account?: PharmacyPortalAccount; token?: string; sessionExpiresAt?: string; error?: string }> {
+    return this.db.magicLoginWithKey(accessKey);
   }
 
-  public async getAccountBySetupToken(setupToken: string): Promise<PharmacyPortalAccount | null> {
-    const acc = this.db.getAccountBySetupToken(setupToken);
-    return acc || null;
+  public async sendPharmacyLoginOtp(
+    phone: string
+  ): Promise<{ success: boolean; otpCode?: string; telegramChatId?: string; pharmacyName?: string; error?: string }> {
+    return this.db.sendPharmacyLoginOtp(phone);
   }
 
-  public async activateAccountWithToken(
-    setupToken: string,
-    newPassword: string,
-    customUsername?: string
-  ): Promise<{ success: boolean; account?: PharmacyPortalAccount; token?: string; error?: string }> {
-    return this.db.activateAccountWithToken(setupToken, newPassword, customUsername);
-  }
-
-  public async changePharmacyPassword(
-    username: string,
-    currentPassword: string,
-    newPassword: string
-  ): Promise<{ success: boolean; account?: PharmacyPortalAccount; error?: string }> {
-    return this.db.changePharmacyPassword(username, currentPassword, newPassword);
+  public async verifyPharmacyLoginOtp(
+    phone: string,
+    otpCode: string
+  ): Promise<{ success: boolean; account?: PharmacyPortalAccount; token?: string; sessionExpiresAt?: string; error?: string }> {
+    return this.db.verifyPharmacyLoginOtp(phone, otpCode);
   }
 
   public async getAccountBySession(token: string): Promise<PharmacyPortalAccount | null> {
     const acc = this.db.getAccountBySession(token);
     return acc || null;
+  }
+
+  public async getAccountByAccessKey(accessKey: string): Promise<PharmacyPortalAccount | null> {
+    const acc = this.db.getAccountByAccessKey(accessKey);
+    return acc || null;
+  }
+
+  public async getAccountByPharmacyId(pharmacyId: string): Promise<PharmacyPortalAccount | null> {
+    const acc = this.db.getAccountByPharmacyId(pharmacyId);
+    return acc || null;
+  }
+
+  public async getAccountByTelegramChatId(chatId: string): Promise<PharmacyPortalAccount | null> {
+    const acc = this.db.getAccountByTelegramChatId(chatId);
+    return acc || null;
+  }
+
+  // Deprecated backward compatibility
+  public async authenticatePharmacy(username: string, password: string): Promise<{ success: boolean; account?: PharmacyPortalAccount; token?: string; error?: string }> {
+    return this.db.authenticatePharmacy(username, password);
+  }
+
+  public async getAccountBySetupToken(setupToken: string): Promise<PharmacyPortalAccount | null> {
+    return this.getAccountByAccessKey(setupToken);
+  }
+
+  public async activateAccountWithToken(setupToken: string, newPassword?: string, _customUsername?: string): Promise<{ success: boolean; account?: PharmacyPortalAccount; token?: string; error?: string }> {
+    return this.db.activateAccountWithToken(setupToken, newPassword);
+  }
+
+  public async changePharmacyPassword(username: string, currentPassword: string, newPassword: string): Promise<{ success: boolean; account?: PharmacyPortalAccount; error?: string }> {
+    return this.db.changePharmacyPassword(username, currentPassword, newPassword);
   }
 
   public async authenticateAdmin(

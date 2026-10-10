@@ -598,79 +598,57 @@ export class PostgresRepository implements IDatabaseRepository {
         });
       }
 
-      // 1. Generate clean base username
-      const cleanName = (appRow.pharmacy_name || 'pharm')
-        .toLowerCase()
-        .replace(/[^a-z0-9]/g, '_')
-        .replace(/_+/g, '_')
-        .replace(/^_|_$/g, '');
-      const randNum = Math.floor(100 + Math.random() * 900);
-      const baseUsername = cleanName ? `${cleanName.substring(0, 15)}_${randNum}` : `pharm_${randNum}`;
-
-      // 2. Check if account already exists for this pharmacy
+      // Check if account already exists for this pharmacy
       const existingAccRes = await pool.query(
         'SELECT * FROM pharmacy_portal_accounts WHERE pharmacy_id = $1',
         [pharmId]
       );
 
+      let portalAccessKey: string;
       if (existingAccRes.rows.length > 0) {
         const existingAcc = existingAccRes.rows[0];
-        portalUsername = existingAcc.username;
-        portalTempPassword = existingAcc.temp_password || `Med#${Math.floor(1000 + Math.random() * 9000)}!ET`;
-        portalSetupToken = crypto.randomBytes(16).toString('hex');
-        const setupExpires = new Date(Date.now() + 24 * 60 * 60 * 1000);
+        portalAccessKey = existingAcc.access_key || ('mf_key_' + crypto.randomBytes(24).toString('hex'));
         await pool.query(
           `UPDATE pharmacy_portal_accounts 
-           SET setup_token = $1, setup_token_expires_at = $2 
+           SET access_key = $1, telegram_chat_id = COALESCE(telegram_chat_id, $2)
            WHERE id = $3`,
-          [portalSetupToken, setupExpires, existingAcc.id]
+          [portalAccessKey, appRow.telegram_chat_id, existingAcc.id]
         );
       } else {
-        let candidateUsername = baseUsername;
-        let counter = 1;
-        while (true) {
-          const checkUser = await pool.query(
-            'SELECT id FROM pharmacy_portal_accounts WHERE LOWER(username) = LOWER($1)',
-            [candidateUsername]
-          );
-          if (checkUser.rows.length === 0) break;
-          candidateUsername = `${baseUsername}_${counter++}`;
-        }
-        portalUsername = candidateUsername;
-        const tempCode = Math.floor(1000 + Math.random() * 9000);
-        portalTempPassword = `Med#${tempCode}!ET`;
-        const passwordHash = this.hashPassword(portalTempPassword);
-        portalSetupToken = crypto.randomBytes(16).toString('hex');
-        const setupExpires = new Date(Date.now() + 24 * 60 * 60 * 1000);
-        const accountId = `acc-${crypto.randomBytes(4).toString('hex')}`;
+        portalAccessKey = 'mf_key_' + crypto.randomBytes(24).toString('hex');
+        const sessionToken = 'sess_' + crypto.randomBytes(32).toString('hex');
+        const sessionExpiresAt = new Date(Date.now() + 180 * 24 * 60 * 60 * 1000);
+        const accountId = `acc-${crypto.randomBytes(6).toString('hex')}`;
 
         await pool.query(
           `INSERT INTO pharmacy_portal_accounts (
-             id, pharmacy_id, pharmacy_name, sub_city, phone, username,
-             password_hash, temp_password, setup_token, setup_token_expires_at,
-             must_change_password, created_at
+             id, pharmacy_id, pharmacy_name, sub_city, phone,
+             access_key, telegram_chat_id, session_token, session_expires_at,
+             created_at
            )
-           VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, TRUE, NOW())`,
+           VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, NOW())`,
           [
             accountId,
             pharmId,
             appRow.pharmacy_name,
             appRow.sub_city,
             appRow.phone,
-            portalUsername,
-            passwordHash,
-            portalTempPassword,
-            portalSetupToken,
-            setupExpires,
+            portalAccessKey,
+            appRow.telegram_chat_id,
+            sessionToken,
+            sessionExpiresAt,
           ]
         );
       }
 
+      portalUsername = portalAccessKey;
+      portalSetupToken = portalAccessKey;
+
       await pool.query(
         `UPDATE pharmacy_verification_applications
-         SET approved_pharmacy_id = $1, portal_username = $2, portal_temp_password = $3, portal_setup_token = $4
-         WHERE id = $5`,
-        [pharmId, portalUsername, portalTempPassword, portalSetupToken, id]
+         SET approved_pharmacy_id = $1, portal_access_key = $2, portal_username = $2, portal_setup_token = $2
+         WHERE id = $3`,
+        [pharmId, portalAccessKey, id]
       );
     } else if (status === 'REJECTED') {
       if (appRow.approved_pharmacy_id) {
@@ -707,195 +685,138 @@ export class PostgresRepository implements IDatabaseRepository {
     };
   }
 
-  public async authenticatePharmacy(
-    username: string,
-    password: string
-  ): Promise<{ success: boolean; account?: PharmacyPortalAccount; token?: string; error?: string }> {
+  public async magicLoginWithKey(
+    accessKey: string
+  ): Promise<{ success: boolean; account?: PharmacyPortalAccount; token?: string; sessionExpiresAt?: string; error?: string }> {
     const pool = getDbPool();
     if (!pool) return { success: false, error: 'Database offline' };
+    if (!accessKey) return { success: false, error: 'Access key is required' };
 
     const res = await pool.query(
-      `SELECT * FROM pharmacy_portal_accounts WHERE LOWER(username) = LOWER($1)`,
-      [username.trim()]
+      `SELECT * FROM pharmacy_portal_accounts WHERE access_key = $1 OR setup_token = $1`,
+      [accessKey.trim()]
     );
 
-    if (res.rows.length === 0) return { success: false, error: 'Invalid username or password' };
-    const acc = res.rows[0];
-
-    const hash = this.hashPassword(password);
-    if (acc.password_hash !== hash) {
-      return { success: false, error: 'Invalid username or password' };
+    if (res.rows.length === 0) {
+      return { success: false, error: 'Invalid or unrecognized 1-Click access key. Open @MedFinder_Verifier_bot and type /key to get a new link.' };
     }
 
-    const token = 'sess_' + crypto.randomBytes(16).toString('hex');
+    const acc = res.rows[0];
+    const sessionToken = 'sess_' + crypto.randomBytes(32).toString('hex');
+    const sessionExpiresAt = new Date(Date.now() + 180 * 24 * 60 * 60 * 1000);
+
     await pool.query(
-      `UPDATE pharmacy_portal_accounts SET session_token = $1, last_login_at = NOW() WHERE id = $2`,
-      [token, acc.id]
+      `UPDATE pharmacy_portal_accounts 
+       SET session_token = $1, session_expires_at = $2, last_login_at = NOW() 
+       WHERE id = $3`,
+      [sessionToken, sessionExpiresAt, acc.id]
     );
 
     return {
       success: true,
-      token,
+      token: sessionToken,
+      sessionExpiresAt: sessionExpiresAt.toISOString(),
       account: {
         id: acc.id,
         pharmacyId: acc.pharmacy_id,
         pharmacyName: acc.pharmacy_name,
         subCity: acc.sub_city,
         phone: acc.phone,
-        username: acc.username,
-        passwordHash: acc.password_hash,
-        tempPassword: acc.temp_password || undefined,
-        setupToken: acc.setup_token || undefined,
-        setupTokenExpiresAt: acc.setup_token_expires_at ? new Date(acc.setup_token_expires_at).toISOString() : undefined,
-        mustChangePassword: Boolean(acc.must_change_password),
+        accessKey: acc.access_key || accessKey.trim(),
+        telegramChatId: acc.telegram_chat_id || undefined,
+        sessionToken,
+        sessionExpiresAt: sessionExpiresAt.toISOString(),
         createdAt: new Date(acc.created_at).toISOString(),
         lastLoginAt: new Date().toISOString(),
-        sessionToken: token,
       },
     };
   }
 
-  public async getAccountBySetupToken(setupToken: string): Promise<PharmacyPortalAccount | null> {
-    const pool = getDbPool();
-    if (!pool || !setupToken) return null;
-
-    const res = await pool.query(
-      `SELECT * FROM pharmacy_portal_accounts WHERE setup_token = $1`,
-      [setupToken.trim()]
-    );
-    if (res.rows.length === 0) return null;
-    const acc = res.rows[0];
-
-    return {
-      id: acc.id,
-      pharmacyId: acc.pharmacy_id,
-      pharmacyName: acc.pharmacy_name,
-      subCity: acc.sub_city,
-      phone: acc.phone,
-      username: acc.username,
-      passwordHash: acc.password_hash,
-      tempPassword: acc.temp_password || undefined,
-      setupToken: acc.setup_token || undefined,
-      setupTokenExpiresAt: acc.setup_token_expires_at ? new Date(acc.setup_token_expires_at).toISOString() : undefined,
-      mustChangePassword: Boolean(acc.must_change_password),
-      createdAt: new Date(acc.created_at).toISOString(),
-      lastLoginAt: acc.last_login_at ? new Date(acc.last_login_at).toISOString() : undefined,
-      sessionToken: acc.session_token || undefined,
-    };
-  }
-
-  public async activateAccountWithToken(
-    setupToken: string,
-    newPassword: string,
-    customUsername?: string
-  ): Promise<{ success: boolean; account?: PharmacyPortalAccount; token?: string; error?: string }> {
-    const pool = getDbPool();
-    if (!pool || !setupToken) return { success: false, error: 'Database offline or invalid token' };
-
-    const res = await pool.query(
-      `SELECT * FROM pharmacy_portal_accounts WHERE setup_token = $1`,
-      [setupToken.trim()]
-    );
-    if (res.rows.length === 0) return { success: false, error: 'Invalid or expired setup token' };
-    const targetAcc = res.rows[0];
-
-    if (targetAcc.setup_token_expires_at && new Date(targetAcc.setup_token_expires_at).getTime() < Date.now()) {
-      return { success: false, error: 'Setup link has expired. Please contact EFDA support or request a new link.' };
-    }
-
-    if (!newPassword || newPassword.length < 8) {
-      return { success: false, error: 'Password must be at least 8 characters long' };
-    }
-
-    let finalUsername = targetAcc.username;
-    if (customUsername && customUsername.trim().length >= 3) {
-      const cleanCustom = customUsername.trim().toLowerCase().replace(/[^a-z0-9_]/g, '');
-      if (cleanCustom !== targetAcc.username) {
-        const checkConflict = await pool.query(
-          `SELECT id FROM pharmacy_portal_accounts WHERE LOWER(username) = LOWER($1) AND id != $2`,
-          [cleanCustom, targetAcc.id]
-        );
-        if (checkConflict.rows.length > 0) {
-          return { success: false, error: 'Chosen username is already taken. Please choose another.' };
-        }
-        finalUsername = cleanCustom;
-      }
-    }
-
-    const newHash = this.hashPassword(newPassword);
-    const sessionToken = 'sess_' + crypto.randomBytes(16).toString('hex');
-
-    await pool.query(
-      `UPDATE pharmacy_portal_accounts 
-       SET username = $1, password_hash = $2, must_change_password = FALSE,
-           temp_password = NULL, setup_token = NULL, setup_token_expires_at = NULL,
-           session_token = $3, last_login_at = NOW()
-       WHERE id = $4`,
-      [finalUsername, newHash, sessionToken, targetAcc.id]
-    );
-
-    const updatedAccount: PharmacyPortalAccount = {
-      id: targetAcc.id,
-      pharmacyId: targetAcc.pharmacy_id,
-      pharmacyName: targetAcc.pharmacy_name,
-      subCity: targetAcc.sub_city,
-      phone: targetAcc.phone,
-      username: finalUsername,
-      passwordHash: newHash,
-      mustChangePassword: false,
-      createdAt: new Date(targetAcc.created_at).toISOString(),
-      sessionToken,
-      lastLoginAt: new Date().toISOString(),
-    };
-
-    return { success: true, account: updatedAccount, token: sessionToken };
-  }
-
-  public async changePharmacyPassword(
-    username: string,
-    currentPassword: string,
-    newPassword: string
-  ): Promise<{ success: boolean; account?: PharmacyPortalAccount; error?: string }> {
+  public async sendPharmacyLoginOtp(
+    phone: string
+  ): Promise<{ success: boolean; otpCode?: string; telegramChatId?: string; pharmacyName?: string; error?: string }> {
     const pool = getDbPool();
     if (!pool) return { success: false, error: 'Database offline' };
 
+    const cleanPhone = phone.trim().replace(/[^0-9]/g, '');
     const res = await pool.query(
-      `SELECT * FROM pharmacy_portal_accounts WHERE LOWER(username) = LOWER($1)`,
-      [username.trim()]
+      `SELECT * FROM pharmacy_portal_accounts WHERE REGEXP_REPLACE(phone, '[^0-9]', '', 'g') = $1 OR REGEXP_REPLACE(phone, '[^0-9]', '', 'g') LIKE '%' || $1 LIMIT 1`,
+      [cleanPhone]
     );
-    if (res.rows.length === 0) return { success: false, error: 'Account not found' };
+
+    if (res.rows.length === 0) {
+      return { success: false, error: 'No registered pharmacy found with this phone number. Please register via @MedFinder_Verifier_bot.' };
+    }
+
     const acc = res.rows[0];
+    const otpCode = Math.floor(1000 + Math.random() * 9000).toString();
+    const otpExpires = new Date(Date.now() + 10 * 60 * 1000);
 
-    const currentHash = this.hashPassword(currentPassword);
-    if (acc.password_hash !== currentHash) {
-      return { success: false, error: 'Current password incorrect' };
-    }
-
-    if (!newPassword || newPassword.length < 8) {
-      return { success: false, error: 'New password must be at least 8 characters long' };
-    }
-
-    const newHash = this.hashPassword(newPassword);
     await pool.query(
-      `UPDATE pharmacy_portal_accounts 
-       SET password_hash = $1, must_change_password = FALSE,
-           temp_password = NULL, setup_token = NULL, setup_token_expires_at = NULL
-       WHERE id = $2`,
-      [newHash, acc.id]
+      `UPDATE pharmacy_portal_accounts SET last_otp_code = $1, last_otp_expires_at = $2 WHERE id = $3`,
+      [otpCode, otpExpires, acc.id]
     );
 
     return {
       success: true,
+      otpCode,
+      telegramChatId: acc.telegram_chat_id || undefined,
+      pharmacyName: acc.pharmacy_name,
+    };
+  }
+
+  public async verifyPharmacyLoginOtp(
+    phone: string,
+    otpCode: string
+  ): Promise<{ success: boolean; account?: PharmacyPortalAccount; token?: string; sessionExpiresAt?: string; error?: string }> {
+    const pool = getDbPool();
+    if (!pool) return { success: false, error: 'Database offline' };
+
+    const cleanPhone = phone.trim().replace(/[^0-9]/g, '');
+    const res = await pool.query(
+      `SELECT * FROM pharmacy_portal_accounts WHERE REGEXP_REPLACE(phone, '[^0-9]', '', 'g') = $1 OR REGEXP_REPLACE(phone, '[^0-9]', '', 'g') LIKE '%' || $1 LIMIT 1`,
+      [cleanPhone]
+    );
+
+    if (res.rows.length === 0) {
+      return { success: false, error: 'Pharmacy account not found' };
+    }
+
+    const acc = res.rows[0];
+    if (!acc.last_otp_code || acc.last_otp_code !== otpCode.trim()) {
+      return { success: false, error: 'Invalid 4-digit code. Please check your Telegram message and retry.' };
+    }
+
+    if (acc.last_otp_expires_at && new Date(acc.last_otp_expires_at).getTime() < Date.now()) {
+      return { success: false, error: 'Login code has expired (10 minutes limit). Please request a new code.' };
+    }
+
+    const sessionToken = 'sess_' + crypto.randomBytes(32).toString('hex');
+    const sessionExpiresAt = new Date(Date.now() + 180 * 24 * 60 * 60 * 1000);
+
+    await pool.query(
+      `UPDATE pharmacy_portal_accounts 
+       SET session_token = $1, session_expires_at = $2, last_otp_code = NULL, last_otp_expires_at = NULL, last_login_at = NOW() 
+       WHERE id = $3`,
+      [sessionToken, sessionExpiresAt, acc.id]
+    );
+
+    return {
+      success: true,
+      token: sessionToken,
+      sessionExpiresAt: sessionExpiresAt.toISOString(),
       account: {
         id: acc.id,
         pharmacyId: acc.pharmacy_id,
         pharmacyName: acc.pharmacy_name,
         subCity: acc.sub_city,
         phone: acc.phone,
-        username: acc.username,
-        passwordHash: newHash,
-        mustChangePassword: false,
+        accessKey: acc.access_key || '',
+        telegramChatId: acc.telegram_chat_id || undefined,
+        sessionToken,
+        sessionExpiresAt: sessionExpiresAt.toISOString(),
         createdAt: new Date(acc.created_at).toISOString(),
+        lastLoginAt: new Date().toISOString(),
       },
     };
   }
@@ -911,22 +832,116 @@ export class PostgresRepository implements IDatabaseRepository {
     if (res.rows.length === 0) return null;
     const acc = res.rows[0];
 
+    // Enforce 180-day expiry
+    if (acc.session_expires_at && new Date(acc.session_expires_at).getTime() < Date.now()) {
+      return null;
+    }
+
     return {
       id: acc.id,
       pharmacyId: acc.pharmacy_id,
       pharmacyName: acc.pharmacy_name,
       subCity: acc.sub_city,
       phone: acc.phone,
-      username: acc.username,
-      passwordHash: acc.password_hash,
-      tempPassword: acc.temp_password || undefined,
-      setupToken: acc.setup_token || undefined,
-      setupTokenExpiresAt: acc.setup_token_expires_at ? new Date(acc.setup_token_expires_at).toISOString() : undefined,
-      mustChangePassword: Boolean(acc.must_change_password),
+      accessKey: acc.access_key || '',
+      telegramChatId: acc.telegram_chat_id || undefined,
+      sessionToken: acc.session_token || undefined,
+      sessionExpiresAt: acc.session_expires_at ? new Date(acc.session_expires_at).toISOString() : undefined,
       createdAt: new Date(acc.created_at).toISOString(),
       lastLoginAt: acc.last_login_at ? new Date(acc.last_login_at).toISOString() : undefined,
-      sessionToken: acc.session_token || undefined,
     };
+  }
+
+  public async getAccountByAccessKey(accessKey: string): Promise<PharmacyPortalAccount | null> {
+    const pool = getDbPool();
+    if (!pool || !accessKey) return null;
+
+    const res = await pool.query(
+      `SELECT * FROM pharmacy_portal_accounts WHERE access_key = $1 OR setup_token = $1 LIMIT 1`,
+      [accessKey.trim()]
+    );
+    if (res.rows.length === 0) return null;
+    const acc = res.rows[0];
+    return {
+      id: acc.id,
+      pharmacyId: acc.pharmacy_id,
+      pharmacyName: acc.pharmacy_name,
+      subCity: acc.sub_city,
+      phone: acc.phone,
+      accessKey: acc.access_key || '',
+      telegramChatId: acc.telegram_chat_id || undefined,
+      sessionToken: acc.session_token || undefined,
+      sessionExpiresAt: acc.session_expires_at ? new Date(acc.session_expires_at).toISOString() : undefined,
+      createdAt: new Date(acc.created_at).toISOString(),
+      lastLoginAt: acc.last_login_at ? new Date(acc.last_login_at).toISOString() : undefined,
+    };
+  }
+
+  public async getAccountByPharmacyId(pharmacyId: string): Promise<PharmacyPortalAccount | null> {
+    const pool = getDbPool();
+    if (!pool || !pharmacyId) return null;
+
+    const res = await pool.query(
+      `SELECT * FROM pharmacy_portal_accounts WHERE pharmacy_id = $1 LIMIT 1`,
+      [pharmacyId.trim()]
+    );
+    if (res.rows.length === 0) return null;
+    const acc = res.rows[0];
+    return {
+      id: acc.id,
+      pharmacyId: acc.pharmacy_id,
+      pharmacyName: acc.pharmacy_name,
+      subCity: acc.sub_city,
+      phone: acc.phone,
+      accessKey: acc.access_key || '',
+      telegramChatId: acc.telegram_chat_id || undefined,
+      sessionToken: acc.session_token || undefined,
+      sessionExpiresAt: acc.session_expires_at ? new Date(acc.session_expires_at).toISOString() : undefined,
+      createdAt: new Date(acc.created_at).toISOString(),
+      lastLoginAt: acc.last_login_at ? new Date(acc.last_login_at).toISOString() : undefined,
+    };
+  }
+
+  public async getAccountByTelegramChatId(chatId: string): Promise<PharmacyPortalAccount | null> {
+    const pool = getDbPool();
+    if (!pool || !chatId) return null;
+
+    const res = await pool.query(
+      `SELECT * FROM pharmacy_portal_accounts WHERE telegram_chat_id = $1 LIMIT 1`,
+      [chatId.trim()]
+    );
+    if (res.rows.length === 0) return null;
+    const acc = res.rows[0];
+    return {
+      id: acc.id,
+      pharmacyId: acc.pharmacy_id,
+      pharmacyName: acc.pharmacy_name,
+      subCity: acc.sub_city,
+      phone: acc.phone,
+      accessKey: acc.access_key || '',
+      telegramChatId: acc.telegram_chat_id || undefined,
+      sessionToken: acc.session_token || undefined,
+      sessionExpiresAt: acc.session_expires_at ? new Date(acc.session_expires_at).toISOString() : undefined,
+      createdAt: new Date(acc.created_at).toISOString(),
+      lastLoginAt: acc.last_login_at ? new Date(acc.last_login_at).toISOString() : undefined,
+    };
+  }
+
+  // Deprecated backward compatibility methods
+  public async authenticatePharmacy(username: string, _password?: string): Promise<{ success: boolean; account?: PharmacyPortalAccount; token?: string; error?: string }> {
+    return this.magicLoginWithKey(username);
+  }
+
+  public async getAccountBySetupToken(setupToken: string): Promise<PharmacyPortalAccount | null> {
+    return this.getAccountByAccessKey(setupToken);
+  }
+
+  public async activateAccountWithToken(setupToken: string, _newPass?: string): Promise<{ success: boolean; account?: PharmacyPortalAccount; token?: string; error?: string }> {
+    return this.magicLoginWithKey(setupToken);
+  }
+
+  public async changePharmacyPassword(_username: string, _curr: string, _new: string): Promise<{ success: boolean; account?: PharmacyPortalAccount; error?: string }> {
+    return { success: true };
   }
 
   public async authenticateAdmin(

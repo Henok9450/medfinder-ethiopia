@@ -1,6 +1,7 @@
 import https from 'https';
 import fs from 'fs';
 import path from 'path';
+import crypto from 'crypto';
 import { InMemoryDatabase, TelegramBotSession, PharmacyVerificationApplication, Pharmacy, MASTER_MEDICINE_CATALOG, ReservationHold } from '../database/in-memory-db';
 import { getDatabaseRepository, IDatabaseRepository } from '../database';
 import { BroadcastMatchingService } from '../matching/broadcast-matching.service';
@@ -540,11 +541,42 @@ export class TelegramVerificationBotService {
   }
 
   /**
-   * Get 1-Click Secure Account Setup Link for newly verified pharmacy
+   * Get 1-Click Secure Passwordless Counter Access Link for pharmacy
+   */
+  public getPharmacyPortalAccessUrl(accessKey: string): string {
+    const host = process.env.BASE_URL || process.env.APP_BASE_URL || 'https://medfinder-ethiopia.onrender.com';
+    return `${host.replace(/\/$/, '')}/pharmacy?key=${encodeURIComponent(accessKey)}`;
+  }
+
+  /**
+   * Get 1-Click Secure Account Setup Link for newly verified pharmacy (alias)
    */
   public getPharmacyPortalSetupUrl(setupToken: string): string {
-    const host = process.env.BASE_URL || process.env.APP_BASE_URL || 'https://medfinder-ethiopia.onrender.com';
-    return `${host.replace(/\/$/, '')}/pharmacy?setupToken=${encodeURIComponent(setupToken)}`;
+    return this.getPharmacyPortalAccessUrl(setupToken);
+  }
+
+  /**
+   * Dispatch instant 4-digit counter login OTP to verified pharmacy via Telegram
+   */
+  public async notifyPharmacyOtp(chatId: string, otpCode: string, pharmacyName?: string): Promise<boolean> {
+    const token = this.pharmacyBot.token || this.patientBot.token;
+    if (!token || !chatId || chatId.startsWith('tg_')) return false;
+    const message = `🔐 *የካውንተር መግቢያ ኮድ (Counter Login Code)*\n\n` +
+      `ፋርማሲ፦ *${pharmacyName || 'Your Pharmacy'}*\n` +
+      `የእርስዎ ባለ 4-አሃዝ ኮድ፦ \`${otpCode}\`\n\n` +
+      `⚠️ ይህ ኮድ ለ10 ደቂቃ ብቻ ያገለግላል። ለማንም አያጋሩት።\n` +
+      `💡 ኮድ መጻፍ ካልፈለጉ በ /key 1-ክሊክ መግቢያዎን ማግኘት ይችላሉ።`;
+    try {
+      const res = await dispatchTelegramApi(token, 'sendMessage', {
+        chat_id: chatId,
+        text: message,
+        parse_mode: 'Markdown',
+      });
+      return res.ok;
+    } catch (err: any) {
+      console.warn('[TelegramBot] Failed to send OTP message:', err.message);
+      return false;
+    }
   }
 
   /**
@@ -1725,6 +1757,50 @@ Type **/status** at any time to monitor progress.
         };
       }
 
+      // 5B. Counter 1-Click Key (/key or /counter or /login)
+      if (cleanText === '/key' || cleanText === '/counter' || cleanText === '/login' || cleanText === '/magic') {
+        const account = (await this.repo.getAccountByTelegramChatId(chatId)) ||
+          this.db.getAccountByTelegramChatId(chatId);
+        const app = this.db.verificationApplications.find((a) => a.telegramChatId === chatId && a.status === 'APPROVED');
+        const pharmacy = this.getPharmacyForChatId(chatId);
+
+        const accessKey = account?.accessKey || app?.portalAccessKey;
+
+        if (account || (app && accessKey)) {
+          const portalUrl = this.getWebStudioUrl();
+          const key = accessKey || `mf_key_${crypto.randomBytes(24).toString('hex')}`;
+          const magicUrl = `${portalUrl}?key=${encodeURIComponent(key)}`;
+          const pharmName = account?.pharmacyName || app?.pharmacyName || pharmacy?.name || 'Your Pharmacy';
+
+          return {
+            chatId,
+            replyText: `🔑 **የካውንተር 1-ክሊክ መግቢያ ቁልፍ (1-Click Counter Key)**\n\n` +
+              `🏥 **${pharmName}**\n\n` +
+              `ይህን ሊንክ በካውንተር ኮምፒውተርዎ ወይም ስልክዎ ላይ ይክፈቱ፦\n` +
+              `👉 ${magicUrl}\n\n` +
+              `━━━━━━━━━━━━━━━━━━━━━━\n` +
+              `💡 **ምንም የይለፍ ቃል አያስፈልግዎትም!**\n` +
+              `• አንዴ በካውንተር መሳሪያዎ ላይ ሲከፍቱት ለ **6 ወራት (180 ቀናት)** ያለማቋረጥ እንደገባ ይቆያል።\n` +
+              `• መሳሪያ ወይም ብራውዘር ሲቀይሩ በማንኛውም ጊዜ በዚህ ቦት **/key** ብለው ሲልኩ አዲስ 1-ክሊክ ቁልፍ ያገኛሉ።`,
+            quickReplies: ['/key', '/status', '/help', '/start'],
+            inlineKeyboard: [
+              [{ text: '🏥 Open Counter Studio (1-Click)', url: magicUrl }]
+            ],
+            sessionStep: 'START',
+          };
+        } else {
+          return {
+            chatId,
+            replyText: `⚠️ **የተረጋገጠ የፋርማሲ አካውንት አልተገኘም**\n\n` +
+              `የ 1-ክሊክ ካውንተር ቁልፍ የሚሰጠው በEFDA ለተረጋገጡ ፋርማሲዎች ብቻ ነው።\n\n` +
+              `• አዲስ ፋርማሲ ለማረጋገጥ 👉 **/verify**\n` +
+              `• የማመልከቻዎን ሁኔታ ለማየት 👉 **/status**`,
+            quickReplies: ['/verify', '/status', '/help'],
+            sessionStep: 'START',
+          };
+        }
+      }
+
       // 6. Help / Guidelines for EFDA Accreditation (/help)
       if (cleanText === '/help' || cleanText.includes('መመሪያ')) {
         return {
@@ -1741,11 +1817,15 @@ Type **/status** at any time to monitor progress.
 ማመልከቻዎ እንደገባ በ24 ሰዓታት ውስጥ በMedFinder የቁጥጥር እና ተገዢነት ቡድን (Compliance Desk) ከEFDA iRIS ዳታቤዝ ጋር ተገናኝቶ ይረጋገጣል።
 
 👉 ምዝገባ ለመጀመር፦ **/verify**
-👉 ሁኔታዎን ለማየት፦ **/status**`,
-          quickReplies: ['/verify', '/status', '/start'],
+👉 ሁኔታዎን ለማየት፦ **/status**
+👉 የ 1-ክሊክ ካውንተር መግቢያ ቁልፍ ለማግኘት፦ **/key**`,
+          quickReplies: ['/key', '/verify', '/status', '/start'],
           inlineKeyboard: [
             [
+              { text: '🔑 የካውንተር ቁልፍ (/key)', callback_data: '/key' },
               { text: '🏢 አዲስ ፋርማሲ አስመዝግብ (/verify)', callback_data: '/verify' },
+            ],
+            [
               { text: '📋 ሁኔታ ፈትሽ (/status)', callback_data: '/status' },
             ]
           ],
@@ -2437,11 +2517,52 @@ ${itemsDisplay}
       };
     }
 
+    if (cleanText === '/key' || cleanText === '/counter' || cleanText === '/login' || cleanText === '/magic') {
+      const account = (await this.repo.getAccountByTelegramChatId(chatId)) ||
+        this.db.getAccountByTelegramChatId(chatId);
+      const app = this.db.verificationApplications?.find((a) => a.telegramChatId === chatId && a.status === 'APPROVED');
+      const pharmacy = this.getPharmacyForChatId(chatId);
+
+      const accessKey = account?.accessKey || app?.portalAccessKey;
+
+      if (account || (app && accessKey)) {
+        const portalUrl = this.getWebStudioUrl();
+        const key = accessKey || `mf_key_${crypto.randomBytes(24).toString('hex')}`;
+        const magicUrl = `${portalUrl}?key=${encodeURIComponent(key)}`;
+        const pharmName = account?.pharmacyName || app?.pharmacyName || pharmacy?.name || 'Your Pharmacy';
+
+        return {
+          chatId,
+          replyText: `🔑 **የካውንተር 1-ክሊክ መግቢያ ቁልፍ (1-Click Counter Key)**\n\n` +
+            `🏥 **${pharmName}**\n\n` +
+            `ይህን ሊንክ በካውንተር ኮምፒውተርዎ ወይም ስልክዎ ላይ ይክፈቱ፦\n` +
+            `👉 ${magicUrl}\n\n` +
+            `━━━━━━━━━━━━━━━━━━━━━━\n` +
+            `💡 **ምንም የይለፍ ቃል አያስፈልግዎትም!**\n` +
+            `• አንዴ በካውንተር መሳሪያዎ ላይ ሲከፍቱት ለ **6 ወራት (180 ቀናት)** ያለማቋረጥ እንደገባ ይቆያል።\n` +
+            `• መሳሪያ ወይም ብራውዘር ሲቀይሩ በማንኛውም ጊዜ በዚህ ቦት **/key** ብለው ሲልኩ አዲስ 1-ክሊክ ቁልፍ ያገኛሉ።`,
+          quickReplies: ['/inventory', '/key', '/import_checklist', '/help'],
+          inlineKeyboard: [
+            [{ text: '🏥 Open Counter Studio (1-Click)', url: magicUrl }]
+          ]
+        };
+      } else {
+        return {
+          chatId,
+          replyText: `⚠️ **የተረጋገጠ የፋርማሲ አካውንት አልተገኘም**\n\n` +
+            `የ 1-ክሊክ ካውንተር ቁልፍ የሚሰጠው በEFDA ለተረጋገጡ ፋርማሲዎች ብቻ ነው።\n\n` +
+            `• አዲስ ፋርማሲ ለማረጋገጥ 👉 **/verify**\n` +
+            `• የማመልከቻዎን ሁኔታ ለማየት 👉 **/status**`,
+          quickReplies: ['/verify', '/status', '/help']
+        };
+      }
+    }
+
     if (cleanText === '/help') {
       return {
         chatId,
-        replyText: `📖 **MedFinder Ethiopia — ፈጣን መመሪያ (Guide)**\n\n💊 **ለመድኃኒት ፈላጊዎች (Patients):**\n• የመድኃኒት ስም በቀጥታ በመጻፍ ይፈልጉ (ምሳሌ፦ *Insulin*)\n• በአቅራቢያዎ ያሉ ፋርማሲዎችን፣ ትክክለኛ ዋጋ እና ስልክ ያግኙ\n• ለ60 ደቂቃ ዋጋውን ለማስያዝ የ /hold ቁልፍን ይጫኑ\n• ሚኒ አፑን ለመክፈት 👉 **/miniapp**\n\n🏥 **ለፋርማሲዎች (Pharmacies):**\n• ይፋዊ ማረጋገጫ ለማግኘት 👉 **/verify**\n• የማመልከቻዎን ሁኔታ ለማየት 👉 **/status**\n• የመድኃኒት መደርደሪያዎን ለማየትና ለመቆጣጠር 👉 **/inventory**\n• 15ቱን ዋና መድኃኒቶች በቅጽበት ለመጫን 👉 **/import_checklist**\n• አዲስ መድኃኒት ለመጨመር 👉 **/add <ስም> <ዋጋ>** (ምሳሌ፦ \`/add Amoxicillin 85\`)\n• ክምችት አለቀ/ገባ ለማለት 👉 **/toggle_<ስም>** (ምሳሌ፦ \`/toggle_Insulin\`)`,
-        quickReplies: ['💊 Insulin', '/inventory', '/import_checklist', '📱 Open Mini App', '/verify', '/status'],
+        replyText: `📖 **MedFinder Ethiopia — ፈጣን መመሪያ (Guide)**\n\n💊 **ለመድኃኒት ፈላጊዎች (Patients):**\n• የመድኃኒት ስም በቀጥታ በመጻፍ ይፈልጉ (ምሳሌ፦ *Insulin*)\n• በአቅራቢያዎ ያሉ ፋርማሲዎችን፣ ትክክለኛ ዋጋ እና ስልክ ያግኙ\n• ለ60 ደቂቃ ዋጋውን ለማስያዝ የ /hold ቁልፍን ይጫኑ\n• ሚኒ አፑን ለመክፈት 👉 **/miniapp**\n\n🏥 **ለፋርማሲዎች (Pharmacies):**\n• ይፋዊ ማረጋገጫ ለማግኘት 👉 **/verify**\n• የማመልከቻዎን ሁኔታ ለማየት 👉 **/status**\n• የ 1-ክሊክ ካውንተር መግቢያ ቁልፍ ለማግኘት 👉 **/key**\n• የመድኃኒት መደርደሪያዎን ለማየትና ለመቆጣጠር 👉 **/inventory**\n• 15ቱን ዋና መድኃኒቶች በቅጽበት ለመጫን 👉 **/import_checklist**\n• አዲስ መድኃኒት ለመጨመር 👉 **/add <ስም> <ዋጋ>** (ምሳሌ፦ \`/add Amoxicillin 85\`)\n• ክምችት አለቀ/ገባ ለማለት 👉 **/toggle_<ስም>** (ምሳሌ፦ \`/toggle_Insulin\`)`,
+        quickReplies: ['💊 Insulin', '/inventory', '/key', '/import_checklist', '📱 Open Mini App', '/verify'],
         inlineKeyboard: [
           [{ text: '📱 Open Telegram Mini App', web_app: { url: this.getMiniAppUrl() } }],
           [{ text: '🖥️ Open Web Pharmacy Studio', url: this.getWebStudioUrl() }]
@@ -2950,7 +3071,7 @@ Send **"Confirm"** to submit to the EFDA Compliance Desk.`;
     }
 
     // Keep in-memory cache synchronized if app has new credentials
-    if (app && app.portalUsername) {
+    if (app && (app.portalAccessKey || app.portalUsername)) {
       const existingIdx = this.db.verificationApplications.findIndex((a) => a.id === app?.id || a.telegramChatId === chatId);
       if (existingIdx >= 0) {
         this.db.verificationApplications[existingIdx] = { ...this.db.verificationApplications[existingIdx], ...app };
@@ -2958,10 +3079,13 @@ Send **"Confirm"** to submit to the EFDA Compliance Desk.`;
     }
 
     const portalUrl = this.getWebStudioUrl();
-    const setupToken = app?.portalSetupToken;
-    const setupUrl = setupToken ? this.getPharmacyPortalSetupUrl(setupToken) : portalUrl;
-    const username = app?.portalUsername || 'pharmacist';
-    const tempPassword = app?.portalTempPassword || 'Med#8492!ET';
+    let accessKey = app?.portalAccessKey;
+    if (!accessKey) {
+      const acc = (await this.repo.getAccountByTelegramChatId(chatId)) ||
+        this.db.getAccountByTelegramChatId(chatId);
+      accessKey = acc?.accessKey || `mf_key_${crypto.randomBytes(24).toString('hex')}`;
+    }
+    const magicUrl = `${portalUrl}?key=${encodeURIComponent(accessKey || '')}`;
 
     if (status === 'APPROVED') {
       message = `
@@ -2975,21 +3099,21 @@ Send **"Confirm"** to submit to the EFDA Compliance Desk.`;
 • የፋርማሲዎ ትክክለኛ ጂፒኤስ እና የመድኃኒት ክምችት በታካሚዎች የፍለጋ ራዳር ላይ በቅድሚያ ይታያል።
 
 ━━━━━━━━━━━━━━━━━━━━━━
-🔐 **የፋርማሲ ፖርታል መግቢያ (Pharmacy PWA Portal Access):**
-የመድኃኒት መደርደሪያዎን፣ ዋጋዎችን እና የታካሚዎችን ጥያቄዎች ለመቆጣጠር በፖርታሉ ይግቡ፦
+🔐 **የካውንተር 1-ክሊክ መግቢያ (Passwordless Counter Access):**
+ምንም አይነት የይለፍ ቃል ማስታወስ አያስፈልግዎትም! ከታች ያለውን ሊንክ በካውንተር መሳሪያዎ ላይ ይክፈቱ፦
 
-🌐 **ፖርታል ሊንክ (Portal URL):** ${portalUrl}
-👤 **የመግቢያ ስም (Username):** \`${username}\`
-🔑 **ጊዜያዊ የይለፍ ቃል (Initial Password):** \`${tempPassword}\`
-⚠️ *ማሳሰቢያ፦ ለመጀመሪያ ጊዜ ሲገቡ አዲስ ቋሚ የይለፍ ቃል እንዲመርጡ ይጠየቃሉ።*
+👉 **1-ክሊክ መግቢያ (Magic Key):**
+${magicUrl}
 
-ወይም በ 1-ክሊክ ያለምንም የይለፍ ቃል በቀጥታ ለማስተካከል፦
-👉 ${setupUrl}
+💡 **የካውንተር ምቾት፦**
+• **ለ 6 ወራት (180 ቀናት)** ያለማቋረጥ እንደገባ ይቆያል!
+• መሳሪያ ወይም ብራውዘር ሲቀይሩ በማንኛውም ጊዜ በዚህ ቦት **/key** በማለት አዲሱን ሊንክ ማግኘት ይችላሉ።
 ━━━━━━━━━━━━━━━━━━━━━━
 📦 **በቴሌግራም ቦት ለመቆጣጠር (Telegram Quick Commands):**
 1️⃣ 15ቱን ዋና ዋና መድኃኒቶች ለመጫን 👉 **/import_checklist**
 2️⃣ መደርደሪያዎን ለማየትና ለመቆጣጠር 👉 **/inventory**
 3️⃣ አዲስ መድኃኒት ለመጨመር 👉 **/add <ስም> <ዋጋ>** (ምሳሌ፦ \`/add Amoxicillin 85\`)
+4️⃣ የካውንተር ቁልፍዎን ለማግኘት 👉 **/key**
 ━━━━━━━━━━━━━━━━━━━━━━
 ማስታወሻ፦ ${adminNotes || 'CoC verified against EFDA iRIS registry.'}
 `;
@@ -3037,8 +3161,8 @@ Send **"Confirm"** to submit to the EFDA Compliance Desk.`;
         if (status === 'APPROVED') {
           payload.reply_markup = {
             inline_keyboard: [
-              [{ text: '🏥 Open Pharmacy Studio PWA', url: setupUrl }],
-              [{ text: '🌐 Direct Portal URL (/pharmacy)', url: portalUrl }]
+              [{ text: '🏥 Open Counter Studio (1-Click)', url: magicUrl }],
+              [{ text: '🔑 Counter Key (/key)', callback_data: '/key' }]
             ]
           };
         } else if (status === 'INFO_REQUESTED') {

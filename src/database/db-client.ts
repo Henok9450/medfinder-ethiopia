@@ -85,15 +85,16 @@ export async function runMigrations(): Promise<{ success: boolean; message: stri
       ALTER TABLE reservations ADD COLUMN IF NOT EXISTS acknowledged_at TIMESTAMPTZ;
     `);
 
-    // Ensure portal credential columns exist on pharmacy_verification_applications
+    // Ensure passwordless portal columns exist on pharmacy_verification_applications
     await p.query(`
       ALTER TABLE pharmacy_verification_applications ADD COLUMN IF NOT EXISTS approved_pharmacy_id TEXT;
+      ALTER TABLE pharmacy_verification_applications ADD COLUMN IF NOT EXISTS portal_access_key TEXT;
       ALTER TABLE pharmacy_verification_applications ADD COLUMN IF NOT EXISTS portal_username TEXT;
       ALTER TABLE pharmacy_verification_applications ADD COLUMN IF NOT EXISTS portal_temp_password TEXT;
       ALTER TABLE pharmacy_verification_applications ADD COLUMN IF NOT EXISTS portal_setup_token TEXT;
     `);
 
-    // Ensure pharmacy_portal_accounts table exists
+    // Ensure pharmacy_portal_accounts table exists with passwordless columns
     await p.query(`
       CREATE TABLE IF NOT EXISTS pharmacy_portal_accounts (
         id TEXT PRIMARY KEY,
@@ -101,16 +102,29 @@ export async function runMigrations(): Promise<{ success: boolean; message: stri
         pharmacy_name TEXT NOT NULL,
         sub_city TEXT NOT NULL,
         phone TEXT NOT NULL,
-        username TEXT UNIQUE NOT NULL,
-        password_hash TEXT NOT NULL,
+        access_key TEXT,
+        telegram_chat_id TEXT,
+        session_expires_at TIMESTAMPTZ,
+        last_otp_code TEXT,
+        last_otp_expires_at TIMESTAMPTZ,
+        username TEXT,
+        password_hash TEXT,
         temp_password TEXT,
         setup_token TEXT,
         setup_token_expires_at TIMESTAMPTZ,
-        must_change_password BOOLEAN DEFAULT TRUE,
+        must_change_password BOOLEAN DEFAULT FALSE,
         created_at TIMESTAMPTZ DEFAULT NOW(),
         last_login_at TIMESTAMPTZ,
         session_token TEXT
       );
+
+      ALTER TABLE pharmacy_portal_accounts ADD COLUMN IF NOT EXISTS access_key TEXT;
+      ALTER TABLE pharmacy_portal_accounts ADD COLUMN IF NOT EXISTS telegram_chat_id TEXT;
+      ALTER TABLE pharmacy_portal_accounts ADD COLUMN IF NOT EXISTS session_expires_at TIMESTAMPTZ;
+      ALTER TABLE pharmacy_portal_accounts ADD COLUMN IF NOT EXISTS last_otp_code TEXT;
+      ALTER TABLE pharmacy_portal_accounts ADD COLUMN IF NOT EXISTS last_otp_expires_at TIMESTAMPTZ;
+      ALTER TABLE pharmacy_portal_accounts ALTER COLUMN password_hash DROP NOT NULL;
+      ALTER TABLE pharmacy_portal_accounts ALTER COLUMN username DROP NOT NULL;
     `);
 
     // Ensure analytics_access column on pharmacies and search_analytics_events table exist

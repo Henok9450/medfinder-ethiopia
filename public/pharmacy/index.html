@@ -114,7 +114,7 @@
   <main class="flex-1 max-w-7xl w-full mx-auto p-4 md:p-6 space-y-6">
 
     <!-- ============================================================== -->
-    <!-- VIEW 1: AUTHENTICATION CONTAINER (LOGIN & 1-CLICK SETUP)       -->
+    <!-- VIEW 1: AUTHENTICATION CONTAINER (PASSWORDLESS & 1-CLICK KEY) -->
     <!-- ============================================================== -->
     <section id="authSection" class="max-w-md mx-auto my-8 space-y-6">
       
@@ -123,85 +123,117 @@
         
         <div class="text-center space-y-2">
           <div class="w-14 h-14 rounded-2xl bg-emerald-50 text-emerald-700 flex items-center justify-center text-2xl mx-auto shadow-inner border border-emerald-100">
-            <i class="fa-solid fa-shield-halved"></i>
+            <i class="fa-solid fa-key"></i>
           </div>
-          <h2 id="authHeading" class="text-xl font-extrabold text-slate-900 tracking-tight">Pharmacy Studio Login</h2>
-          <p id="authSubheading" class="text-xs text-slate-500">Sign in with your verified credentials or 1-click Telegram setup token.</p>
+          <h2 id="authHeading" class="text-xl font-extrabold text-slate-900 tracking-tight">Pharmacy Counter Studio</h2>
+          <p id="authSubheading" class="text-xs text-slate-500">
+            Passwordless Counter Authentication — 6-Month persistent counter session backed by <span class="text-emerald-700 font-semibold">@MedFinder_Verifier_bot</span>.
+          </p>
         </div>
 
-        <!-- AUTH TABS: Sign In vs 1-Click Setup -->
+        <!-- AUTH TABS: 1-Click Key vs Instant Phone OTP -->
         <div class="flex p-1 bg-slate-100 rounded-xl text-xs font-semibold">
-          <button id="tabBtnLogin" onclick="switchAuthMode('login')" class="flex-1 py-2 rounded-lg bg-white shadow-sm text-slate-900 transition">
-            Password Login
+          <button id="tabBtnMagicKey" onclick="switchAuthMode('key')" class="flex-1 py-2 rounded-lg bg-white shadow-sm text-slate-900 font-bold transition">
+            1-Click Telegram Key
           </button>
-          <button id="tabBtnSetup" onclick="switchAuthMode('setup')" class="flex-1 py-2 rounded-lg text-slate-500 hover:text-slate-800 transition">
-            1-Click Setup Token
+          <button id="tabBtnPhoneOtp" onclick="switchAuthMode('otp')" class="flex-1 py-2 rounded-lg text-slate-500 hover:text-slate-800 transition">
+            Instant Phone OTP
           </button>
         </div>
 
-        <!-- FORM A: STANDARD USERNAME & PASSWORD -->
-        <form id="loginForm" onsubmit="handleLoginSubmit(event)" class="space-y-4">
-          <div>
-            <label class="block text-xs font-medium text-slate-600 mb-1">Username / የስራ መታወቂያ ስም</label>
-            <div class="relative">
-              <i class="fa-solid fa-user absolute left-3.5 top-3 text-slate-400 text-xs"></i>
-              <input type="text" id="loginUsername" required placeholder="e.g. kenema_bole_412" class="w-full text-xs pl-9 pr-3 py-2.5 rounded-xl border border-slate-300 focus:ring-2 focus:ring-emerald-500 outline-none">
+        <!-- TAB 1: 1-CLICK MAGIC KEY -->
+        <div id="panelMagicKey" class="space-y-4">
+          <div class="p-3.5 bg-sky-50 border border-sky-200 rounded-2xl text-sky-950 text-xs space-y-2">
+            <div class="flex items-center space-x-2 font-bold text-sky-900">
+              <i class="fa-brands fa-telegram text-sky-600 text-sm"></i>
+              <span>Open on Counter Device via Telegram Bot</span>
             </div>
+            <p class="text-[11px] text-sky-800 leading-relaxed">
+              Upon EFDA approval, your verified Telegram bot gave you a 1-click counter link. Clicking that link automatically unlocks this studio on your counter device for <strong>6 months</strong> without any passwords!
+            </p>
+            <a href="https://t.me/MedFinder_Verifier_bot?start=key" target="_blank" class="w-full inline-flex items-center justify-center space-x-1.5 bg-sky-600 hover:bg-sky-700 text-white font-bold py-2 rounded-xl text-xs transition shadow-sm">
+              <i class="fa-brands fa-telegram"></i>
+              <span>Get 1-Click Key on @MedFinder_Verifier_bot</span>
+            </a>
           </div>
 
-          <div>
-            <label class="block text-xs font-medium text-slate-600 mb-1">Password / የይለፍ ቃል</label>
-            <div class="relative">
-              <i class="fa-solid fa-lock absolute left-3.5 top-3 text-slate-400 text-xs"></i>
-              <input type="password" id="loginPassword" required placeholder="Initial password from Telegram" class="w-full text-xs pl-9 pr-10 py-2.5 rounded-xl border border-slate-300 focus:ring-2 focus:ring-emerald-500 outline-none">
-              <button type="button" onclick="togglePasswordVisibility('loginPassword', 'eyeIcon1')" class="absolute right-3 top-3 text-slate-400 hover:text-slate-600 text-xs">
-                <i id="eyeIcon1" class="fa-solid fa-eye"></i>
-              </button>
+          <form id="keyForm" onsubmit="handleMagicKeySubmit(event)" class="space-y-3">
+            <div>
+              <label class="block text-xs font-medium text-slate-600 mb-1">Or Paste 1-Click Access Key / የመግቢያ ቁልፍ</label>
+              <div class="relative">
+                <i class="fa-solid fa-fingerprint absolute left-3.5 top-3 text-slate-400 text-xs"></i>
+                <input type="text" id="accessKeyInput" required placeholder="mf_key_..." class="w-full text-xs pl-9 pr-3 py-2.5 rounded-xl border border-slate-300 font-mono focus:ring-2 focus:ring-emerald-500 outline-none">
+              </div>
             </div>
+
+            <div id="keyAlertBox" class="hidden p-3 rounded-xl text-xs"></div>
+
+            <button type="submit" id="keySubmitBtn" class="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs py-3 rounded-xl shadow-md transition flex items-center justify-center space-x-2">
+              <i class="fa-solid fa-arrow-right-to-bracket"></i>
+              <span>Unlock Counter Studio (6-Month Session)</span>
+            </button>
+          </form>
+        </div>
+
+        <!-- TAB 2: INSTANT PHONE OTP -->
+        <div id="panelPhoneOtp" class="hidden space-y-4">
+          <div class="p-3 bg-emerald-50 border border-emerald-200 rounded-2xl text-emerald-950 text-xs flex items-start space-x-2">
+            <i class="fa-solid fa-shield-halved text-emerald-600 mt-0.5"></i>
+            <span class="text-[11px] leading-relaxed">
+              Enter your verified pharmacy contact phone number. A 4-digit instant login code will be delivered to your Telegram bot and SMS.
+            </span>
           </div>
 
-          <div id="loginAlertBox" class="hidden p-3 rounded-xl text-xs"></div>
+          <!-- Step 1: Phone Request -->
+          <form id="otpPhoneForm" onsubmit="handleRequestOtpSubmit(event)" class="space-y-3">
+            <div>
+              <label class="block text-xs font-medium text-slate-600 mb-1">Pharmacy Phone Number / የስራ ስልክ ቁጥር</label>
+              <div class="relative">
+                <i class="fa-solid fa-phone absolute left-3.5 top-3 text-slate-400 text-xs"></i>
+                <input type="tel" id="otpPhoneInput" required placeholder="0911223344 or +251911..." class="w-full text-xs pl-9 pr-3 py-2.5 rounded-xl border border-slate-300 focus:ring-2 focus:ring-emerald-500 outline-none">
+              </div>
+            </div>
 
-          <button type="submit" id="loginSubmitBtn" class="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs py-3 rounded-xl shadow-md transition flex items-center justify-center space-x-2">
-            <i class="fa-solid fa-arrow-right-to-bracket"></i>
-            <span>Sign In to Studio</span>
-          </button>
-        </form>
+            <button type="submit" id="otpPhoneBtn" class="w-full bg-slate-900 hover:bg-black text-white font-bold text-xs py-3 rounded-xl shadow-md transition flex items-center justify-center space-x-2">
+              <i class="fa-solid fa-paper-plane text-emerald-400"></i>
+              <span>Send 4-Digit Login Code</span>
+            </button>
+          </form>
 
-        <!-- FORM B: 1-CLICK ACTIVATION VIA SETUP TOKEN -->
-        <form id="setupForm" onsubmit="handleSetupSubmit(event)" class="hidden space-y-4">
-          <div class="p-3 bg-sky-50 border border-sky-200 rounded-xl text-sky-900 text-xs flex items-start space-x-2">
-            <i class="fa-solid fa-circle-info text-sky-600 mt-0.5"></i>
-            <span>Enter the 24-hour setup token sent by <strong>@MedFinder_Verifier_bot</strong> upon EFDA approval.</span>
+          <!-- Step 2: Code Verification (Shown after code sent) -->
+          <form id="otpVerifyForm" onsubmit="handleVerifyOtpSubmit(event)" class="hidden space-y-3 pt-2 border-t border-slate-100">
+            <div>
+              <label class="block text-xs font-medium text-slate-600 mb-1">Enter 4-Digit Code / ባለ 4-አሃዝ ኮድ</label>
+              <input type="text" id="otpCodeInput" maxlength="6" required placeholder="e.g. 8492" class="w-full text-center text-lg font-mono tracking-widest py-2 rounded-xl border border-slate-300 focus:ring-2 focus:ring-emerald-500 outline-none">
+            </div>
+
+            <button type="submit" id="otpVerifyBtn" class="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs py-3 rounded-xl shadow-md transition flex items-center justify-center space-x-2">
+              <i class="fa-solid fa-check-circle"></i>
+              <span>Verify & Unlock Studio</span>
+            </button>
+
+            <button type="button" onclick="resetOtpStep()" class="w-full text-slate-500 hover:text-slate-700 text-center text-[11px] underline">
+              Change phone number
+            </button>
+          </form>
+
+          <div id="otpAlertBox" class="hidden p-3 rounded-xl text-xs"></div>
+        </div>
+
+        <!-- Security & Persistence Guarantee Badge -->
+        <div class="p-3 bg-slate-50 rounded-2xl border border-slate-100 flex items-center space-x-3 text-slate-600">
+          <div class="w-8 h-8 rounded-xl bg-white shadow-sm flex items-center justify-center text-emerald-600 text-sm border border-slate-200">
+            <i class="fa-solid fa-lock"></i>
           </div>
-
-          <div>
-            <label class="block text-xs font-medium text-slate-600 mb-1">Setup Token / የማግበሪያ ቁጥር</label>
-            <input type="text" id="setupTokenInput" required placeholder="Paste token from Telegram link" class="w-full text-xs px-3 py-2.5 rounded-xl border border-slate-300 font-mono focus:ring-2 focus:ring-emerald-500 outline-none">
+          <div class="text-[11px] leading-tight">
+            <span class="font-bold text-slate-800">Zero Password Burden:</span> Counter device remains logged in for <strong>6 Months (180 days)</strong>.
           </div>
-
-          <div>
-            <label class="block text-xs font-medium text-slate-600 mb-1">Choose Permanent Password / ቋሚ የይለፍ ቃል</label>
-            <input type="password" id="setupNewPassword" required minlength="8" placeholder="Minimum 8 characters" class="w-full text-xs px-3 py-2.5 rounded-xl border border-slate-300 focus:ring-2 focus:ring-emerald-500 outline-none">
-          </div>
-
-          <div>
-            <label class="block text-xs font-medium text-slate-600 mb-1">Optional: Custom Username</label>
-            <input type="text" id="setupCustomUsername" placeholder="e.g. aster_pharmacy" class="w-full text-xs px-3 py-2.5 rounded-xl border border-slate-300 focus:ring-2 focus:ring-emerald-500 outline-none">
-          </div>
-
-          <div id="setupAlertBox" class="hidden p-3 rounded-xl text-xs"></div>
-
-          <button type="submit" id="setupSubmitBtn" class="w-full bg-slate-900 hover:bg-black text-white font-bold text-xs py-3 rounded-xl shadow-md transition flex items-center justify-center space-x-2">
-            <i class="fa-solid fa-key text-emerald-400"></i>
-            <span>Set Password & Activate Portal</span>
-          </button>
-        </form>
+        </div>
 
         <!-- Bottom Assistance Callout -->
-        <div class="pt-4 border-t border-slate-100 text-center space-y-2">
+        <div class="pt-2 border-t border-slate-100 text-center space-y-2">
           <p class="text-[11px] text-slate-500">
-            Need an account? Only verified Ethiopian pharmacies can access this Studio.
+            Need EFDA verification? Only verified Ethiopian pharmacies can access this Studio.
           </p>
           <a href="https://t.me/MedFinder_Verifier_bot?start=verify" target="_blank" class="inline-flex items-center space-x-1.5 text-xs font-bold text-sky-700 hover:underline">
             <i class="fa-brands fa-telegram"></i>
@@ -558,9 +590,9 @@
                 <i class="fa-brands fa-telegram text-sky-600"></i>
                 <span>Open @MedFinder_Verifier_bot</span>
               </a>
-              <button onclick="openChangePasswordModal()" class="w-full bg-sky-500/30 hover:bg-sky-500/40 text-white text-xs font-semibold py-2 rounded-xl border border-white/20 transition flex items-center justify-center space-x-1.5">
-                <i class="fa-solid fa-key text-xs"></i>
-                <span>Update Portal Password</span>
+              <button onclick="copyCounterMagicLink()" class="w-full bg-sky-500/30 hover:bg-sky-500/40 text-white text-xs font-semibold py-2 rounded-xl border border-white/20 transition flex items-center justify-center space-x-1.5">
+                <i class="fa-solid fa-link text-xs"></i>
+                <span id="copyLinkBtnText">Copy 1-Click Counter Link</span>
               </button>
             </div>
           </div>
@@ -813,40 +845,7 @@
     </div>
   </div>
 
-  <!-- ============================================================== -->
-  <!-- MODAL 4: FORCED / OPTIONAL PASSWORD CHANGE                     -->
-  <!-- ============================================================== -->
-  <div id="changePasswordModal" class="hidden fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4">
-    <div class="bg-white rounded-3xl max-w-md w-full p-6 shadow-2xl border border-slate-200 space-y-4">
-      <div class="flex items-center justify-between pb-3 border-b border-slate-100">
-        <div>
-          <h3 id="pwdModalTitle" class="font-extrabold text-sm text-slate-900">Set Permanent Secure Password</h3>
-          <p class="text-[11px] text-slate-500">First-time login requires changing your temporary password.</p>
-        </div>
-      </div>
 
-      <form onsubmit="handleChangePasswordSubmit(event)" class="space-y-3 text-xs">
-        <div>
-          <label class="block font-medium text-slate-600 mb-1">Current Password (or Initial Temp Password)</label>
-          <input type="password" id="pwdCurrent" required placeholder="Enter current password" class="w-full text-xs px-3 py-2 border border-slate-300 rounded-xl outline-none focus:ring-2 focus:ring-emerald-500">
-        </div>
-        <div>
-          <label class="block font-medium text-slate-600 mb-1">New Permanent Password (min 8 chars)</label>
-          <input type="password" id="pwdNew" required minlength="8" placeholder="Create strong password" class="w-full text-xs px-3 py-2 border border-slate-300 rounded-xl outline-none focus:ring-2 focus:ring-emerald-500">
-        </div>
-        <div>
-          <label class="block font-medium text-slate-600 mb-1">Confirm New Password</label>
-          <input type="password" id="pwdConfirm" required minlength="8" placeholder="Re-type new password" class="w-full text-xs px-3 py-2 border border-slate-300 rounded-xl outline-none focus:ring-2 focus:ring-emerald-500">
-        </div>
-
-        <div id="pwdAlertBox" class="hidden p-3 rounded-xl text-xs"></div>
-
-        <div class="pt-3 flex justify-end space-x-2">
-          <button type="button" id="pwdCancelBtn" onclick="closeModal('changePasswordModal')" class="px-4 py-2 text-xs font-semibold text-slate-600 hover:bg-slate-100 rounded-lg">Cancel</button>
-          <button type="submit" class="px-5 py-2 text-xs font-bold bg-slate-900 hover:bg-black text-white rounded-xl shadow transition">Save Password</button>
-        </div>
-      </form>
-    </div>
   <!-- ============================================================== -->
   <!-- MODAL 5: PHARMACY COUNTER GPS GUIDE MODAL                      -->
   <!-- ============================================================== -->
@@ -959,18 +958,20 @@
     window.addEventListener('DOMContentLoaded', async () => {
       updateNetworkStatus();
 
-      // Check if URL has ?setupToken=...
+      // 1. Check if URL has ?key=... or ?token=... or ?setupToken=...
       const urlParams = new URLSearchParams(window.location.search);
-      const setupToken = urlParams.get('setupToken');
+      const incomingKey = urlParams.get('key') || urlParams.get('token') || urlParams.get('setupToken');
 
-      if (setupToken) {
-        switchAuthMode('setup');
-        document.getElementById('setupTokenInput').value = setupToken;
-        await verifyTokenDetails(setupToken);
+      if (incomingKey) {
+        const keyInput = document.getElementById('accessKeyInput');
+        if (keyInput) keyInput.value = incomingKey;
+        await performMagicLogin(incomingKey);
+        // Clean URL to prevent key leakage in browser history
+        window.history.replaceState({}, document.title, window.location.pathname);
         return;
       }
 
-      // Check existing saved session in localStorage
+      // 2. Check existing saved session in localStorage (persistent for 6 months)
       const savedToken = localStorage.getItem('medfinder_pharmacy_token');
       if (savedToken) {
         await restoreSession(savedToken);
@@ -979,133 +980,166 @@
       }
     });
 
-    // --- AUTHENTICATION FLOWS ---
+    // --- PASSWORDLESS AUTHENTICATION FLOWS ---
     function switchAuthMode(mode) {
-      const tabLogin = document.getElementById('tabBtnLogin');
-      const tabSetup = document.getElementById('tabBtnSetup');
-      const formLogin = document.getElementById('loginForm');
-      const formSetup = document.getElementById('setupForm');
+      const tabKey = document.getElementById('tabBtnMagicKey');
+      const tabOtp = document.getElementById('tabBtnPhoneOtp');
+      const panelKey = document.getElementById('panelMagicKey');
+      const panelOtp = document.getElementById('panelPhoneOtp');
 
-      if (mode === 'login') {
-        tabLogin.className = 'flex-1 py-2 rounded-lg bg-white shadow-sm text-slate-900 transition font-bold';
-        tabSetup.className = 'flex-1 py-2 rounded-lg text-slate-500 hover:text-slate-800 transition';
-        formLogin.classList.remove('hidden');
-        formSetup.classList.add('hidden');
-        document.getElementById('authHeading').innerText = 'Pharmacy Studio Login';
+      if (mode === 'key') {
+        tabKey.className = 'flex-1 py-2 rounded-lg bg-white shadow-sm text-slate-900 font-bold transition';
+        tabOtp.className = 'flex-1 py-2 rounded-lg text-slate-500 hover:text-slate-800 transition';
+        panelKey.classList.remove('hidden');
+        panelOtp.classList.add('hidden');
       } else {
-        tabSetup.className = 'flex-1 py-2 rounded-lg bg-white shadow-sm text-slate-900 transition font-bold';
-        tabLogin.className = 'flex-1 py-2 rounded-lg text-slate-500 hover:text-slate-800 transition';
-        formSetup.classList.remove('hidden');
-        formLogin.classList.add('hidden');
-        document.getElementById('authHeading').innerText = 'Activate Pharmacy Account';
+        tabOtp.className = 'flex-1 py-2 rounded-lg bg-white shadow-sm text-slate-900 font-bold transition';
+        tabKey.className = 'flex-1 py-2 rounded-lg text-slate-500 hover:text-slate-800 transition';
+        panelOtp.classList.remove('hidden');
+        panelKey.classList.add('hidden');
       }
     }
 
-    async function verifyTokenDetails(token) {
-      try {
-        const res = await fetch(`/api/pharmacy/auth/verify-token?token=${encodeURIComponent(token)}`);
-        const data = await res.json();
-        const alertBox = document.getElementById('setupAlertBox');
-        if (data.success) {
-          alertBox.className = 'p-3 rounded-xl text-xs bg-emerald-50 text-emerald-800 border border-emerald-200';
-          alertBox.innerHTML = `✅ Token valid for <strong>${data.pharmacyName}</strong> (${data.subCity}). Set your password below.`;
-          alertBox.classList.remove('hidden');
-          if (data.username) {
-            document.getElementById('setupCustomUsername').value = data.username;
-          }
-        } else {
-          alertBox.className = 'p-3 rounded-xl text-xs bg-rose-50 text-rose-800 border border-rose-200';
-          alertBox.innerHTML = `⚠️ ${data.error || 'Token expired or invalid'}`;
-          alertBox.classList.remove('hidden');
-        }
-      } catch (err) {
-        console.error('Error verifying token:', err);
+    async function performMagicLogin(accessKey) {
+      const btn = document.getElementById('keySubmitBtn');
+      const alertBox = document.getElementById('keyAlertBox');
+
+      if (btn) {
+        btn.disabled = true;
+        btn.innerHTML = `<i class="fa-solid fa-spinner fa-spin"></i><span>Unlocking Counter Studio...</span>`;
       }
-    }
-
-    async function handleLoginSubmit(e) {
-      e.preventDefault();
-      const btn = document.getElementById('loginSubmitBtn');
-      const alertBox = document.getElementById('loginAlertBox');
-      const username = document.getElementById('loginUsername').value.trim();
-      const password = document.getElementById('loginPassword').value;
-
-      btn.disabled = true;
-      btn.innerText = 'Verifying...';
-      alertBox.classList.add('hidden');
+      if (alertBox) alertBox.classList.add('hidden');
 
       try {
-        const res = await fetch('/api/pharmacy/auth/login', {
+        const res = await fetch('/api/pharmacy/auth/magic-login', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ username, password })
+          body: JSON.stringify({ accessKey })
         });
         const data = await res.json();
 
         if (data.success && data.token) {
           currentAuthSession = data;
           localStorage.setItem('medfinder_pharmacy_token', data.token);
-
-          if (data.mustChangePassword) {
-            // Force first-time password change!
-            document.getElementById('pwdCurrent').value = password;
-            openChangePasswordModal(true);
-          } else {
-            activateStudioDashboard(data);
+          activateStudioDashboard(data);
+        } else {
+          showAuthView();
+          if (alertBox) {
+            alertBox.className = 'p-3 rounded-xl text-xs bg-rose-50 text-rose-800 border border-rose-200';
+            alertBox.innerHTML = `<i class="fa-solid fa-circle-exclamation mr-1"></i> ${data.error || 'Invalid or expired counter key. Send /key to @MedFinder_Verifier_bot to generate a new key.'}`;
+            alertBox.classList.remove('hidden');
           }
+        }
+      } catch (err) {
+        showAuthView();
+        if (alertBox) {
+          alertBox.className = 'p-3 rounded-xl text-xs bg-rose-50 text-rose-800 border border-rose-200';
+          alertBox.innerHTML = `Server connection error: ${err.message}`;
+          alertBox.classList.remove('hidden');
+        }
+      } finally {
+        if (btn) {
+          btn.disabled = false;
+          btn.innerHTML = `<i class="fa-solid fa-arrow-right-to-bracket"></i><span>Unlock Counter Studio (6-Month Session)</span>`;
+        }
+      }
+    }
+
+    async function handleMagicKeySubmit(e) {
+      e.preventDefault();
+      const key = document.getElementById('accessKeyInput').value.trim();
+      if (!key) return;
+      await performMagicLogin(key);
+    }
+
+    // Phone OTP Flow
+    let currentOtpPhone = '';
+
+    async function handleRequestOtpSubmit(e) {
+      e.preventDefault();
+      const phoneInput = document.getElementById('otpPhoneInput');
+      const phone = phoneInput.value.trim();
+      const btn = document.getElementById('otpPhoneBtn');
+      const alertBox = document.getElementById('otpAlertBox');
+
+      btn.disabled = true;
+      btn.innerHTML = `<i class="fa-solid fa-spinner fa-spin"></i><span>Sending Code...</span>`;
+      alertBox.classList.add('hidden');
+
+      try {
+        const res = await fetch('/api/pharmacy/auth/send-otp', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ phone })
+        });
+        const data = await res.json();
+
+        if (data.success) {
+          currentOtpPhone = phone;
+          alertBox.className = 'p-3 rounded-xl text-xs bg-emerald-50 text-emerald-800 border border-emerald-200';
+          alertBox.innerHTML = `✅ ${data.message || 'Login code sent to Telegram bot & SMS.'}` +
+            (data.demoCode ? ` <br><span class="font-mono font-bold text-emerald-900">Demo Code: ${data.demoCode}</span>` : '');
+          alertBox.classList.remove('hidden');
+
+          document.getElementById('otpPhoneForm').classList.add('hidden');
+          document.getElementById('otpVerifyForm').classList.remove('hidden');
+          document.getElementById('otpCodeInput').focus();
         } else {
           alertBox.className = 'p-3 rounded-xl text-xs bg-rose-50 text-rose-800 border border-rose-200';
-          alertBox.innerHTML = `<i class="fa-solid fa-circle-exclamation mr-1"></i> ${data.error || 'Invalid credentials'}`;
+          alertBox.innerHTML = `⚠️ ${data.error || 'Failed to send code'}`;
           alertBox.classList.remove('hidden');
         }
       } catch (err) {
         alertBox.className = 'p-3 rounded-xl text-xs bg-rose-50 text-rose-800 border border-rose-200';
-        alertBox.innerHTML = `Server error: ${err.message}`;
+        alertBox.innerHTML = `Error: ${err.message}`;
         alertBox.classList.remove('hidden');
       } finally {
         btn.disabled = false;
-        btn.innerText = 'Sign In to Studio';
+        btn.innerHTML = `<i class="fa-solid fa-paper-plane text-emerald-400"></i><span>Send 4-Digit Login Code</span>`;
       }
     }
 
-    async function handleSetupSubmit(e) {
+    async function handleVerifyOtpSubmit(e) {
       e.preventDefault();
-      const btn = document.getElementById('setupSubmitBtn');
-      const alertBox = document.getElementById('setupAlertBox');
-      const setupToken = document.getElementById('setupTokenInput').value.trim();
-      const newPassword = document.getElementById('setupNewPassword').value;
-      const customUsername = document.getElementById('setupCustomUsername').value.trim();
+      const otpCode = document.getElementById('otpCodeInput').value.trim();
+      const btn = document.getElementById('otpVerifyBtn');
+      const alertBox = document.getElementById('otpAlertBox');
 
       btn.disabled = true;
-      btn.innerText = 'Activating...';
-      alertBox.classList.add('hidden');
+      btn.innerHTML = `<i class="fa-solid fa-spinner fa-spin"></i><span>Verifying...</span>`;
 
       try {
-        const res = await fetch('/api/pharmacy/auth/activate-setup', {
+        const res = await fetch('/api/pharmacy/auth/verify-otp', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ setupToken, newPassword, customUsername })
+          body: JSON.stringify({ phone: currentOtpPhone, otpCode })
         });
         const data = await res.json();
 
         if (data.success && data.token) {
           currentAuthSession = data;
           localStorage.setItem('medfinder_pharmacy_token', data.token);
-          alert('🎉 Portal account activated successfully!');
           activateStudioDashboard(data);
         } else {
           alertBox.className = 'p-3 rounded-xl text-xs bg-rose-50 text-rose-800 border border-rose-200';
-          alertBox.innerHTML = `<i class="fa-solid fa-circle-exclamation mr-1"></i> ${data.error || 'Activation failed'}`;
+          alertBox.innerHTML = `⚠️ ${data.error || 'Invalid or expired code. Please try again.'}`;
           alertBox.classList.remove('hidden');
         }
       } catch (err) {
         alertBox.className = 'p-3 rounded-xl text-xs bg-rose-50 text-rose-800 border border-rose-200';
-        alertBox.innerHTML = `Server error: ${err.message}`;
+        alertBox.innerHTML = `Error: ${err.message}`;
         alertBox.classList.remove('hidden');
       } finally {
         btn.disabled = false;
-        btn.innerText = 'Set Password & Activate Portal';
+        btn.innerHTML = `<i class="fa-solid fa-check-circle"></i><span>Verify & Unlock Studio</span>`;
       }
+    }
+
+    function resetOtpStep() {
+      document.getElementById('otpPhoneForm').classList.remove('hidden');
+      document.getElementById('otpVerifyForm').classList.add('hidden');
+      document.getElementById('otpCodeInput').value = '';
+      document.getElementById('otpAlertBox').classList.add('hidden');
     }
 
     async function restoreSession(token) {
@@ -1123,7 +1157,6 @@
           showAuthView();
         }
       } catch (err) {
-        // If offline, check if we have cached pharmacy info
         showAuthView();
       }
     }
@@ -1249,10 +1282,42 @@
     }
 
     function logoutPharmacy() {
-      if (confirm('Are you sure you want to log out of this counter session?')) {
+      if (confirm('Are you sure you want to sign out of this counter session?')) {
+        const token = localStorage.getItem('medfinder_pharmacy_token');
+        if (token) {
+          fetch('/api/pharmacy/auth/logout', {
+            method: 'POST',
+            headers: { 'Authorization': `Bearer ${token}` }
+          }).catch(() => {});
+        }
         localStorage.removeItem('medfinder_pharmacy_token');
         currentAuthSession = null;
         window.location.href = '/pharmacy';
+      }
+    }
+
+    function copyCounterMagicLink() {
+      const accessKey = currentAuthSession?.account?.accessKey;
+      if (!accessKey) {
+        alert('Active counter session is authenticated. You can also request a new key on Telegram using /key.');
+        return;
+      }
+      const url = `${window.location.origin}/pharmacy?key=${encodeURIComponent(accessKey)}`;
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(url).then(() => {
+          const btnText = document.getElementById('copyLinkBtnText');
+          if (btnText) {
+            const orig = btnText.innerText;
+            btnText.innerText = '✅ Link Copied!';
+            setTimeout(() => { btnText.innerText = orig; }, 3000);
+          } else {
+            alert('1-Click Counter Link copied to clipboard!\n\n' + url);
+          }
+        }).catch(() => {
+          prompt('Copy this 1-click counter link:', url);
+        });
+      } else {
+        prompt('Copy this 1-click counter link:', url);
       }
     }
 
@@ -1944,72 +2009,9 @@
       loadCounterReservations();
     }
 
-    // --- PASSWORD CHANGE MODAL ---
-    function openChangePasswordModal(isForced = false) {
-      const modal = document.getElementById('changePasswordModal');
-      const cancelBtn = document.getElementById('pwdCancelBtn');
-      modal.classList.remove('hidden');
-      if (isForced) {
-        cancelBtn.classList.add('hidden');
-        document.getElementById('pwdModalTitle').innerText = 'Mandatory: Set Permanent Password';
-      } else {
-        cancelBtn.classList.remove('hidden');
-        document.getElementById('pwdModalTitle').innerText = 'Update Portal Password';
-      }
-    }
-
-    async function handleChangePasswordSubmit(e) {
-      e.preventDefault();
-      const currentPassword = document.getElementById('pwdCurrent').value;
-      const newPassword = document.getElementById('pwdNew').value;
-      const confirmPassword = document.getElementById('pwdConfirm').value;
-      const alertBox = document.getElementById('pwdAlertBox');
-      const username = currentAuthSession?.account?.username;
-
-      if (newPassword !== confirmPassword) {
-        alertBox.className = 'p-3 rounded-xl text-xs bg-rose-50 text-rose-800 border border-rose-200';
-        alertBox.innerText = 'New passwords do not match.';
-        alertBox.classList.remove('hidden');
-        return;
-      }
-
-      try {
-        const res = await fetch('/api/pharmacy/auth/change-password', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ username, currentPassword, newPassword })
-        });
-        const data = await res.json();
-        if (data.success) {
-          alert('🎉 Permanent password updated successfully!');
-          closeModal('changePasswordModal');
-          if (currentAuthSession) currentAuthSession.mustChangePassword = false;
-          activateStudioDashboard(currentAuthSession);
-        } else {
-          alertBox.className = 'p-3 rounded-xl text-xs bg-rose-50 text-rose-800 border border-rose-200';
-          alertBox.innerText = data.error || 'Failed to update password';
-          alertBox.classList.remove('hidden');
-        }
-      } catch (err) {
-        alert('Server error: ' + err.message);
-      }
-    }
-
     // Helper functions
     function closeModal(id) {
       document.getElementById(id).classList.add('hidden');
-    }
-
-    function togglePasswordVisibility(inputId, iconId) {
-      const input = document.getElementById(inputId);
-      const icon = document.getElementById(iconId);
-      if (input.type === 'password') {
-        input.type = 'text';
-        icon.className = 'fa-solid fa-eye-slash';
-      } else {
-        input.type = 'password';
-        icon.className = 'fa-solid fa-eye';
-      }
     }
 
     async function loadActiveBroadcasts() {

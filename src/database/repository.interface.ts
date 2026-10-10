@@ -114,40 +114,47 @@ export interface IDatabaseRepository {
   }>;
 
   /**
-   * Authenticate a pharmacy portal account
+   * Passwordless 1-Click Magic Login with Access Key
+   * Issues a 6-month (180 days) persistent session token
    */
-  authenticatePharmacy(
-    username: string,
-    password: string
-  ): Promise<{ success: boolean; account?: PharmacyPortalAccount; token?: string; error?: string }>;
+  magicLoginWithKey(
+    accessKey: string
+  ): Promise<{ success: boolean; account?: PharmacyPortalAccount; token?: string; sessionExpiresAt?: string; error?: string }>;
 
   /**
-   * Get pharmacy portal account by setup token
+   * Request 4-digit login OTP code to registered Telegram chat
    */
-  getAccountBySetupToken(setupToken: string): Promise<PharmacyPortalAccount | null>;
+  sendPharmacyLoginOtp(
+    phone: string
+  ): Promise<{ success: boolean; otpCode?: string; telegramChatId?: string; pharmacyName?: string; error?: string }>;
 
   /**
-   * Activate pharmacy portal account with setup token and new password
+   * Verify 4-digit login OTP code and issue 180-day persistent session token
    */
-  activateAccountWithToken(
-    setupToken: string,
-    newPassword: string,
-    customUsername?: string
-  ): Promise<{ success: boolean; account?: PharmacyPortalAccount; token?: string; error?: string }>;
+  verifyPharmacyLoginOtp(
+    phone: string,
+    otpCode: string
+  ): Promise<{ success: boolean; account?: PharmacyPortalAccount; token?: string; sessionExpiresAt?: string; error?: string }>;
 
   /**
-   * Change pharmacy portal account password
-   */
-  changePharmacyPassword(
-    username: string,
-    currentPassword: string,
-    newPassword: string
-  ): Promise<{ success: boolean; account?: PharmacyPortalAccount; error?: string }>;
-
-  /**
-   * Get pharmacy portal account by session token
+   * Get pharmacy portal account by session token (verifying 180-day validity)
    */
   getAccountBySession(token: string): Promise<PharmacyPortalAccount | null>;
+
+  /**
+   * Get pharmacy portal account by access key
+   */
+  getAccountByAccessKey(accessKey: string): Promise<PharmacyPortalAccount | null>;
+
+  /**
+   * Get pharmacy portal account by pharmacy ID
+   */
+  getAccountByPharmacyId(pharmacyId: string): Promise<PharmacyPortalAccount | null>;
+
+  /**
+   * Get pharmacy portal account by Telegram chat ID
+   */
+  getAccountByTelegramChatId(chatId: string): Promise<PharmacyPortalAccount | null>;
 
   /**
    * Authenticate an administrative account

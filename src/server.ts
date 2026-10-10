@@ -336,89 +336,17 @@ app.post('/api/pharmacy/respond', (req: Request, res: Response) => {
 });
 
 // ==========================================
-// 3A. PHARMACY PORTAL AUTHENTICATION & SETUP
+// 3A. PHARMACY PORTAL PASSWORDLESS AUTHENTICATION
 // ==========================================
-app.post('/api/pharmacy/auth/login', async (req: Request, res: Response) => {
-  const { username, password } = req.body;
-  if (!username || !password) {
-    return res.status(400).json({ success: false, error: 'Username and password are required' });
+app.post('/api/pharmacy/auth/magic-login', async (req: Request, res: Response) => {
+  const accessKey = String(req.body.accessKey || req.body.key || req.query.key || '').trim();
+  if (!accessKey) {
+    return res.status(400).json({ success: false, error: 'Access key is required' });
   }
 
-  const auth = await dbRepo.authenticatePharmacy(String(username), String(password));
-  if (!auth.success || !auth.account) {
-    return res.status(401).json({ success: false, error: auth.error || 'Invalid credentials' });
-  }
-
-  const pharmacy = await dbRepo.getPharmacyById(auth.account.pharmacyId);
-
-  res.json({
-    success: true,
-    token: auth.token,
-    mustChangePassword: auth.account.mustChangePassword,
-    account: {
-      username: auth.account.username,
-      pharmacyId: auth.account.pharmacyId,
-      pharmacyName: auth.account.pharmacyName,
-      subCity: auth.account.subCity,
-      phone: auth.account.phone,
-    },
-    pharmacy: pharmacy ? {
-      id: pharmacy.id,
-      name: pharmacy.name,
-      subCity: pharmacy.subCity,
-      phone: pharmacy.phone,
-      efdaLicenseNumber: pharmacy.efdaLicenseNumber,
-      tinNumber: pharmacy.tinNumber,
-      isVerified: pharmacy.isVerified,
-      trustScore: pharmacy.trustScore,
-      strikeCount: pharmacy.strikeCount,
-    } : null,
-  });
-});
-
-app.post('/api/pharmacy/auth/change-password', async (req: Request, res: Response) => {
-  const { username, currentPassword, newPassword } = req.body;
-  if (!username || !currentPassword || !newPassword) {
-    return res.status(400).json({ success: false, error: 'username, currentPassword, and newPassword are required' });
-  }
-
-  const result = await dbRepo.changePharmacyPassword(String(username), String(currentPassword), String(newPassword));
-  if (!result.success) {
-    return res.status(400).json({ success: false, error: result.error });
-  }
-
-  res.json({ success: true, message: 'Password updated successfully. You can now access your studio.' });
-});
-
-app.get('/api/pharmacy/auth/verify-token', async (req: Request, res: Response) => {
-  const token = String(req.query.token || '');
-  if (!token) return res.status(400).json({ success: false, error: 'Token is required' });
-
-  const account = await dbRepo.getAccountBySetupToken(token);
-  if (!account) return res.status(404).json({ success: false, error: 'Invalid or expired setup token' });
-
-  if (account.setupTokenExpiresAt && new Date(account.setupTokenExpiresAt).getTime() < Date.now()) {
-    return res.status(410).json({ success: false, error: 'Setup link has expired (24h limit). Please request a new link from EFDA support or via Telegram bot.' });
-  }
-
-  res.json({
-    success: true,
-    pharmacyName: account.pharmacyName,
-    subCity: account.subCity,
-    username: account.username,
-    expiresAt: account.setupTokenExpiresAt,
-  });
-});
-
-app.post('/api/pharmacy/auth/activate-setup', async (req: Request, res: Response) => {
-  const { setupToken, newPassword, customUsername } = req.body;
-  if (!setupToken || !newPassword) {
-    return res.status(400).json({ success: false, error: 'setupToken and newPassword are required' });
-  }
-
-  const result = await dbRepo.activateAccountWithToken(String(setupToken), String(newPassword), customUsername ? String(customUsername) : undefined);
+  const result = await dbRepo.magicLoginWithKey(accessKey);
   if (!result.success || !result.account) {
-    return res.status(400).json({ success: false, error: result.error });
+    return res.status(401).json({ success: false, error: result.error || 'Invalid or expired counter access key' });
   }
 
   const pharmacy = await dbRepo.getPharmacyById(result.account.pharmacyId);
@@ -426,14 +354,14 @@ app.post('/api/pharmacy/auth/activate-setup', async (req: Request, res: Response
   res.json({
     success: true,
     token: result.token,
-    mustChangePassword: false,
-    message: 'Portal account successfully activated!',
+    sessionExpiresAt: result.account.sessionExpiresAt,
     account: {
       username: result.account.username,
       pharmacyId: result.account.pharmacyId,
       pharmacyName: result.account.pharmacyName,
       subCity: result.account.subCity,
       phone: result.account.phone,
+      accessKey: result.account.accessKey,
     },
     pharmacy: pharmacy ? {
       id: pharmacy.id,
@@ -446,6 +374,126 @@ app.post('/api/pharmacy/auth/activate-setup', async (req: Request, res: Response
       trustScore: pharmacy.trustScore,
       strikeCount: pharmacy.strikeCount,
     } : null,
+  });
+});
+
+app.post('/api/pharmacy/auth/send-otp', async (req: Request, res: Response) => {
+  const phone = String(req.body.phone || '').trim();
+  if (!phone) {
+    return res.status(400).json({ success: false, error: 'Phone number is required' });
+  }
+
+  const result = await dbRepo.sendPharmacyLoginOtp(phone);
+  if (!result.success) {
+    return res.status(404).json({ success: false, error: result.error || 'No registered pharmacy found for this phone number' });
+  }
+
+  // If the account has a verified Telegram chat ID, send OTP to Telegram bot immediately
+  if (result.telegramChatId && result.otpCode) {
+    telegramBotService.notifyPharmacyOtp(
+      result.telegramChatId,
+      result.otpCode,
+      result.pharmacyName
+    ).catch((err: any) => console.warn('[OTP Telegram Alert] Failed:', err.message));
+  }
+
+  res.json({
+    success: true,
+    message: 'Login code dispatched to your verified Telegram bot and SMS.',
+    demoCode: process.env.NODE_ENV !== 'production' ? result.otpCode : undefined,
+  });
+});
+
+app.post('/api/pharmacy/auth/verify-otp', async (req: Request, res: Response) => {
+  const { phone, otpCode } = req.body;
+  if (!phone || !otpCode) {
+    return res.status(400).json({ success: false, error: 'Phone number and OTP code are required' });
+  }
+
+  const result = await dbRepo.verifyPharmacyLoginOtp(String(phone).trim(), String(otpCode).trim());
+  if (!result.success || !result.account) {
+    return res.status(401).json({ success: false, error: result.error || 'Invalid or expired OTP code' });
+  }
+
+  const pharmacy = await dbRepo.getPharmacyById(result.account.pharmacyId);
+
+  res.json({
+    success: true,
+    token: result.token,
+    sessionExpiresAt: result.account.sessionExpiresAt,
+    account: {
+      username: result.account.username,
+      pharmacyId: result.account.pharmacyId,
+      pharmacyName: result.account.pharmacyName,
+      subCity: result.account.subCity,
+      phone: result.account.phone,
+      accessKey: result.account.accessKey,
+    },
+    pharmacy: pharmacy ? {
+      id: pharmacy.id,
+      name: pharmacy.name,
+      subCity: pharmacy.subCity,
+      phone: pharmacy.phone,
+      efdaLicenseNumber: pharmacy.efdaLicenseNumber,
+      tinNumber: pharmacy.tinNumber,
+      isVerified: pharmacy.isVerified,
+      trustScore: pharmacy.trustScore,
+      strikeCount: pharmacy.strikeCount,
+    } : null,
+  });
+});
+
+// Unified login supporting accessKey or phone+otp
+app.post('/api/pharmacy/auth/login', async (req: Request, res: Response) => {
+  const { accessKey, key, phone, otpCode, username } = req.body;
+
+  const keyToUse = accessKey || key || (username && String(username).startsWith('mf_key_') ? username : undefined);
+  if (keyToUse) {
+    const result = await dbRepo.magicLoginWithKey(String(keyToUse));
+    if (result.success && result.account) {
+      const pharmacy = await dbRepo.getPharmacyById(result.account.pharmacyId);
+      return res.json({
+        success: true,
+        token: result.token,
+        sessionExpiresAt: result.account.sessionExpiresAt,
+        account: result.account,
+        pharmacy,
+      });
+    }
+    return res.status(401).json({ success: false, error: result.error || 'Invalid access key' });
+  }
+
+  if (phone && otpCode) {
+    const result = await dbRepo.verifyPharmacyLoginOtp(String(phone), String(otpCode));
+    if (result.success && result.account) {
+      const pharmacy = await dbRepo.getPharmacyById(result.account.pharmacyId);
+      return res.json({
+        success: true,
+        token: result.token,
+        sessionExpiresAt: result.account.sessionExpiresAt,
+        account: result.account,
+        pharmacy,
+      });
+    }
+    return res.status(401).json({ success: false, error: result.error || 'Invalid OTP code' });
+  }
+
+  return res.status(400).json({ success: false, error: 'Passwordless 1-click accessKey or phone+otpCode is required' });
+});
+
+app.get('/api/pharmacy/auth/verify-token', async (req: Request, res: Response) => {
+  const key = String(req.query.key || req.query.token || '').trim();
+  if (!key) return res.status(400).json({ success: false, error: 'Key is required' });
+
+  const account = await dbRepo.getAccountByAccessKey(key);
+  if (!account) return res.status(404).json({ success: false, error: 'Invalid or expired counter access key' });
+
+  res.json({
+    success: true,
+    pharmacyName: account.pharmacyName,
+    subCity: account.subCity,
+    username: account.username,
+    accessKey: account.accessKey,
   });
 });
 
@@ -455,19 +503,20 @@ app.get('/api/pharmacy/auth/session', async (req: Request, res: Response) => {
   if (!token) return res.status(401).json({ success: false, error: 'Not authenticated' });
 
   const account = await dbRepo.getAccountBySession(token);
-  if (!account) return res.status(401).json({ success: false, error: 'Session expired or invalid' });
+  if (!account) return res.status(401).json({ success: false, error: 'Session expired (6-month limit reached) or invalid. Use your Telegram 1-click key to reconnect.' });
 
   const pharmacy = await dbRepo.getPharmacyById(account.pharmacyId);
 
   res.json({
     success: true,
-    mustChangePassword: account.mustChangePassword,
+    sessionExpiresAt: account.sessionExpiresAt,
     account: {
       username: account.username,
       pharmacyId: account.pharmacyId,
       pharmacyName: account.pharmacyName,
       subCity: account.subCity,
       phone: account.phone,
+      accessKey: account.accessKey,
     },
     pharmacy: pharmacy ? {
       id: pharmacy.id,
@@ -481,6 +530,19 @@ app.get('/api/pharmacy/auth/session', async (req: Request, res: Response) => {
       strikeCount: pharmacy.strikeCount,
     } : null,
   });
+});
+
+app.post('/api/pharmacy/auth/logout', async (req: Request, res: Response) => {
+  const authHeader = req.headers.authorization || '';
+  const token = authHeader.replace(/^Bearer\s+/i, '') || String(req.body.token || '');
+  if (token) {
+    const account = await dbRepo.getAccountBySession(token);
+    if (account) {
+      account.sessionToken = undefined;
+      account.sessionExpiresAt = undefined;
+    }
+  }
+  res.json({ success: true, message: 'Counter session logged out successfully.' });
 });
 
 // Dedicated Pharmacy PWA direct route
@@ -912,9 +974,33 @@ const requirePrivilege = (privilegeKey: keyof AdminPrivileges) => {
 // UNIFIED PLATFORM AUTHENTICATION (ALL ROLES)
 // ==========================================
 app.post('/api/auth/login', async (req: Request, res: Response) => {
-  const { username, password } = req.body;
+  const { username, password, accessKey, key } = req.body;
+
+  // 0. Support 1-Click Access Key passwordless login
+  const magicKey = accessKey || key || (username && String(username).startsWith('mf_key_') ? username : undefined);
+  if (magicKey) {
+    const magicResult = await dbRepo.magicLoginWithKey(String(magicKey));
+    if (magicResult.success && magicResult.account) {
+      const pharmacy = await dbRepo.getPharmacyById(magicResult.account.pharmacyId);
+      return res.json({
+        success: true,
+        userType: 'PHARMACY',
+        token: magicResult.token,
+        sessionExpiresAt: magicResult.account.sessionExpiresAt,
+        user: {
+          id: magicResult.account.id,
+          username: magicResult.account.username,
+          fullName: magicResult.account.pharmacyName,
+          pharmacyId: magicResult.account.pharmacyId,
+          type: 'PHARMACY',
+        },
+        pharmacy,
+      });
+    }
+  }
+
   if (!username || !password) {
-    return res.status(400).json({ success: false, error: 'Username and password are required' });
+    return res.status(400).json({ success: false, error: 'Username and password or accessKey are required' });
   }
 
   // 1. Check Administrator credentials
@@ -931,27 +1017,7 @@ app.post('/api/auth/login', async (req: Request, res: Response) => {
     });
   }
 
-  // 2. Check Pharmacy credentials
-  const pharmAuth = await dbRepo.authenticatePharmacy(String(username), String(password));
-  if (pharmAuth.success && pharmAuth.account) {
-    const pharmacy = await dbRepo.getPharmacyById(pharmAuth.account.pharmacyId);
-    return res.json({
-      success: true,
-      userType: 'PHARMACY',
-      token: pharmAuth.token,
-      mustChangePassword: pharmAuth.account.mustChangePassword,
-      user: {
-        id: pharmAuth.account.id,
-        username: pharmAuth.account.username,
-        fullName: pharmAuth.account.pharmacyName,
-        pharmacyId: pharmAuth.account.pharmacyId,
-        type: 'PHARMACY'
-      },
-      pharmacy
-    });
-  }
-
-  return res.status(401).json({ success: false, error: 'Invalid username or password' });
+  return res.status(401).json({ success: false, error: 'Invalid credentials. Pharmacies authenticate passwordless with counter accessKey.' });
 });
 
 app.get('/api/auth/session', async (req: Request, res: Response) => {
