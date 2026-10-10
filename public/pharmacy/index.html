@@ -344,6 +344,11 @@
           <span>Demand Radar & Shortages</span>
           <span id="navAnalyticsTierBadge" class="text-[9px] bg-slate-100 text-slate-600 font-bold px-1.5 py-0.2 rounded uppercase">Basic</span>
         </button>
+        <button onclick="switchStudioTab('medsupply')" id="tabNavMedsupply" class="px-4 py-2.5 text-xs font-semibold border-b-2 border-transparent text-slate-500 hover:text-slate-900 whitespace-nowrap transition flex items-center gap-1.5">
+          <i class="fa-solid fa-truck-ramp-box text-indigo-600"></i>
+          <span>MedSupply B2B (Restock)</span>
+          <span class="text-[9px] bg-indigo-100 text-indigo-800 font-extrabold px-1.5 py-0.5 rounded uppercase">2% Fee</span>
+        </button>
       </div>
 
       <!-- ============================================================ -->
@@ -716,6 +721,116 @@
 
       </div>
 
+      <!-- ============================================================ -->
+      <!-- TAB 6: MEDSUPPLY B2B WHOLESALE RESTOCK MARKETPLACE           -->
+      <!-- ============================================================ -->
+      <div id="panelMedsupply" class="hidden space-y-6">
+
+        <div class="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm space-y-5">
+          <!-- Marketplace Header -->
+          <div class="flex flex-wrap items-center justify-between gap-4 pb-4 border-b border-slate-100">
+            <div class="flex items-center space-x-3">
+              <div class="w-12 h-12 rounded-2xl bg-indigo-600 text-white flex items-center justify-center text-xl shadow-md">
+                <i class="fa-solid fa-truck-ramp-box"></i>
+              </div>
+              <div>
+                <div class="flex items-center gap-2">
+                  <h2 class="text-base font-extrabold text-slate-900">MedSupply B2B Wholesale Exchange</h2>
+                  <span class="text-[10px] font-bold px-2 py-0.5 rounded-full uppercase bg-indigo-100 text-indigo-800 border border-indigo-200">
+                    Certified Importers
+                  </span>
+                  <span class="text-[10px] font-bold px-2 py-0.5 rounded-full uppercase bg-emerald-100 text-emerald-800 border border-emerald-200">
+                    2% Platform Commission
+                  </span>
+                </div>
+                <p class="text-xs text-slate-500 mt-0.5">
+                  Restock your shelves directly from EFDA-certified importers & distributors across Addis Ababa with verified batches & fast dispatch.
+                </p>
+              </div>
+            </div>
+
+            <!-- Sub-Navigation Toggle: Catalog vs Orders -->
+            <div class="flex items-center bg-slate-100 p-1 rounded-xl">
+              <button onclick="toggleMedSupplyView('catalog')" id="b2bViewCatalogBtn" class="px-3.5 py-1.5 rounded-lg text-xs font-bold bg-white text-indigo-700 shadow-xs transition">
+                <i class="fa-solid fa-boxes-packing mr-1"></i> Wholesale Catalog
+              </button>
+              <button onclick="toggleMedSupplyView('orders')" id="b2bViewOrdersBtn" class="px-3.5 py-1.5 rounded-lg text-xs font-semibold text-slate-600 hover:text-slate-900 transition">
+                <i class="fa-solid fa-file-invoice mr-1"></i> My Purchase Orders (<span id="b2bOrdersCount">0</span>)
+              </button>
+            </div>
+          </div>
+
+          <!-- SUB-VIEW 1: WHOLESALE CATALOG -->
+          <div id="medSupplyCatalogView" class="space-y-4">
+            <!-- Filter Bar -->
+            <div class="flex flex-wrap items-center justify-between gap-3 bg-slate-50 p-3 rounded-2xl border border-slate-200">
+              <div class="flex flex-wrap items-center gap-2 flex-1">
+                <div class="relative flex-1 min-w-[200px]">
+                  <i class="fa-solid fa-magnifying-glass absolute left-3 top-2.5 text-slate-400 text-xs"></i>
+                  <input type="text" id="b2bSearchInput" oninput="debounceB2bSearch()" placeholder="Search wholesale medicines, active ingredients..." class="w-full text-xs pl-8 pr-3 py-2 bg-white border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-indigo-500">
+                </div>
+                <select id="b2bCategoryFilter" onchange="loadMedSupplyListings()" class="text-xs bg-white border border-slate-200 rounded-xl px-3 py-2 font-medium text-slate-700 outline-none">
+                  <option value="">All Categories</option>
+                  <option value="Respiratory">Respiratory</option>
+                  <option value="Diabetes">Diabetes</option>
+                  <option value="Antibiotics">Antibiotics</option>
+                  <option value="Cardiovascular">Cardiovascular</option>
+                  <option value="Thyroid">Thyroid</option>
+                  <option value="Pain Management">Pain Management</option>
+                </select>
+              </div>
+
+              <div class="flex items-center gap-2">
+                <button onclick="loadMedSupplyListings()" class="px-3 py-2 text-xs bg-indigo-50 text-indigo-700 hover:bg-indigo-100 rounded-xl font-bold transition flex items-center gap-1">
+                  <i class="fa-solid fa-rotate-right"></i>
+                  <span>Refresh Stock</span>
+                </button>
+              </div>
+            </div>
+
+            <!-- Wholesale Listings Grid -->
+            <div id="b2bListingsContainer" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+              <div class="col-span-full py-12 text-center text-slate-400 text-xs">
+                Loading certified wholesale listings...
+              </div>
+            </div>
+          </div>
+
+          <!-- SUB-VIEW 2: PURCHASE ORDERS TRACKER -->
+          <div id="medSupplyOrdersView" class="hidden space-y-4">
+            <div class="flex items-center justify-between pb-2">
+              <h3 class="text-xs font-bold text-slate-700 uppercase tracking-wider">Purchase Orders Dispatched to Importers</h3>
+              <button onclick="loadWholesaleOrders()" class="text-xs text-indigo-600 hover:underline font-semibold flex items-center gap-1">
+                <i class="fa-solid fa-rotate-right"></i> Refresh Orders
+              </button>
+            </div>
+
+            <div class="overflow-x-auto rounded-2xl border border-slate-200">
+              <table class="w-full text-left text-xs">
+                <thead class="bg-slate-50 text-slate-500 font-semibold border-b border-slate-200">
+                  <tr>
+                    <th class="p-3">PO Number</th>
+                    <th class="p-3">Importer</th>
+                    <th class="p-3">Medicine Ordered</th>
+                    <th class="p-3">Quantity</th>
+                    <th class="p-3">Wholesale Total</th>
+                    <th class="p-3">2% Fee</th>
+                    <th class="p-3">Payment</th>
+                    <th class="p-3">Status</th>
+                    <th class="p-3 text-right">Date</th>
+                  </tr>
+                </thead>
+                <tbody id="b2bOrdersTableTbody" class="divide-y divide-slate-100 bg-white">
+                  <tr><td colspan="9" class="p-6 text-center text-slate-400">Loading purchase orders...</td></tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+        </div>
+
+      </div>
+
     </section>
 
   </main>
@@ -885,6 +1000,119 @@
         </button>
         <button onclick="closeModal('pharmGpsModal')" class="w-full bg-slate-100 hover:bg-slate-200 text-slate-700 font-semibold text-xs py-2.5 rounded-xl transition">
           ይቅር / ዝጋ (Close)
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ============================================================== -->
+  <!-- MODAL 6: B2B WHOLESALE RESTOCK & PURCHASE ORDER MODAL          -->
+  <!-- ============================================================== -->
+  <div id="medSupplyOrderModal" class="hidden fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4">
+    <div class="bg-white rounded-3xl max-w-lg w-full max-h-[90vh] flex flex-col shadow-2xl overflow-hidden border border-slate-200 animate-in fade-in zoom-in duration-150">
+      <div class="p-5 border-b border-slate-100 flex items-center justify-between bg-indigo-50/70">
+        <div class="flex items-center space-x-2.5">
+          <div class="w-9 h-9 rounded-xl bg-indigo-600 text-white flex items-center justify-center text-sm shadow-sm">
+            <i class="fa-solid fa-file-invoice"></i>
+          </div>
+          <div>
+            <h3 class="font-extrabold text-sm text-slate-900">Wholesale Purchase Order</h3>
+            <p class="text-[11px] text-slate-500">MedSupply Exchange • Certified EFDA Importer</p>
+          </div>
+        </div>
+        <button onclick="closeModal('medSupplyOrderModal')" class="text-slate-400 hover:text-slate-700 text-lg px-2">
+          <i class="fa-solid fa-xmark"></i>
+        </button>
+      </div>
+
+      <div class="p-6 overflow-y-auto space-y-4 flex-1 text-xs">
+        <!-- Selected Item & Importer Info Card -->
+        <div class="p-3.5 bg-slate-50 rounded-2xl border border-slate-200 space-y-2">
+          <div class="flex justify-between items-start">
+            <div>
+              <h4 id="poModalDrugName" class="font-black text-sm text-slate-900">Medicine Name</h4>
+              <p id="poModalWholesaler" class="text-xs text-indigo-700 font-semibold mt-0.5">Importer Name PLC</p>
+            </div>
+            <div class="text-right">
+              <span id="poModalUnitPrice" class="text-sm font-black text-slate-900">0 ETB</span>
+              <span class="text-[10px] text-slate-400 block">per unit / box</span>
+            </div>
+          </div>
+
+          <div class="grid grid-cols-2 gap-2 pt-2 border-t border-slate-200/70 text-[11px] text-slate-500">
+            <div>Batch: <strong id="poModalBatch" class="font-mono text-slate-700">—</strong></div>
+            <div>Expiry: <strong id="poModalExpiry" class="font-mono text-slate-700">—</strong></div>
+            <div>EFDA Reg: <strong id="poModalEfda" class="font-mono text-slate-700">—</strong></div>
+            <div>Dispatch: <strong id="poModalDeliveryTime" class="text-emerald-700 font-semibold">2-4 hrs</strong></div>
+          </div>
+        </div>
+
+        <!-- Order Quantity Input & MOQ validation -->
+        <div>
+          <div class="flex justify-between items-center mb-1">
+            <label class="font-bold text-slate-700">Order Quantity (Units / Boxes)</label>
+            <span class="text-[11px] text-indigo-700 font-semibold" id="poModalMoqLabel">Min. Order: 10 units</span>
+          </div>
+          <div class="relative">
+            <input type="number" id="poOrderQtyInput" min="1" oninput="calculatePoPricing()" class="w-full text-base font-extrabold px-3 py-2 border border-slate-300 rounded-xl outline-none focus:ring-2 focus:ring-indigo-500 font-mono">
+            <span class="absolute right-3 top-2.5 text-xs text-slate-400 font-semibold">units</span>
+          </div>
+          <p id="poMoqWarning" class="hidden text-[11px] text-rose-600 mt-1 font-semibold">
+            Quantity must meet or exceed minimum order quantity.
+          </p>
+        </div>
+
+        <!-- Live Price & 2% Fee Calculation Breakdown -->
+        <div class="bg-indigo-50/50 p-3.5 rounded-2xl border border-indigo-100 space-y-1.5 text-xs">
+          <div class="flex justify-between text-slate-600">
+            <span>Wholesale Goods Subtotal:</span>
+            <strong id="poSubtotalTxt" class="font-mono text-slate-900">0 ETB</strong>
+          </div>
+          <div class="flex justify-between text-indigo-900 font-medium">
+            <span>MedSupply Platform Fee (2.0%):</span>
+            <strong id="poPlatformFeeTxt" class="font-mono text-indigo-700">0 ETB</strong>
+          </div>
+          <div class="flex justify-between pt-2 border-t border-indigo-200 text-sm font-black text-slate-900">
+            <span>Total Wholesale Invoice:</span>
+            <span id="poTotalInvoiceTxt" class="font-mono text-emerald-700">0 ETB</span>
+          </div>
+          <p class="text-[10px] text-slate-500 pt-1">
+            * 2% platform fee is settled with the wholesaler upon successful dispatch and invoice clearance.
+          </p>
+        </div>
+
+        <!-- Delivery Address -->
+        <div>
+          <label class="block font-bold text-slate-700 mb-1">Counter Delivery Address</label>
+          <input type="text" id="poDeliveryAddressInput" placeholder="e.g. Bole Medhanialem, Next to Edna Mall" class="w-full text-xs px-3 py-2 border border-slate-300 rounded-xl outline-none focus:ring-2 focus:ring-indigo-500">
+        </div>
+
+        <!-- Payment Method -->
+        <div>
+          <label class="block font-bold text-slate-700 mb-1">Payment Method</label>
+          <select id="poPaymentMethodSelect" class="w-full text-xs px-3 py-2 border border-slate-300 rounded-xl outline-none focus:ring-2 focus:ring-indigo-500 font-medium">
+            <option value="COD">Cash on Delivery (COD) / ካሽ ሲደርስ</option>
+            <option value="TELEBIRR">Telebirr Merchant Transfer / ቴሌብር</option>
+            <option value="CBE_BIRR">CBE Birr / Commercial Bank of Ethiopia</option>
+          </select>
+        </div>
+
+        <!-- Notes -->
+        <div>
+          <label class="block font-bold text-slate-700 mb-1">Notes / Special Instructions (Optional)</label>
+          <textarea id="poNotesInput" rows="2" placeholder="e.g. Urgent morning stock replenishment, deliver before 2 PM" class="w-full text-xs px-3 py-2 border border-slate-300 rounded-xl outline-none focus:ring-2 focus:ring-indigo-500"></textarea>
+        </div>
+
+        <div id="poOrderAlertBox" class="hidden p-3 rounded-xl text-xs"></div>
+      </div>
+
+      <div class="p-4 border-t border-slate-100 bg-slate-50 flex items-center justify-between">
+        <button onclick="closeModal('medSupplyOrderModal')" class="px-4 py-2 text-xs font-semibold text-slate-600 hover:bg-slate-200 rounded-xl transition">
+          Cancel
+        </button>
+        <button id="poSubmitBtn" onclick="submitWholesalePurchaseOrder()" class="px-5 py-2.5 text-xs font-bold bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl shadow-md transition flex items-center gap-1.5">
+          <i class="fa-solid fa-paper-plane"></i>
+          <span>Dispatch Purchase Order</span>
         </button>
       </div>
     </div>
@@ -1323,21 +1551,22 @@
 
     // --- TAB SWITCHING IN STUDIO ---
     function switchStudioTab(tab) {
-      const tabs = ['inventory', 'vouchers', 'broadcasts', 'regulatory', 'analytics'];
+      const tabs = ['inventory', 'vouchers', 'broadcasts', 'regulatory', 'analytics', 'medsupply'];
       tabs.forEach(t => {
         const panel = document.getElementById('panel' + t.charAt(0).toUpperCase() + t.slice(1));
         const nav = document.getElementById('tabNav' + t.charAt(0).toUpperCase() + t.slice(1));
         if (t === tab) {
-          panel.classList.remove('hidden');
-          nav.className = 'px-4 py-2.5 text-xs font-bold border-b-2 border-emerald-600 text-emerald-700 whitespace-nowrap transition flex items-center gap-1.5';
+          if (panel) panel.classList.remove('hidden');
+          if (nav) nav.className = 'px-4 py-2.5 text-xs font-bold border-b-2 border-emerald-600 text-emerald-700 whitespace-nowrap transition flex items-center gap-1.5';
         } else {
-          panel.classList.add('hidden');
-          nav.className = 'px-4 py-2.5 text-xs font-semibold border-b-2 border-transparent text-slate-500 hover:text-slate-900 whitespace-nowrap transition flex items-center gap-1.5';
+          if (panel) panel.classList.add('hidden');
+          if (nav) nav.className = 'px-4 py-2.5 text-xs font-semibold border-b-2 border-transparent text-slate-500 hover:text-slate-900 whitespace-nowrap transition flex items-center gap-1.5';
         }
       });
       if (tab === 'broadcasts') loadActiveBroadcasts();
       if (tab === 'vouchers') loadCounterReservations();
       if (tab === 'analytics') loadPwaDemandRadar();
+      if (tab === 'medsupply') loadMedSupplyExchange();
     }
 
     // --- DEMAND RADAR LOGIC IN STUDIO PWA ---
@@ -1513,10 +1742,18 @@
           </td>
           <td class="p-3.5 font-mono font-bold text-slate-900">${item.priceETB} ETB</td>
           <td class="p-3.5">
-            <button onclick="toggleStock('${pharmacyId}', '${item.name}', ${!item.inStock})" class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-bold transition ${item.inStock ? 'bg-emerald-100 text-emerald-800 hover:bg-emerald-200' : 'bg-rose-100 text-rose-800 hover:bg-rose-200'}">
-              <span class="w-2 h-2 rounded-full ${item.inStock ? 'bg-emerald-500' : 'bg-rose-500'}"></span>
-              <span>${item.inStock ? 'In Stock' : 'Out of Stock'}</span>
-            </button>
+            <div class="flex items-center gap-2">
+              <button onclick="toggleStock('${pharmacyId}', '${item.name}', ${!item.inStock})" class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-bold transition ${item.inStock ? 'bg-emerald-100 text-emerald-800 hover:bg-emerald-200' : 'bg-rose-100 text-rose-800 hover:bg-rose-200'}">
+                <span class="w-2 h-2 rounded-full ${item.inStock ? 'bg-emerald-500' : 'bg-rose-500'}"></span>
+                <span>${item.inStock ? 'In Stock' : 'Out of Stock'}</span>
+              </button>
+              ${!item.inStock ? `
+                <button onclick="openRestockModalForDrug('${encodeURIComponent(item.name)}')" class="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-bold bg-indigo-50 text-indigo-700 border border-indigo-200 hover:bg-indigo-100 transition shadow-xs" title="1-Click wholesale restock from certified importers">
+                  <i class="fa-solid fa-truck-ramp-box text-[10px]"></i>
+                  <span>Restock</span>
+                </button>
+              ` : ''}
+            </div>
           </td>
           <td class="p-3.5 text-right">
             <button onclick="deleteItem('${pharmacyId}', '${item.name}')" title="Delete from shelf" class="text-xs text-rose-500 hover:text-rose-700 p-1.5 rounded-lg hover:bg-rose-50 transition">
@@ -2010,8 +2247,14 @@
     }
 
     // Helper functions
+    function openModal(id) {
+      const el = document.getElementById(id);
+      if (el) el.classList.remove('hidden');
+    }
+
     function closeModal(id) {
-      document.getElementById(id).classList.add('hidden');
+      const el = document.getElementById(id);
+      if (el) el.classList.add('hidden');
     }
 
     async function loadActiveBroadcasts() {
@@ -2020,6 +2263,359 @@
       setTimeout(() => {
         container.innerHTML = `<div class="text-center py-8 text-slate-400 text-xs">No pending rare drug broadcast inquiries in this sub-city right now.</div>`;
       }, 500);
+    }
+
+    // ==============================================================
+    // MEDSUPPLY B2B WHOLESALE EXCHANGE CONTROLLER
+    // ==============================================================
+    let currentB2bListing = null;
+    let b2bListingsCache = [];
+    let b2bSearchTimeout = null;
+
+    function toggleMedSupplyView(view) {
+      const catalogView = document.getElementById('medSupplyCatalogView');
+      const ordersView = document.getElementById('medSupplyOrdersView');
+      const catBtn = document.getElementById('b2bViewCatalogBtn');
+      const ordBtn = document.getElementById('b2bViewOrdersBtn');
+
+      if (view === 'orders') {
+        catalogView.classList.add('hidden');
+        ordersView.classList.remove('hidden');
+        ordBtn.className = 'px-3.5 py-1.5 rounded-lg text-xs font-bold bg-white text-indigo-700 shadow-xs transition';
+        catBtn.className = 'px-3.5 py-1.5 rounded-lg text-xs font-semibold text-slate-600 hover:text-slate-900 transition';
+        loadWholesaleOrders();
+      } else {
+        catalogView.classList.remove('hidden');
+        ordersView.classList.add('hidden');
+        catBtn.className = 'px-3.5 py-1.5 rounded-lg text-xs font-bold bg-white text-indigo-700 shadow-xs transition';
+        ordBtn.className = 'px-3.5 py-1.5 rounded-lg text-xs font-semibold text-slate-600 hover:text-slate-900 transition';
+        loadMedSupplyListings();
+      }
+    }
+
+    function debounceB2bSearch() {
+      clearTimeout(b2bSearchTimeout);
+      b2bSearchTimeout = setTimeout(() => {
+        loadMedSupplyListings();
+      }, 300);
+    }
+
+    async function loadMedSupplyExchange() {
+      await loadMedSupplyListings();
+      await loadWholesaleOrders();
+    }
+
+    async function loadMedSupplyListings() {
+      const container = document.getElementById('b2bListingsContainer');
+      if (!container) return;
+
+      const searchInput = document.getElementById('b2bSearchInput');
+      const catSelect = document.getElementById('b2bCategoryFilter');
+      const search = searchInput ? searchInput.value.trim() : '';
+      const category = catSelect ? catSelect.value : '';
+
+      container.innerHTML = `
+        <div class="col-span-full py-12 text-center text-slate-400 text-xs">
+          <i class="fa-solid fa-spinner fa-spin text-lg text-indigo-600 mb-2 block"></i>
+          Loading certified wholesale listings...
+        </div>
+      `;
+
+      try {
+        const query = new URLSearchParams();
+        if (search) query.set('search', search);
+        if (category) query.set('category', category);
+
+        const res = await fetch(`/api/b2b/listings?${query.toString()}`);
+        const data = await res.json();
+
+        if (data.success && Array.isArray(data.listings)) {
+          b2bListingsCache = data.listings;
+          renderB2bListings(b2bListingsCache);
+        } else {
+          container.innerHTML = `
+            <div class="col-span-full py-8 text-center text-slate-400 text-xs">
+              No wholesale inventory matching your criteria.
+            </div>
+          `;
+        }
+      } catch (err) {
+        container.innerHTML = `
+          <div class="col-span-full py-8 text-center text-rose-500 text-xs">
+            Failed to load wholesale listings: ${err.message}
+          </div>
+        `;
+      }
+    }
+
+    function renderB2bListings(listings) {
+      const container = document.getElementById('b2bListingsContainer');
+      if (!container) return;
+
+      if (!listings || listings.length === 0) {
+        container.innerHTML = `
+          <div class="col-span-full py-12 text-center text-slate-400 text-xs bg-slate-50 rounded-2xl border border-slate-200">
+            <i class="fa-solid fa-box-open text-3xl text-slate-300 mb-2 block"></i>
+            No wholesale medicine batches available for this search.
+          </div>
+        `;
+        return;
+      }
+
+      container.innerHTML = listings.map(item => `
+        <div class="bg-white rounded-2xl border border-slate-200 p-4 shadow-sm hover:shadow-md transition flex flex-col justify-between space-y-3">
+          <div>
+            <div class="flex items-start justify-between gap-2">
+              <div>
+                <span class="text-[10px] font-bold px-2 py-0.5 rounded-full bg-slate-100 text-slate-700 uppercase tracking-wider">
+                  ${item.category}
+                </span>
+                <h4 class="font-extrabold text-sm text-slate-900 mt-1.5 leading-snug">${item.drugName}</h4>
+                <p class="text-[11px] text-slate-500">${item.genericName}</p>
+              </div>
+              <div class="text-right">
+                <div class="text-base font-black text-indigo-700 font-mono">${item.wholesaleUnitPriceETB} ETB</div>
+                <div class="text-[10px] text-slate-400">per unit</div>
+              </div>
+            </div>
+
+            <div class="mt-3 p-2.5 bg-slate-50 rounded-xl border border-slate-100 space-y-1 text-[11px]">
+              <div class="flex justify-between text-slate-700">
+                <span class="text-slate-500 font-medium"><i class="fa-solid fa-building-circle-check text-indigo-600 mr-1"></i> Importer:</span>
+                <strong class="font-semibold truncate max-w-[170px]" title="${item.wholesalerName}">${item.wholesalerName}</strong>
+              </div>
+              <div class="flex justify-between text-slate-600">
+                <span class="text-slate-500">📍 Hub:</span>
+                <span>${item.wholesalerAddress || 'Churchill Rd, Addis Ababa'}</span>
+              </div>
+              <div class="flex justify-between text-slate-600">
+                <span class="text-slate-500">Min. Order (MOQ):</span>
+                <strong class="font-mono text-slate-800">${item.minimumOrderQty} units</strong>
+              </div>
+              <div class="flex justify-between text-slate-600">
+                <span class="text-slate-500">Available Batch:</span>
+                <span class="font-mono text-emerald-700 font-semibold">${item.availableQuantity} in stock</span>
+              </div>
+              <div class="flex justify-between text-slate-600">
+                <span class="text-slate-500">Expiry Date:</span>
+                <span class="font-mono">${item.expiryDate}</span>
+              </div>
+            </div>
+          </div>
+
+          <div class="pt-2 border-t border-slate-100 flex items-center justify-between">
+            <div class="text-[10px] text-emerald-700 font-semibold flex items-center gap-1">
+              <i class="fa-solid fa-bolt text-amber-500"></i> ${item.deliveryLeadTimeHours || 4}h same-day dispatch
+            </div>
+            <button onclick="openB2bOrderModal('${item.id}')" class="px-3.5 py-1.5 text-xs font-bold bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl transition shadow-xs flex items-center gap-1">
+              <i class="fa-solid fa-cart-shopping text-[10px]"></i>
+              <span>Order Stock</span>
+            </button>
+          </div>
+        </div>
+      `).join('');
+    }
+
+    async function openRestockModalForDrug(encodedDrugName) {
+      const drugName = decodeURIComponent(encodedDrugName);
+      try {
+        const res = await fetch(`/api/b2b/match/${encodeURIComponent(drugName)}`);
+        const data = await res.json();
+
+        if (data.success && data.matches && data.matches.length > 0) {
+          // Open order modal for the best matched listing
+          const bestMatch = data.matches[0];
+          b2bListingsCache = data.matches;
+          openB2bOrderModal(bestMatch.id);
+        } else {
+          // Switch to MedSupply tab and pre-fill search with this drug
+          switchStudioTab('medsupply');
+          const searchInput = document.getElementById('b2bSearchInput');
+          if (searchInput) {
+            searchInput.value = drugName;
+            loadMedSupplyListings();
+          }
+          alert(`No immediate certified batch found for "${drugName}". Opened the MedSupply catalog so you can browse alternative importers or generic substitutes.`);
+        }
+      } catch (err) {
+        alert('Failed to check wholesale availability: ' + err.message);
+      }
+    }
+
+    function openB2bOrderModal(listingId) {
+      const listing = b2bListingsCache.find(l => l.id === listingId);
+      if (!listing) return;
+
+      currentB2bListing = listing;
+
+      document.getElementById('poModalDrugName').innerText = listing.drugName;
+      document.getElementById('poModalWholesaler').innerText = `${listing.wholesalerName} • ${listing.wholesalerAddress || 'Addis Ababa'}`;
+      document.getElementById('poModalUnitPrice').innerText = `${listing.wholesaleUnitPriceETB} ETB`;
+      document.getElementById('poModalBatch').innerText = listing.batchNumber;
+      document.getElementById('poModalExpiry').innerText = listing.expiryDate;
+      document.getElementById('poModalEfda').innerText = listing.efdaRegistrationNo;
+      document.getElementById('poModalDeliveryTime').innerText = `${listing.deliveryLeadTimeHours || 4} hrs`;
+      document.getElementById('poModalMoqLabel').innerText = `Min. Order: ${listing.minimumOrderQty} units`;
+
+      const qtyInput = document.getElementById('poOrderQtyInput');
+      qtyInput.value = listing.minimumOrderQty;
+      qtyInput.min = listing.minimumOrderQty;
+
+      // Pre-fill delivery address with current pharmacy address
+      const pharm = currentAuthSession?.pharmacy || {};
+      const addrInput = document.getElementById('poDeliveryAddressInput');
+      if (addrInput) {
+        addrInput.value = pharm.address ? `${pharm.name}, ${pharm.address}, ${pharm.subCity}` : `${pharm.name || 'Our Pharmacy'}, ${pharm.subCity || 'Addis Ababa'}`;
+      }
+
+      document.getElementById('poNotesInput').value = '';
+      const alertBox = document.getElementById('poOrderAlertBox');
+      alertBox.className = 'hidden';
+      document.getElementById('poMoqWarning').classList.add('hidden');
+
+      calculatePoPricing();
+      openModal('medSupplyOrderModal');
+    }
+
+    function calculatePoPricing() {
+      if (!currentB2bListing) return;
+
+      const qtyInput = document.getElementById('poOrderQtyInput');
+      const qty = parseInt(qtyInput.value || '0', 10);
+      const moqWarning = document.getElementById('poMoqWarning');
+
+      if (qty < currentB2bListing.minimumOrderQty) {
+        moqWarning.classList.remove('hidden');
+        moqWarning.innerText = `Minimum order quantity is ${currentB2bListing.minimumOrderQty} units for this certified batch.`;
+      } else {
+        moqWarning.classList.add('hidden');
+      }
+
+      const subtotal = qty * currentB2bListing.wholesaleUnitPriceETB;
+      const platformFee = Math.round(subtotal * 0.02 * 100) / 100;
+
+      document.getElementById('poSubtotalTxt').innerText = `${subtotal.toLocaleString()} ETB`;
+      document.getElementById('poPlatformFeeTxt').innerText = `${platformFee.toLocaleString()} ETB (2%)`;
+      document.getElementById('poTotalInvoiceTxt').innerText = `${subtotal.toLocaleString()} ETB`;
+    }
+
+    async function submitWholesalePurchaseOrder() {
+      if (!currentB2bListing || !currentAuthSession) return;
+
+      const pharmacyId = currentAuthSession.account?.pharmacyId || currentAuthSession.pharmacy?.id;
+      const qty = parseInt(document.getElementById('poOrderQtyInput').value || '0', 10);
+      const deliveryAddress = document.getElementById('poDeliveryAddressInput').value.trim();
+      const paymentMethod = document.getElementById('poPaymentMethodSelect').value;
+      const notes = document.getElementById('poNotesInput').value.trim();
+      const alertBox = document.getElementById('poOrderAlertBox');
+      const submitBtn = document.getElementById('poSubmitBtn');
+
+      if (qty < currentB2bListing.minimumOrderQty) {
+        alertBox.className = 'p-3 bg-rose-50 text-rose-800 rounded-xl font-bold border border-rose-200 block';
+        alertBox.innerText = `Quantity must be at least ${currentB2bListing.minimumOrderQty} units.`;
+        return;
+      }
+
+      submitBtn.disabled = true;
+      submitBtn.innerHTML = `<i class="fa-solid fa-spinner fa-spin mr-1"></i> Submitting PO...`;
+
+      try {
+        const res = await fetch('/api/b2b/orders', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            pharmacyId,
+            listingId: currentB2bListing.id,
+            quantity: qty,
+            deliveryAddress,
+            paymentMethod,
+            statusNotes: notes || undefined,
+          })
+        });
+
+        const data = await res.json();
+        if (data.success && data.order) {
+          alertBox.className = 'p-3 bg-emerald-50 text-emerald-800 rounded-xl font-bold border border-emerald-200 block';
+          alertBox.innerText = `✅ Order ${data.order.poNumber} created! Importer notified via Telegram.`;
+
+          setTimeout(() => {
+            closeModal('medSupplyOrderModal');
+            submitBtn.disabled = false;
+            submitBtn.innerHTML = `<i class="fa-solid fa-paper-plane mr-1"></i> Dispatch Purchase Order`;
+            toggleMedSupplyView('orders');
+          }, 1500);
+        } else {
+          alertBox.className = 'p-3 bg-rose-50 text-rose-800 rounded-xl font-bold border border-rose-200 block';
+          alertBox.innerText = data.error || 'Failed to place order.';
+          submitBtn.disabled = false;
+          submitBtn.innerHTML = `<i class="fa-solid fa-paper-plane mr-1"></i> Dispatch Purchase Order`;
+        }
+      } catch (err) {
+        alertBox.className = 'p-3 bg-rose-50 text-rose-800 rounded-xl font-bold border border-rose-200 block';
+        alertBox.innerText = 'Network error: ' + err.message;
+        submitBtn.disabled = false;
+        submitBtn.innerHTML = `<i class="fa-solid fa-paper-plane mr-1"></i> Dispatch Purchase Order`;
+      }
+    }
+
+    async function loadWholesaleOrders() {
+      if (!currentAuthSession) return;
+      const pharmacyId = currentAuthSession.account?.pharmacyId || currentAuthSession.pharmacy?.id;
+      const tbody = document.getElementById('b2bOrdersTableTbody');
+      const ordersCount = document.getElementById('b2bOrdersCount');
+
+      if (!tbody) return;
+
+      try {
+        const res = await fetch(`/api/b2b/orders?pharmacyId=${pharmacyId}`);
+        const data = await res.json();
+
+        if (data.success && Array.isArray(data.orders)) {
+          if (ordersCount) ordersCount.innerText = data.orders.length;
+          renderWholesaleOrdersTable(data.orders);
+        } else {
+          tbody.innerHTML = `<tr><td colspan="9" class="p-6 text-center text-slate-400">No purchase orders placed yet.</td></tr>`;
+        }
+      } catch (err) {
+        tbody.innerHTML = `<tr><td colspan="9" class="p-6 text-center text-rose-500">Failed to load orders: ${err.message}</td></tr>`;
+      }
+    }
+
+    function renderWholesaleOrdersTable(orders) {
+      const tbody = document.getElementById('b2bOrdersTableTbody');
+      if (!tbody) return;
+
+      if (!orders || orders.length === 0) {
+        tbody.innerHTML = `<tr><td colspan="9" class="p-8 text-center text-slate-400 text-xs">No purchase orders placed yet. Browse the catalog to restock your shelf.</td></tr>`;
+        return;
+      }
+
+      tbody.innerHTML = orders.map(po => {
+        let statusBadge = 'bg-slate-100 text-slate-700';
+        if (po.status === 'PENDING') statusBadge = 'bg-amber-100 text-amber-800 font-bold';
+        else if (po.status === 'CONFIRMED') statusBadge = 'bg-blue-100 text-blue-800 font-bold';
+        else if (po.status === 'DISPATCHED') statusBadge = 'bg-indigo-100 text-indigo-800 font-bold animate-pulse';
+        else if (po.status === 'DELIVERED') statusBadge = 'bg-emerald-100 text-emerald-800 font-bold';
+        else if (po.status === 'CANCELLED') statusBadge = 'bg-rose-100 text-rose-800 font-semibold';
+
+        const dateStr = new Date(po.createdAt).toLocaleDateString([], { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
+
+        return `
+          <tr class="hover:bg-slate-50 transition">
+            <td class="p-3 font-mono font-bold text-slate-900">${po.poNumber}</td>
+            <td class="p-3 font-semibold text-slate-800">${po.wholesalerName}</td>
+            <td class="p-3 font-bold text-indigo-900">${po.drugName}</td>
+            <td class="p-3 font-mono font-bold text-slate-900">${po.quantity} units</td>
+            <td class="p-3 font-mono font-black text-slate-900">${po.totalPriceETB.toLocaleString()} ETB</td>
+            <td class="p-3 font-mono text-indigo-700 font-semibold">${po.platformFeeETB.toLocaleString()} ETB</td>
+            <td class="p-3 text-[11px] font-semibold text-slate-600">${po.paymentMethod}</td>
+            <td class="p-3">
+              <span class="${statusBadge} px-2.5 py-0.5 rounded-full text-[10px] inline-block">${po.status}</span>
+            </td>
+            <td class="p-3 text-right text-slate-400 text-[11px]">${dateStr}</td>
+          </tr>
+        `;
+      }).join('');
     }
   </script>
 </body>

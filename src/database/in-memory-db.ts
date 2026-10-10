@@ -107,6 +107,67 @@ export interface DemandIntelligenceItem {
   lastSearchedAt: string;
 }
 
+export interface Wholesaler {
+  id: string;
+  name: string;
+  subCity: string;
+  city: string;
+  phone: string;
+  telegramChatId?: string;
+  efdaWholesaleLicense: string; // EFDA license e.g. "EFDA/WHOLESALE/AA-9912"
+  tinNumber: string;
+  isVerified: boolean;
+  trustScore: number;
+  deliveryTerms: string;
+  minimumOrderValueETB?: number;
+}
+
+export interface WholesaleListing {
+  id: string;
+  wholesalerId: string;
+  wholesalerName: string;
+  wholesalerPhone: string;
+  wholesalerSubCity: string;
+  drugName: string;
+  genericName?: string;
+  category: string;
+  wholesalePriceETB: number;
+  retailMspETB?: number;
+  minimumOrderQty: number;
+  availableStock: number;
+  batchNumber: string;
+  expiryDate: string;
+  efdaRegistrationNo: string;
+  originCountry: string;
+  deliveryEstimateHours: number;
+  isActive: boolean;
+  updatedAt: string;
+}
+
+export interface WholesalePurchaseOrder {
+  id: string;
+  poNumber: string;
+  pharmacyId: string;
+  pharmacyName: string;
+  pharmacySubCity: string;
+  pharmacyPhone: string;
+  wholesalerId: string;
+  wholesalerName: string;
+  listingId: string;
+  drugName: string;
+  quantity: number;
+  unitPriceETB: number;
+  totalPriceETB: number;
+  platformFeeRate: number; // 0.02 (2%)
+  platformFeeETB: number; // totalPriceETB * 0.02
+  deliveryAddress: string;
+  paymentMethod: 'COD' | 'TELEBIRR' | 'CBE_BIRR';
+  status: 'PENDING' | 'CONFIRMED' | 'DISPATCHED' | 'DELIVERED' | 'CANCELLED';
+  statusNotes?: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
 export interface ReservationHold {
   reservationCode: string; // 4-digit code e.g. "8492"
   patientUserId: string;
@@ -236,12 +297,16 @@ export class InMemoryDatabase {
   public pharmacyAccounts: Map<string, PharmacyPortalAccount> = new Map(); // Keyed by username
   public adminUsers: Map<string, AdminUser> = new Map(); // Keyed by username
   public searchAnalyticsEvents: SearchAnalyticsEvent[] = [];
+  public wholesalers: Wholesaler[] = [];
+  public wholesaleListings: WholesaleListing[] = [];
+  public wholesalePurchaseOrders: WholesalePurchaseOrder[] = [];
 
   private constructor() {
     this.seedPharmacies();
     this.seedVerificationApplications();
     this.seedDefaultAdmin();
     this.seedSearchTelemetry();
+    this.seedWholesaleMarketplace();
   }
 
   public static getInstance(): InMemoryDatabase {
@@ -252,7 +317,33 @@ export class InMemoryDatabase {
   }
 
   private seedPharmacies() {
-    this.pharmacies = [];
+    const defaultPharm: Pharmacy = {
+      id: 'pharm-bole-3527',
+      name: 'St. Mary Pharmacy Bole',
+      subCity: 'Bole',
+      city: 'Addis Ababa',
+      phone: '0911223344',
+      telegramChatId: 'tg_user_99120',
+      latitude: 9.0015,
+      longitude: 38.7845,
+      address: 'Cameroon St, Next to Edna Mall',
+      isVerified: true,
+      efdaLicenseNumber: 'EFDA/PH/AA/2024/3297',
+      tinNumber: 'TIN-0083920194',
+      tier: 'PREMIUM',
+      trustScore: 98,
+      strikeCount: 0,
+      isShadowBanned: false,
+      isPermanentlyBanned: false,
+      inStockItems: ['ventolin inhaler 100mcg', 'amoxicillin 500mg'],
+      inventory: [
+        { name: 'Ventolin Inhaler 100mcg', genericName: 'Salbutamol', category: 'Respiratory', priceETB: 550, inStock: false, updatedAt: new Date().toISOString() },
+        { name: 'Amoxicillin 500mg', genericName: 'Amoxicillin', category: 'Antibiotics', priceETB: 220, inStock: true, updatedAt: new Date().toISOString() },
+      ],
+      analyticsAccess: { enabled: true, tier: 'PRO', allowedSubCities: ['Bole'] },
+    };
+    this.pharmacies = [defaultPharm];
+    this.createOrGetPharmacyAccount(defaultPharm, defaultPharm.telegramChatId);
   }
 
   private seedSearchTelemetry() {
@@ -1186,5 +1277,453 @@ export class InMemoryDatabase {
 
     this.adminUsers.delete(targetKey);
     return { success: true };
+  }
+
+  // ==========================================
+  // B2B WHOLESALE MARKETPLACE (MEDSUPPLY EXCHANGE)
+  // ==========================================
+  private seedWholesaleMarketplace() {
+    this.wholesalers = [
+      {
+        id: 'wholesaler_cadila',
+        name: 'Cadila Pharmaceuticals Ethiopia PLC',
+        subCity: 'Kirkos / Churchill Road',
+        city: 'Addis Ababa',
+        phone: '0911-203490',
+        telegramChatId: 'tg_wholesaler_cadila',
+        efdaWholesaleLicense: 'EFDA/WHOLESALE/AA-7718',
+        tinNumber: 'TIN-0019283741',
+        isVerified: true,
+        trustScore: 99,
+        deliveryTerms: 'Same-Day Dispatch (Within 2 Hours in Addis Ababa) • Cold-Chain Certified',
+        minimumOrderValueETB: 2000,
+      },
+      {
+        id: 'wholesaler_medtech',
+        name: 'Medtech Ethiopia Importers & Distributors',
+        subCity: 'Gotera / Nifas Silk',
+        city: 'Addis Ababa',
+        phone: '0911-554433',
+        telegramChatId: 'tg_wholesaler_medtech',
+        efdaWholesaleLicense: 'EFDA/WHOLESALE/AA-8842',
+        tinNumber: 'TIN-0028391024',
+        isVerified: true,
+        trustScore: 98,
+        deliveryTerms: 'Scheduled Express Delivery (Within 3 Hours) • Free on Orders >10,000 ETB',
+        minimumOrderValueETB: 3000,
+      },
+      {
+        id: 'wholesaler_epharm',
+        name: 'EPHARM & Sante Importers PLC',
+        subCity: 'Kirkos / Stadium',
+        city: 'Addis Ababa',
+        phone: '0911-889900',
+        telegramChatId: 'tg_wholesaler_epharm',
+        efdaWholesaleLicense: 'EFDA/WHOLESALE/AA-5531',
+        tinNumber: 'TIN-0039281745',
+        isVerified: true,
+        trustScore: 97,
+        deliveryTerms: 'Same-Day Counter Dropoff (Within 4 Hours) • Batch Analysis Certificate Included',
+        minimumOrderValueETB: 1500,
+      },
+    ];
+
+    const now = new Date().toISOString();
+    this.wholesaleListings = [
+      {
+        id: 'wlist-ventolin-01',
+        wholesalerId: 'wholesaler_cadila',
+        wholesalerName: 'Cadila Pharmaceuticals Ethiopia PLC',
+        wholesalerPhone: '0911-203490',
+        wholesalerSubCity: 'Kirkos / Churchill Road',
+        drugName: 'Ventolin Inhaler 100mcg',
+        genericName: 'Salbutamol Sulfate',
+        category: 'Respiratory',
+        wholesalePriceETB: 420,
+        retailMspETB: 650,
+        minimumOrderQty: 10,
+        availableStock: 850,
+        batchNumber: 'BN-2025-VNT41',
+        expiryDate: '11/2027',
+        efdaRegistrationNo: 'EFDA-REG-ET-84920',
+        originCountry: 'UK / GlaxoSmithKline',
+        deliveryEstimateHours: 2,
+        isActive: true,
+        updatedAt: now,
+      },
+      {
+        id: 'wlist-ventolin-02',
+        wholesalerId: 'wholesaler_medtech',
+        wholesalerName: 'Medtech Ethiopia Importers & Distributors',
+        wholesalerPhone: '0911-554433',
+        wholesalerSubCity: 'Gotera / Nifas Silk',
+        drugName: 'Ventolin Evohaler 100mcg',
+        genericName: 'Salbutamol Sulfate',
+        category: 'Respiratory',
+        wholesalePriceETB: 435,
+        retailMspETB: 680,
+        minimumOrderQty: 15,
+        availableStock: 600,
+        batchNumber: 'BN-2025-VNT92',
+        expiryDate: '08/2027',
+        efdaRegistrationNo: 'EFDA-REG-ET-84921',
+        originCountry: 'France / GSK',
+        deliveryEstimateHours: 3,
+        isActive: true,
+        updatedAt: now,
+      },
+      {
+        id: 'wlist-insulin-01',
+        wholesalerId: 'wholesaler_cadila',
+        wholesalerName: 'Cadila Pharmaceuticals Ethiopia PLC',
+        wholesalerPhone: '0911-203490',
+        wholesalerSubCity: 'Kirkos / Churchill Road',
+        drugName: 'Insulin Humulin N 100 IU/ml',
+        genericName: 'Isophane Insulin Human (NPH)',
+        category: 'Diabetes',
+        wholesalePriceETB: 540,
+        retailMspETB: 850,
+        minimumOrderQty: 5,
+        availableStock: 320,
+        batchNumber: 'BN-2025-INS11',
+        expiryDate: '05/2027',
+        efdaRegistrationNo: 'EFDA-REG-ET-91024',
+        originCountry: 'France / Eli Lilly',
+        deliveryEstimateHours: 2,
+        isActive: true,
+        updatedAt: now,
+      },
+      {
+        id: 'wlist-insulin-02',
+        wholesalerId: 'wholesaler_epharm',
+        wholesalerName: 'EPHARM & Sante Importers PLC',
+        wholesalerPhone: '0911-889900',
+        wholesalerSubCity: 'Kirkos / Stadium',
+        drugName: 'Insulin Mixtard 30/70 100 IU/ml',
+        genericName: 'Biphasic Isophane Insulin',
+        category: 'Diabetes',
+        wholesalePriceETB: 580,
+        retailMspETB: 900,
+        minimumOrderQty: 5,
+        availableStock: 240,
+        batchNumber: 'BN-2025-MX70',
+        expiryDate: '09/2027',
+        efdaRegistrationNo: 'EFDA-REG-ET-91088',
+        originCountry: 'Denmark / Novo Nordisk',
+        deliveryEstimateHours: 3,
+        isActive: true,
+        updatedAt: now,
+      },
+      {
+        id: 'wlist-augmentin-01',
+        wholesalerId: 'wholesaler_medtech',
+        wholesalerName: 'Medtech Ethiopia Importers & Distributors',
+        wholesalerPhone: '0911-554433',
+        wholesalerSubCity: 'Gotera / Nifas Silk',
+        drugName: 'Augmentin 625mg / 1g',
+        genericName: 'Amoxicillin + Clavulanic Acid',
+        category: 'Antibiotics',
+        wholesalePriceETB: 280,
+        retailMspETB: 450,
+        minimumOrderQty: 20,
+        availableStock: 1200,
+        batchNumber: 'BN-2025-AUG62',
+        expiryDate: '03/2028',
+        efdaRegistrationNo: 'EFDA-REG-ET-77192',
+        originCountry: 'UK / GSK',
+        deliveryEstimateHours: 3,
+        isActive: true,
+        updatedAt: now,
+      },
+      {
+        id: 'wlist-eltroxin-01',
+        wholesalerId: 'wholesaler_epharm',
+        wholesalerName: 'EPHARM & Sante Importers PLC',
+        wholesalerPhone: '0911-889900',
+        wholesalerSubCity: 'Kirkos / Stadium',
+        drugName: 'Eltroxin 50mcg / 100mcg',
+        genericName: 'Levothyroxine Sodium',
+        category: 'Thyroid',
+        wholesalePriceETB: 340,
+        retailMspETB: 550,
+        minimumOrderQty: 10,
+        availableStock: 400,
+        batchNumber: 'BN-2025-ELT10',
+        expiryDate: '01/2028',
+        efdaRegistrationNo: 'EFDA-REG-ET-66129',
+        originCountry: 'South Africa / Aspen',
+        deliveryEstimateHours: 4,
+        isActive: true,
+        updatedAt: now,
+      },
+      {
+        id: 'wlist-ceftriaxone-01',
+        wholesalerId: 'wholesaler_cadila',
+        wholesalerName: 'Cadila Pharmaceuticals Ethiopia PLC',
+        wholesalerPhone: '0911-203490',
+        wholesalerSubCity: 'Kirkos / Churchill Road',
+        drugName: 'Ceftriaxone 1g Vial',
+        genericName: 'Ceftriaxone Sodium',
+        category: 'Injectables',
+        wholesalePriceETB: 85,
+        retailMspETB: 150,
+        minimumOrderQty: 50,
+        availableStock: 2500,
+        batchNumber: 'BN-2025-CEF1G',
+        expiryDate: '12/2027',
+        efdaRegistrationNo: 'EFDA-REG-ET-55102',
+        originCountry: 'India / Cadila',
+        deliveryEstimateHours: 2,
+        isActive: true,
+        updatedAt: now,
+      },
+      {
+        id: 'wlist-metformin-01',
+        wholesalerId: 'wholesaler_cadila',
+        wholesalerName: 'Cadila Pharmaceuticals Ethiopia PLC',
+        wholesalerPhone: '0911-203490',
+        wholesalerSubCity: 'Kirkos / Churchill Road',
+        drugName: 'Metformin 500mg / 850mg',
+        genericName: 'Metformin Hydrochloride',
+        category: 'Diabetes',
+        wholesalePriceETB: 80,
+        retailMspETB: 130,
+        minimumOrderQty: 20,
+        availableStock: 1500,
+        batchNumber: 'BN-2025-MET85',
+        expiryDate: '06/2028',
+        efdaRegistrationNo: 'EFDA-REG-ET-44910',
+        originCountry: 'India / Cadila',
+        deliveryEstimateHours: 2,
+        isActive: true,
+        updatedAt: now,
+      },
+      {
+        id: 'wlist-amlodipine-01',
+        wholesalerId: 'wholesaler_medtech',
+        wholesalerName: 'Medtech Ethiopia Importers & Distributors',
+        wholesalerPhone: '0911-554433',
+        wholesalerSubCity: 'Gotera / Nifas Silk',
+        drugName: 'Amlodipine 5mg / 10mg',
+        genericName: 'Amlodipine Besylate',
+        category: 'Hypertension',
+        wholesalePriceETB: 90,
+        retailMspETB: 160,
+        minimumOrderQty: 20,
+        availableStock: 900,
+        batchNumber: 'BN-2025-AML10',
+        expiryDate: '10/2027',
+        efdaRegistrationNo: 'EFDA-REG-ET-33291',
+        originCountry: 'Germany / Sandoz',
+        deliveryEstimateHours: 3,
+        isActive: true,
+        updatedAt: now,
+      },
+      {
+        id: 'wlist-atorvastatin-01',
+        wholesalerId: 'wholesaler_epharm',
+        wholesalerName: 'EPHARM & Sante Importers PLC',
+        wholesalerPhone: '0911-889900',
+        wholesalerSubCity: 'Kirkos / Stadium',
+        drugName: 'Atorvastatin 20mg (Lipitor)',
+        genericName: 'Atorvastatin Calcium',
+        category: 'Cardiovascular',
+        wholesalePriceETB: 160,
+        retailMspETB: 280,
+        minimumOrderQty: 15,
+        availableStock: 750,
+        batchNumber: 'BN-2025-ATV20',
+        expiryDate: '04/2028',
+        efdaRegistrationNo: 'EFDA-REG-ET-22190',
+        originCountry: 'Ireland / Pfizer',
+        deliveryEstimateHours: 4,
+        isActive: true,
+        updatedAt: now,
+      },
+    ];
+
+    this.wholesalePurchaseOrders = [
+      {
+        id: 'PO-77291',
+        poNumber: 'PO-77291',
+        pharmacyId: 'pharm-bole-3527',
+        pharmacyName: 'St. Mary Pharmacy Bole',
+        pharmacySubCity: 'Bole',
+        pharmacyPhone: '0911223344',
+        wholesalerId: 'wholesaler_cadila',
+        wholesalerName: 'Cadila Pharmaceuticals Ethiopia PLC',
+        listingId: 'wlist-ventolin-01',
+        drugName: 'Ventolin Inhaler 100mcg',
+        quantity: 30,
+        unitPriceETB: 420,
+        totalPriceETB: 12600,
+        platformFeeRate: 0.02,
+        platformFeeETB: 252,
+        deliveryAddress: 'St. Mary Pharmacy Bole, Cameroon St, Addis Ababa',
+        paymentMethod: 'COD',
+        status: 'DELIVERED',
+        statusNotes: 'Delivered in 90 minutes. 2% Platform Fee recorded for weekly settlement.',
+        createdAt: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000).toISOString(),
+        updatedAt: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000 + 90 * 60 * 1000).toISOString(),
+      }
+    ];
+  }
+
+  public getWholesaleListings(filter?: { drugName?: string; category?: string; wholesalerId?: string; inStockOnly?: boolean }): WholesaleListing[] {
+    let result = [...this.wholesaleListings.filter((l) => l.isActive)];
+    if (filter?.wholesalerId) {
+      result = result.filter((l) => l.wholesalerId === filter.wholesalerId);
+    }
+    if (filter?.category && filter.category !== 'ALL') {
+      result = result.filter((l) => l.category.toLowerCase() === filter.category!.toLowerCase());
+    }
+    if (filter?.inStockOnly) {
+      result = result.filter((l) => l.availableStock > 0);
+    }
+    if (filter?.drugName) {
+      const q = filter.drugName.toLowerCase().trim();
+      result = result.filter((l) =>
+        l.drugName.toLowerCase().includes(q) ||
+        (l.genericName && l.genericName.toLowerCase().includes(q))
+      );
+    }
+    return result.sort((a, b) => a.wholesalePriceETB - b.wholesalePriceETB);
+  }
+
+  public getWholesaleListingById(id: string): WholesaleListing | undefined {
+    return this.wholesaleListings.find((l) => l.id === id);
+  }
+
+  public matchWholesaleStockForDrug(drugName: string): WholesaleListing[] {
+    const q = drugName.toLowerCase().replace(/[^a-z0-9]/g, ' ').trim();
+    const tokens = q.split(/\s+/).filter((t) => t.length > 2);
+
+    return this.wholesaleListings.filter((l) => {
+      if (!l.isActive || l.availableStock <= 0) return false;
+      const combined = `${l.drugName} ${l.genericName || ''} ${l.category}`.toLowerCase();
+      if (combined.includes(q)) return true;
+      return tokens.some((t) => combined.includes(t));
+    }).sort((a, b) => a.wholesalePriceETB - b.wholesalePriceETB);
+  }
+
+  public createWholesalePurchaseOrder(orderData: {
+    pharmacyId: string;
+    listingId: string;
+    quantity: number;
+    deliveryAddress?: string;
+    paymentMethod?: 'COD' | 'TELEBIRR' | 'CBE_BIRR';
+    statusNotes?: string;
+  }): { success: boolean; order?: WholesalePurchaseOrder; error?: string } {
+    const listing = this.wholesaleListings.find((l) => l.id === orderData.listingId);
+    if (!listing) return { success: false, error: 'Wholesale inventory listing not found' };
+
+    const pharmacy = this.pharmacies.find((p) => p.id === orderData.pharmacyId);
+    const account = Array.from(this.pharmacyAccounts.values()).find((a) => a.pharmacyId === orderData.pharmacyId);
+    const pharmacyName = pharmacy?.name || account?.pharmacyName || 'Verified Counter Pharmacy';
+    const pharmacySubCity = pharmacy?.subCity || account?.subCity || 'Bole';
+    const pharmacyPhone = pharmacy?.phone || account?.phone || '0911000000';
+
+    if (orderData.quantity < listing.minimumOrderQty) {
+      return {
+        success: false,
+        error: `Order quantity (${orderData.quantity}) is below the Minimum Order Quantity (MOQ) of ${listing.minimumOrderQty} units for this importer.`
+      };
+    }
+
+    if (orderData.quantity > listing.availableStock) {
+      return {
+        success: false,
+        error: `Requested quantity (${orderData.quantity}) exceeds currently verified batch stock (${listing.availableStock} units).`
+      };
+    }
+
+    // Decrement wholesale stock
+    listing.availableStock -= orderData.quantity;
+
+    const unitPriceETB = listing.wholesalePriceETB;
+    const totalPriceETB = unitPriceETB * orderData.quantity;
+    const platformFeeRate = 0.02; // 2%
+    const platformFeeETB = Math.round(totalPriceETB * platformFeeRate * 100) / 100;
+
+    const poNumber = `PO-${Math.floor(10000 + Math.random() * 90000)}`;
+    const order: WholesalePurchaseOrder = {
+      id: poNumber,
+      poNumber,
+      pharmacyId: orderData.pharmacyId,
+      pharmacyName,
+      pharmacySubCity,
+      pharmacyPhone,
+      wholesalerId: listing.wholesalerId,
+      wholesalerName: listing.wholesalerName,
+      listingId: listing.id,
+      drugName: listing.drugName,
+      quantity: orderData.quantity,
+      unitPriceETB,
+      totalPriceETB,
+      platformFeeRate,
+      platformFeeETB,
+      deliveryAddress: orderData.deliveryAddress || `${pharmacyName}, ${pharmacySubCity}, Addis Ababa`,
+      paymentMethod: orderData.paymentMethod || 'COD',
+      status: 'CONFIRMED',
+      statusNotes: orderData.statusNotes || `Purchase order locked with ${listing.wholesalerName}. Scheduled for same-day dispatch.`,
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    };
+
+    this.wholesalePurchaseOrders.unshift(order);
+    return { success: true, order };
+  }
+
+  public getWholesaleOrders(filter?: { pharmacyId?: string; wholesalerId?: string; status?: string }): WholesalePurchaseOrder[] {
+    let result = [...this.wholesalePurchaseOrders];
+    if (filter?.pharmacyId) {
+      result = result.filter((o) => o.pharmacyId === filter.pharmacyId);
+    }
+    if (filter?.wholesalerId) {
+      result = result.filter((o) => o.wholesalerId === filter.wholesalerId);
+    }
+    if (filter?.status) {
+      result = result.filter((o) => o.status === filter.status);
+    }
+    return result;
+  }
+
+  public updateWholesaleOrderStatus(
+    orderId: string,
+    status: 'PENDING' | 'CONFIRMED' | 'DISPATCHED' | 'DELIVERED' | 'CANCELLED',
+    statusNotes?: string
+  ): { success: boolean; order?: WholesalePurchaseOrder; error?: string } {
+    const order = this.wholesalePurchaseOrders.find((o) => o.id === orderId);
+    if (!order) return { success: false, error: 'Purchase order not found' };
+
+    order.status = status;
+    if (statusNotes) order.statusNotes = statusNotes;
+    order.updatedAt = new Date().toISOString();
+
+    // If cancelled, return stock back
+    if (status === 'CANCELLED') {
+      const listing = this.wholesaleListings.find((l) => l.id === order.listingId);
+      if (listing) {
+        listing.availableStock += order.quantity;
+      }
+    }
+
+    return { success: true, order };
+  }
+
+  public getAllWholesalers(): Wholesaler[] {
+    return [...this.wholesalers];
+  }
+
+  public getB2BCommissionReport(): { totalGrossVolumeETB: number; totalPlatformFeesETB: number; ordersCount: number; orders: WholesalePurchaseOrder[] } {
+    const activeOrders = this.wholesalePurchaseOrders.filter((o) => o.status !== 'CANCELLED');
+    const totalGrossVolumeETB = activeOrders.reduce((sum, o) => sum + o.totalPriceETB, 0);
+    const totalPlatformFeesETB = activeOrders.reduce((sum, o) => sum + o.platformFeeETB, 0);
+    return {
+      totalGrossVolumeETB,
+      totalPlatformFeesETB,
+      ordersCount: activeOrders.length,
+      orders: activeOrders,
+    };
   }
 }

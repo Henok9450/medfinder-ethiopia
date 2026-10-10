@@ -2,7 +2,7 @@ import https from 'https';
 import fs from 'fs';
 import path from 'path';
 import crypto from 'crypto';
-import { InMemoryDatabase, TelegramBotSession, PharmacyVerificationApplication, Pharmacy, MASTER_MEDICINE_CATALOG, ReservationHold } from '../database/in-memory-db';
+import { InMemoryDatabase, TelegramBotSession, PharmacyVerificationApplication, Pharmacy, MASTER_MEDICINE_CATALOG, ReservationHold, WholesalePurchaseOrder } from '../database/in-memory-db';
 import { getDatabaseRepository, IDatabaseRepository } from '../database';
 import { BroadcastMatchingService } from '../matching/broadcast-matching.service';
 import { PrescriptionVisionService } from '../prescription/prescription-vision.service';
@@ -577,6 +577,44 @@ export class TelegramVerificationBotService {
       console.warn('[TelegramBot] Failed to send OTP message:', err.message);
       return false;
     }
+  }
+
+  /**
+   * Notify wholesaler & pharmacy when a B2B wholesale purchase order is placed
+   */
+  public async notifyWholesalePurchaseOrder(order: WholesalePurchaseOrder): Promise<boolean> {
+    const token = this.pharmacyBot.token || this.patientBot.token;
+    const wholesaler = this.db.wholesalers.find((w) => w.id === order.wholesalerId);
+    const targetChatId = wholesaler?.telegramChatId || order.pharmacyPhone;
+
+    const message = `📦 **አዲስ የጅምላ ትዕዛዝ ደርሷል (New Bulk Purchase Order)!**\n` +
+      `━━━━━━━━━━━━━━━━━━━━━━━━━━\n` +
+      `🔖 **የሰነድ ቁጥር (PO #):** \`${order.id}\`\n` +
+      `🏥 **አዛዥ ፋርማሲ፦** **${order.pharmacyName}** (${order.pharmacySubCity})\n` +
+      `📞 **የፋርማሲ ስልክ፦** \`${order.pharmacyPhone}\`\n\n` +
+      `💊 **የታዘዘው መድኃኒት፦** **${order.drugName}**\n` +
+      `📦 **ብዛት (Quantity):** **${order.quantity}** ሳጥን/ፓኬት\n` +
+      `💵 **የአንዱ ዋጋ፦** **${order.unitPriceETB} ETB**\n` +
+      `💰 **ጠቅላላ ዋጋ፦** **${order.totalPriceETB.toLocaleString()} ETB**\n` +
+      `🏛️ **የMedSupply ኮሚሽን (2%):** \`${order.platformFeeETB} ETB\`\n` +
+      `🚚 **የማስረከቢያ አድራሻ፦** ${order.deliveryAddress}\n` +
+      `💳 **የክፍያ ዘዴ፦** ${order.paymentMethod}\n` +
+      `━━━━━━━━━━━━━━━━━━━━━━━━━━\n` +
+      `📌 *እባክዎ ትዕዛዙን አዘጋጅተው በተስማሙበት ሰዓት ውስጥ ለካውንተሩ ያስረክቡ።*`;
+
+    if (token && targetChatId && !targetChatId.startsWith('tg_')) {
+      try {
+        await dispatchTelegramApi(token, 'sendMessage', {
+          chat_id: targetChatId,
+          text: message.replace(/\*\*(.*?)\*\*/g, '*$1*'),
+          parse_mode: 'Markdown',
+        });
+        return true;
+      } catch (err: any) {
+        console.warn('[TelegramBot] Failed to send B2B PO alert:', err.message);
+      }
+    }
+    return false;
   }
 
   /**

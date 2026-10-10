@@ -5,6 +5,9 @@ import {
   PharmacyPortalAccount,
   AdminUser,
   DemandIntelligenceItem,
+  Wholesaler,
+  WholesaleListing,
+  WholesalePurchaseOrder,
 } from './in-memory-db';
 import { UserSubscription } from '../monetization/subscription.types';
 
@@ -269,4 +272,69 @@ export interface IDatabaseRepository {
       expiresAt?: string;
     }
   ): Promise<{ success: boolean; pharmacy?: Pharmacy; error?: string }>;
+
+  /**
+   * B2B MedSupply Exchange: Get certified wholesale stock listings
+   */
+  getWholesaleListings(filter?: {
+    drugName?: string;
+    category?: string;
+    wholesalerId?: string;
+    inStockOnly?: boolean;
+  }): Promise<WholesaleListing[]>;
+
+  /**
+   * B2B MedSupply Exchange: Get wholesale listing by ID
+   */
+  getWholesaleListingById(id: string): Promise<WholesaleListing | null>;
+
+  /**
+   * B2B MedSupply Exchange: Match available bulk importers for a low-stock/out-of-stock medicine
+   */
+  matchWholesaleStockForDrug(drugName: string): Promise<WholesaleListing[]>;
+
+  /**
+   * B2B MedSupply Exchange: Create wholesale Purchase Order (PO)
+   */
+  createWholesalePurchaseOrder(orderData: {
+    pharmacyId: string;
+    listingId: string;
+    quantity: number;
+    deliveryAddress?: string;
+    paymentMethod?: 'COD' | 'TELEBIRR' | 'CBE_BIRR';
+    statusNotes?: string;
+  }): Promise<{ success: boolean; order?: WholesalePurchaseOrder; error?: string }>;
+
+  /**
+   * B2B MedSupply Exchange: List wholesale purchase orders
+   */
+  getWholesaleOrders(filter?: {
+    pharmacyId?: string;
+    wholesalerId?: string;
+    status?: string;
+  }): Promise<WholesalePurchaseOrder[]>;
+
+  /**
+   * B2B MedSupply Exchange: Update status of purchase order
+   */
+  updateWholesaleOrderStatus(
+    orderId: string,
+    status: 'PENDING' | 'CONFIRMED' | 'DISPATCHED' | 'DELIVERED' | 'CANCELLED',
+    statusNotes?: string
+  ): Promise<{ success: boolean; order?: WholesalePurchaseOrder; error?: string }>;
+
+  /**
+   * B2B MedSupply Exchange: Retrieve all certified wholesalers/importers
+   */
+  getAllWholesalers(): Promise<Wholesaler[]>;
+
+  /**
+   * B2B MedSupply Exchange: Platform fee and gross merchandise volume report (2% fee telemetry)
+   */
+  getB2BCommissionReport(): Promise<{
+    totalGrossVolumeETB: number;
+    totalPlatformFeesETB: number;
+    ordersCount: number;
+    orders: WholesalePurchaseOrder[];
+  }>;
 }

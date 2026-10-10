@@ -1375,6 +1375,162 @@ app.post(
 );
 
 // ==========================================
+// 6C. B2B WHOLESALE RESTOCKING MARKETPLACE ("MEDSUPPLY EXCHANGE")
+// ==========================================
+
+// 1. Browse certified wholesale listings
+app.get('/api/b2b/listings', async (req: Request, res: Response) => {
+  try {
+    const { category, search, wholesalerId, inStockOnly } = req.query;
+    const listings = await dbRepo.getWholesaleListings({
+      category: category ? String(category) : undefined,
+      drugName: search ? String(search) : undefined,
+      wholesalerId: wholesalerId ? String(wholesalerId) : undefined,
+      inStockOnly: inStockOnly !== 'false',
+    });
+    res.json({
+      success: true,
+      count: listings.length,
+      listings,
+    });
+  } catch (err: any) {
+    console.error('[API /b2b/listings] Error:', err);
+    res.status(500).json({ success: false, error: err.message || 'Failed to fetch wholesale listings' });
+  }
+});
+
+// 2. 1-Click stock matcher for out-of-stock retail shelf drug
+app.get('/api/b2b/match/:drugName', async (req: Request, res: Response) => {
+  try {
+    const drugName = decodeURIComponent(String(req.params.drugName || ''));
+    if (!drugName) {
+      return res.status(400).json({ success: false, error: 'drugName is required' });
+    }
+    const matches = await dbRepo.matchWholesaleStockForDrug(drugName);
+    res.json({
+      success: true,
+      drugName,
+      matchesCount: matches.length,
+      matches,
+    });
+  } catch (err: any) {
+    console.error('[API /b2b/match] Error:', err);
+    res.status(500).json({ success: false, error: err.message || 'Failed to match wholesale stock' });
+  }
+});
+
+// 3. Create a Wholesale Purchase Order (PO) with 2% platform fee calculation
+app.post('/api/b2b/orders', async (req: Request, res: Response) => {
+  try {
+    const { pharmacyId, listingId, quantity, deliveryAddress, paymentMethod, statusNotes } = req.body;
+    if (!pharmacyId || !listingId || !quantity) {
+      return res.status(400).json({ success: false, error: 'pharmacyId, listingId, and quantity are required' });
+    }
+
+    const qty = parseInt(String(quantity), 10);
+    if (isNaN(qty) || qty <= 0) {
+      return res.status(400).json({ success: false, error: 'Quantity must be a positive number' });
+    }
+
+    const result = await dbRepo.createWholesalePurchaseOrder({
+      pharmacyId: String(pharmacyId),
+      listingId: String(listingId),
+      quantity: qty,
+      deliveryAddress: deliveryAddress ? String(deliveryAddress) : undefined,
+      paymentMethod: paymentMethod || 'COD',
+      statusNotes: statusNotes ? String(statusNotes) : undefined,
+    });
+
+    if (!result.success || !result.order) {
+      return res.status(400).json({ success: false, error: result.error || 'Failed to place purchase order' });
+    }
+
+    // Instant dispatch notification to wholesaler Telegram channel/bot
+    telegramBotService.notifyWholesalePurchaseOrder(result.order).catch((err: any) => {
+      console.warn('[B2B Order] Telegram notification to wholesaler failed:', err.message);
+    });
+
+    res.json({
+      success: true,
+      message: `Purchase Order ${result.order.poNumber} submitted successfully to ${result.order.wholesalerName}.`,
+      order: result.order,
+    });
+  } catch (err: any) {
+    console.error('[API /b2b/orders POST] Error:', err);
+    res.status(500).json({ success: false, error: err.message || 'Error processing purchase order' });
+  }
+});
+
+// 4. Retrieve Wholesale Purchase Orders (for retail counter or admin)
+app.get('/api/b2b/orders', async (req: Request, res: Response) => {
+  try {
+    const { pharmacyId, wholesalerId, status } = req.query;
+    const orders = await dbRepo.getWholesaleOrders({
+      pharmacyId: pharmacyId ? String(pharmacyId) : undefined,
+      wholesalerId: wholesalerId ? String(wholesalerId) : undefined,
+      status: status ? String(status) : undefined,
+    });
+    res.json({
+      success: true,
+      count: orders.length,
+      orders,
+    });
+  } catch (err: any) {
+    console.error('[API /b2b/orders GET] Error:', err);
+    res.status(500).json({ success: false, error: err.message || 'Failed to retrieve orders' });
+  }
+});
+
+// 5. Update Wholesale Purchase Order status
+app.post('/api/b2b/orders/:orderId/status', async (req: Request, res: Response) => {
+  try {
+    const orderId = String(req.params.orderId);
+    const { status, statusNotes } = req.body;
+    if (!status) {
+      return res.status(400).json({ success: false, error: 'status is required' });
+    }
+
+    const result = await dbRepo.updateWholesaleOrderStatus(orderId, status, statusNotes);
+    if (!result.success) {
+      return res.status(400).json({ success: false, error: result.error || 'Failed to update order status' });
+    }
+    res.json(result);
+  } catch (err: any) {
+    console.error('[API /b2b/orders/status] Error:', err);
+    res.status(500).json({ success: false, error: err.message || 'Failed to update order status' });
+  }
+});
+
+// 6. List all certified importers/wholesalers
+app.get('/api/b2b/wholesalers', async (_req: Request, res: Response) => {
+  try {
+    const wholesalers = await dbRepo.getAllWholesalers();
+    res.json({
+      success: true,
+      wholesalers,
+    });
+  } catch (err: any) {
+    console.error('[API /b2b/wholesalers] Error:', err);
+    res.status(500).json({ success: false, error: err.message || 'Failed to list wholesalers' });
+  }
+});
+
+// 7. B2B Platform commission & gross merchandise volume audit (Admin / Finance)
+app.get('/api/b2b/invoicing', async (_req: Request, res: Response) => {
+  try {
+    const report = await dbRepo.getB2BCommissionReport();
+    res.json({
+      success: true,
+      commissionRatePercent: '2.0%',
+      ...report,
+    });
+  } catch (err: any) {
+    console.error('[API /b2b/invoicing] Error:', err);
+    res.status(500).json({ success: false, error: err.message || 'Failed to fetch B2B commission report' });
+  }
+});
+
+// ==========================================
 // 7. TELEGRAM VERIFICATION BOT APIS (CHANNEL B)
 // ==========================================
 // Webhook & Chat Interaction

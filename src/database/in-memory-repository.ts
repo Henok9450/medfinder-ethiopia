@@ -7,6 +7,9 @@ import {
   PharmacyPortalAccount,
   AdminUser,
   DemandIntelligenceItem,
+  Wholesaler,
+  WholesaleListing,
+  WholesalePurchaseOrder,
 } from './in-memory-db';
 import { UserSubscription } from '../monetization/subscription.types';
 import { MedicalFuzzyMatcher } from '../matching/medical-fuzzy-matcher';
@@ -388,5 +391,53 @@ export class InMemoryRepository implements IDatabaseRepository {
 
     pharm.analyticsAccess = access;
     return { success: true, pharmacy: pharm };
+  }
+
+  public async getWholesaleListings(filter?: { drugName?: string; category?: string; wholesalerId?: string; inStockOnly?: boolean }): Promise<WholesaleListing[]> {
+    return this.db.getWholesaleListings(filter);
+  }
+
+  public async getWholesaleListingById(id: string): Promise<WholesaleListing | null> {
+    return this.db.getWholesaleListingById(id) || null;
+  }
+
+  public async matchWholesaleStockForDrug(drugName: string): Promise<WholesaleListing[]> {
+    return this.db.matchWholesaleStockForDrug(drugName);
+  }
+
+  public async createWholesalePurchaseOrder(orderData: {
+    pharmacyId: string;
+    listingId: string;
+    quantity: number;
+    deliveryAddress?: string;
+    paymentMethod?: 'COD' | 'TELEBIRR' | 'CBE_BIRR';
+    statusNotes?: string;
+  }): Promise<{ success: boolean; order?: WholesalePurchaseOrder; error?: string }> {
+    return this.db.createWholesalePurchaseOrder(orderData);
+  }
+
+  public async getWholesaleOrders(filter?: { pharmacyId?: string; wholesalerId?: string; status?: string }): Promise<WholesalePurchaseOrder[]> {
+    return this.db.getWholesaleOrders(filter);
+  }
+
+  public async updateWholesaleOrderStatus(
+    orderId: string,
+    status: 'PENDING' | 'CONFIRMED' | 'DISPATCHED' | 'DELIVERED' | 'CANCELLED',
+    statusNotes?: string
+  ): Promise<{ success: boolean; order?: WholesalePurchaseOrder; error?: string }> {
+    return this.db.updateWholesaleOrderStatus(orderId, status, statusNotes);
+  }
+
+  public async getAllWholesalers(): Promise<Wholesaler[]> {
+    return this.db.getAllWholesalers();
+  }
+
+  public async getB2BCommissionReport(): Promise<{
+    totalGrossVolumeETB: number;
+    totalPlatformFeesETB: number;
+    ordersCount: number;
+    orders: WholesalePurchaseOrder[];
+  }> {
+    return this.db.getB2BCommissionReport();
   }
 }
