@@ -307,6 +307,11 @@
           <i class="fa-solid fa-scale-balanced"></i>
           <span>EFDA & Telegram Alerts</span>
         </button>
+        <button onclick="switchStudioTab('analytics')" id="tabNavAnalytics" class="px-4 py-2.5 text-xs font-semibold border-b-2 border-transparent text-slate-500 hover:text-slate-900 whitespace-nowrap transition flex items-center gap-1.5">
+          <i class="fa-solid fa-chart-line text-indigo-500"></i>
+          <span>Demand Radar & Shortages</span>
+          <span id="navAnalyticsTierBadge" class="text-[9px] bg-slate-100 text-slate-600 font-bold px-1.5 py-0.2 rounded uppercase">Basic</span>
+        </button>
       </div>
 
       <!-- ============================================================ -->
@@ -560,6 +565,123 @@
             </div>
           </div>
         </div>
+      </div>
+
+      <!-- ============================================================ -->
+      <!-- TAB 5: NEIGHBORHOOD DEMAND RADAR & STOCK-OUT INTELLIGENCE   -->
+      <!-- ============================================================ -->
+      <div id="panelAnalytics" class="hidden space-y-6">
+
+        <div class="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm space-y-4">
+          <div class="flex flex-wrap items-center justify-between gap-3 pb-3 border-b border-slate-100">
+            <div class="flex items-center space-x-3">
+              <div class="w-12 h-12 rounded-2xl bg-gradient-to-tr from-amber-500 to-rose-500 text-white flex items-center justify-center text-xl shadow-md">
+                <i class="fa-solid fa-chart-line"></i>
+              </div>
+              <div>
+                <div class="flex items-center gap-2">
+                  <h2 class="text-base font-extrabold text-slate-900">Neighborhood Demand Radar & Stock-Out Intelligence</h2>
+                  <span id="pwaAnalyticsActiveBadge" class="text-[10px] font-bold px-2.5 py-0.5 rounded-full uppercase bg-slate-100 text-slate-600">Basic</span>
+                </div>
+                <p class="text-xs text-slate-500 mt-0.5">Real-time patient search telemetry in your sub-city showing high unmet demand & retail stock opportunities.</p>
+              </div>
+            </div>
+
+            <div class="flex items-center gap-2">
+              <select id="pwaDemandSubCitySelect" onchange="loadPwaDemandRadar()" class="text-xs bg-white border border-slate-200 rounded-xl px-3 py-2 font-semibold text-slate-700 outline-none shadow-xs">
+                <option value="Bole">Bole Sub-City</option>
+                <option value="Kirkos">Kirkos Sub-City</option>
+                <option value="Yeka">Yeka Sub-City</option>
+                <option value="Arada">Arada Sub-City</option>
+                <option value="Nifas Silk-Lafto">Nifas Silk-Lafto</option>
+                <option value="Lideta">Lideta Sub-City</option>
+                <option value="Gullele">Gullele Sub-City</option>
+                <option value="Kolfe Keranio">Kolfe Keranio</option>
+                <option value="Akaky Kaliti">Akaky Kaliti</option>
+                <option value="Addis Ketema">Addis Ketema</option>
+                <option value="ALL">All Sub-Cities (Enterprise)</option>
+              </select>
+              <button onclick="loadPwaDemandRadar()" class="text-xs bg-slate-100 hover:bg-slate-200 text-slate-700 font-semibold px-3 py-2 rounded-xl transition flex items-center gap-1 shadow-xs">
+                <i class="fa-solid fa-rotate-right"></i>
+                <span>Refresh</span>
+              </button>
+            </div>
+          </div>
+
+          <!-- SUMMARY KPI CARDS -->
+          <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
+            <div class="p-4 bg-rose-50/70 border border-rose-200 rounded-2xl space-y-1">
+              <span class="text-[11px] font-semibold text-rose-700 uppercase tracking-wider flex items-center gap-1">
+                <i class="fa-solid fa-triangle-exclamation"></i> Critical Drug Deficits
+              </span>
+              <div id="pwaKpiCritical" class="text-2xl font-black text-rose-950">0 Items</div>
+              <p class="text-[10px] text-slate-500">Searched heavily with zero or near-zero stocking pharmacies.</p>
+            </div>
+
+            <div class="p-4 bg-amber-50/70 border border-amber-200 rounded-2xl space-y-1">
+              <span class="text-[11px] font-semibold text-amber-700 uppercase tracking-wider flex items-center gap-1">
+                <i class="fa-solid fa-fire text-amber-600"></i> Tracked Patient Inquiries
+              </span>
+              <div id="pwaKpiSearches" class="text-2xl font-black text-amber-950">0 Inquiries</div>
+              <p class="text-[10px] text-slate-500">Total patient search queries logged in this area (last 14 days).</p>
+            </div>
+
+            <div class="p-4 bg-emerald-50/70 border border-emerald-200 rounded-2xl space-y-1">
+              <span class="text-[11px] font-semibold text-emerald-700 uppercase tracking-wider flex items-center gap-1">
+                <i class="fa-solid fa-sack-dollar text-emerald-600"></i> Missed Market Opportunity
+              </span>
+              <div id="pwaKpiOpportunity" class="text-2xl font-black text-emerald-950">0 ETB</div>
+              <p class="text-[10px] text-slate-500">Estimated retail prescription sales lost due to local stock-outs.</p>
+            </div>
+          </div>
+
+          <!-- RADAR TABLE CONTAINER / LOCKED PAYWALL OVERLAY -->
+          <div class="relative rounded-2xl border border-slate-200 overflow-hidden shadow-xs">
+            
+            <!-- LOCKED OVERLAY FOR UNSUBSCRIBED PHARMACIES -->
+            <div id="pwaDemandLockedOverlay" class="hidden absolute inset-0 z-20 bg-slate-900/60 backdrop-blur-md flex flex-col items-center justify-center p-6 text-center text-white space-y-3">
+              <div class="w-14 h-14 rounded-2xl bg-gradient-to-tr from-amber-400 to-rose-500 flex items-center justify-center text-2xl shadow-xl">
+                <i class="fa-solid fa-lock"></i>
+              </div>
+              <div class="max-w-md space-y-1">
+                <h4 class="font-extrabold text-lg text-white">Unlock Neighborhood Demand Intelligence</h4>
+                <p class="text-xs text-slate-200 leading-relaxed">
+                  See exactly which drugs patients are searching for in your sub-city right now. Procure shortage stock before competitors and capture high-margin prescriptions.
+                </p>
+              </div>
+              <div class="flex flex-wrap items-center justify-center gap-2 pt-2">
+                <button onclick="alert('To activate Demand Radar Pro for your pharmacy counter, please contact the EFDA Regulatory Administration desk or platform support.')" class="bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-600 hover:to-teal-700 text-white text-xs font-bold px-4 py-2.5 rounded-xl shadow-md transition flex items-center gap-1.5">
+                  <i class="fa-solid fa-bolt"></i>
+                  <span>Upgrade to Demand Radar Pro</span>
+                </button>
+              </div>
+              <span class="text-[10px] text-slate-300">Feature status: Controlled by EFDA Regulatory Administration desk.</span>
+            </div>
+
+            <!-- TABLE CONTENT -->
+            <div class="overflow-x-auto">
+              <table class="w-full text-left text-xs">
+                <thead class="bg-slate-50 text-slate-600 uppercase font-semibold border-b border-slate-200">
+                  <tr>
+                    <th class="p-3">Medication</th>
+                    <th class="p-3">Sub-City</th>
+                    <th class="p-3">Patient Demand</th>
+                    <th class="p-3">Stocking Pharmacies</th>
+                    <th class="p-3">Pressure Ratio</th>
+                    <th class="p-3">Shortage Level</th>
+                    <th class="p-3">Estimated Missed Sales</th>
+                    <th class="p-3 text-right">Action</th>
+                  </tr>
+                </thead>
+                <tbody id="pwaDemandTableTbody" class="divide-y divide-slate-100 bg-white">
+                  <tr><td colspan="8" class="p-4 text-center text-slate-400">Loading demand telemetry...</td></tr>
+                </tbody>
+              </table>
+            </div>
+
+          </div>
+        </div>
+
       </div>
 
     </section>
@@ -1136,7 +1258,7 @@
 
     // --- TAB SWITCHING IN STUDIO ---
     function switchStudioTab(tab) {
-      const tabs = ['inventory', 'vouchers', 'broadcasts', 'regulatory'];
+      const tabs = ['inventory', 'vouchers', 'broadcasts', 'regulatory', 'analytics'];
       tabs.forEach(t => {
         const panel = document.getElementById('panel' + t.charAt(0).toUpperCase() + t.slice(1));
         const nav = document.getElementById('tabNav' + t.charAt(0).toUpperCase() + t.slice(1));
@@ -1150,6 +1272,139 @@
       });
       if (tab === 'broadcasts') loadActiveBroadcasts();
       if (tab === 'vouchers') loadCounterReservations();
+      if (tab === 'analytics') loadPwaDemandRadar();
+    }
+
+    // --- DEMAND RADAR LOGIC IN STUDIO PWA ---
+    async function loadPwaDemandRadar() {
+      const pharmacyId = currentAuthSession?.account?.pharmacyId || currentAuthSession?.pharmacy?.id;
+      if (!pharmacyId) return;
+
+      const subCitySelect = document.getElementById('pwaDemandSubCitySelect');
+      const subCity = subCitySelect ? subCitySelect.value : (currentAuthSession?.pharmacy?.subCity || 'Bole');
+      const tbody = document.getElementById('pwaDemandTableTbody');
+      const lockedOverlay = document.getElementById('pwaDemandLockedOverlay');
+      const activeBadge = document.getElementById('pwaAnalyticsActiveBadge');
+      const navBadge = document.getElementById('navAnalyticsTierBadge');
+
+      if (!tbody) return;
+      tbody.innerHTML = `<tr><td colspan="8" class="p-6 text-center text-slate-400">Loading real-time demand telemetry...</td></tr>`;
+
+      try {
+        const url = `/api/analytics/demand?pharmacyId=${encodeURIComponent(pharmacyId)}&subCity=${encodeURIComponent(subCity)}&days=14`;
+        const res = await fetch(url);
+        const data = await res.json();
+
+        if (data.locked) {
+          if (lockedOverlay) lockedOverlay.classList.remove('hidden');
+          if (activeBadge) {
+            activeBadge.className = 'text-[10px] font-bold px-2.5 py-0.5 rounded-full uppercase bg-slate-100 text-slate-500';
+            activeBadge.textContent = 'Basic (Locked)';
+          }
+          if (navBadge) {
+            navBadge.className = 'text-[9px] bg-slate-100 text-slate-500 font-bold px-1.5 py-0.2 rounded uppercase';
+            navBadge.textContent = 'Locked';
+          }
+
+          const teaser = data.teaser || [];
+          tbody.innerHTML = teaser.map(item => `
+            <tr class="opacity-40 filter blur-[1px]">
+              <td class="p-3.5 font-bold text-slate-900">${item.drugName}</td>
+              <td class="p-3.5 text-slate-500">${item.subCity}</td>
+              <td class="p-3.5 font-bold text-indigo-700">🔒 Pro Tier</td>
+              <td class="p-3.5 font-semibold text-slate-600">${item.stockingPharmaciesCount} counters</td>
+              <td class="p-3.5 font-mono">🔒 Locked</td>
+              <td class="p-3.5"><span class="bg-amber-100 text-amber-800 font-bold px-2 py-0.5 rounded text-[10px]">${item.shortageLevel}</span></td>
+              <td class="p-3.5 font-bold text-emerald-800">~${Math.round(item.estimatedMissedSalesETB || 2500)} ETB</td>
+              <td class="p-3.5 text-right"><span class="text-xs text-slate-400">Upgrade Required</span></td>
+            </tr>
+          `).join('');
+
+          document.getElementById('pwaKpiCritical').innerText = `${teaser.filter(t => t.shortageLevel === 'CRITICAL').length} Items`;
+          document.getElementById('pwaKpiSearches').innerText = '🔒 Locked';
+          document.getElementById('pwaKpiOpportunity').innerText = '🔒 Locked';
+          return;
+        }
+
+        // UNLOCKED VIEW
+        if (lockedOverlay) lockedOverlay.classList.add('hidden');
+        if (activeBadge) {
+          activeBadge.className = 'text-[10px] font-bold px-2.5 py-0.5 rounded-full uppercase bg-emerald-100 text-emerald-800';
+          activeBadge.textContent = `🟢 ${data.tier || 'PRO'} ACTIVATED`;
+        }
+        if (navBadge) {
+          navBadge.className = 'text-[9px] bg-emerald-100 text-emerald-800 font-bold px-1.5 py-0.2 rounded uppercase';
+          navBadge.textContent = 'Active ⚡';
+        }
+
+        const items = data.items || [];
+        if (items.length === 0) {
+          tbody.innerHTML = `<tr><td colspan="8" class="p-8 text-center text-slate-400 text-xs">No shortage spikes recorded for ${subCity} in the last 14 days. Demand telemetry logs automatically as patients search.</td></tr>`;
+          document.getElementById('pwaKpiCritical').innerText = '0 Items';
+          document.getElementById('pwaKpiSearches').innerText = '0 Inquiries';
+          document.getElementById('pwaKpiOpportunity').innerText = '0 ETB';
+          return;
+        }
+
+        tbody.innerHTML = items.map(item => {
+          let badgeColor = 'bg-slate-100 text-slate-700';
+          if (item.shortageLevel === 'CRITICAL') badgeColor = 'bg-rose-100 text-rose-800 font-bold';
+          else if (item.shortageLevel === 'HIGH') badgeColor = 'bg-amber-100 text-amber-800 font-bold';
+          else if (item.shortageLevel === 'MODERATE') badgeColor = 'bg-blue-100 text-blue-800 font-semibold';
+
+          return `
+            <tr class="hover:bg-slate-50 transition">
+              <td class="p-3.5 font-bold text-slate-900">${item.drugName}</td>
+              <td class="p-3.5 text-slate-500 font-medium">📍 ${item.subCity}</td>
+              <td class="p-3.5">
+                <span class="font-extrabold text-indigo-950">${item.searchCount}</span>
+                <span class="text-[10px] text-slate-400 block">patient searches</span>
+              </td>
+              <td class="p-3.5 font-semibold ${item.stockingPharmaciesCount === 0 ? 'text-rose-600 font-bold' : 'text-slate-700'}">
+                ${item.stockingPharmaciesCount === 0 ? '⚠️ 0 Pharmacies (Acute Deficit)' : `${item.stockingPharmaciesCount} stocking`}
+              </td>
+              <td class="p-3.5 font-mono font-bold text-slate-800">${item.unmetDemandRatio}x</td>
+              <td class="p-3.5">
+                <span class="${badgeColor} px-2 py-0.5 rounded text-[10px] inline-flex items-center gap-1">
+                  ${item.shortageLevel === 'CRITICAL' ? '● CRITICAL' : item.shortageLevel === 'HIGH' ? '▲ HIGH GAP' : item.shortageLevel}
+                </span>
+              </td>
+              <td class="p-3.5 font-bold text-emerald-700">
+                ${(item.estimatedMissedSalesETB || 0).toLocaleString()} ETB
+              </td>
+              <td class="p-3.5 text-right">
+                <button onclick="quickAddPwaShortage('${item.drugName}')" class="text-xs bg-emerald-600 hover:bg-emerald-700 text-white font-bold px-3 py-1.5 rounded-xl transition shadow-xs flex items-center gap-1 ml-auto">
+                  <i class="fa-solid fa-plus text-[10px]"></i>
+                  <span>Add to Shelf</span>
+                </button>
+              </td>
+            </tr>
+          `;
+        }).join('');
+
+        const criticalCount = items.filter(i => i.shortageLevel === 'CRITICAL').length;
+        const totalQueries = items.reduce((acc, c) => acc + (c.searchCount || 0), 0);
+        const totalOpp = items.reduce((acc, c) => acc + (c.estimatedMissedSalesETB || 0), 0);
+
+        document.getElementById('pwaKpiCritical').innerText = `${criticalCount} Items`;
+        document.getElementById('pwaKpiSearches').innerText = `${totalQueries} Inquiries`;
+        document.getElementById('pwaKpiOpportunity').innerText = `${totalOpp.toLocaleString()} ETB`;
+
+      } catch (err) {
+        tbody.innerHTML = `<tr><td colspan="8" class="p-6 text-center text-rose-500">Failed to load demand radar: ${err.message}</td></tr>`;
+      }
+    }
+
+    function quickAddPwaShortage(drugName) {
+      switchStudioTab('inventory');
+      openSingleAddModal();
+      setTimeout(() => {
+        const nameInput = document.getElementById('singleMedName');
+        if (nameInput) {
+          nameInput.value = drugName;
+          nameInput.focus();
+        }
+      }, 150);
     }
 
     // --- INVENTORY MANAGEMENT ---
