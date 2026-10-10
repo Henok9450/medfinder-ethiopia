@@ -25,6 +25,7 @@ CREATE TABLE IF NOT EXISTS pharmacies (
   is_permanently_banned BOOLEAN DEFAULT FALSE,
   in_stock_items TEXT[] DEFAULT ARRAY[]::TEXT[],
   inventory JSONB DEFAULT '[]'::jsonb,
+  analytics_access JSONB DEFAULT '{"enabled": false, "tier": "BASIC"}'::jsonb,
   -- Spatial location using PostGIS geography point (Longitude, Latitude)
   location GEOGRAPHY(Point, 4326) NOT NULL,
   created_at TIMESTAMPTZ DEFAULT NOW(),
@@ -165,3 +166,20 @@ CREATE TABLE IF NOT EXISTS pharmacy_portal_accounts (
   last_login_at TIMESTAMPTZ,
   session_token TEXT
 );
+
+-- 11. Search Telemetry & Demand Intelligence Events
+CREATE TABLE IF NOT EXISTS search_analytics_events (
+  id TEXT PRIMARY KEY,
+  query TEXT NOT NULL,
+  normalized_drug TEXT NOT NULL,
+  core_brand_or_generic TEXT NOT NULL,
+  sub_city TEXT NOT NULL,
+  city TEXT NOT NULL DEFAULT 'Addis Ababa',
+  matched_count INTEGER NOT NULL DEFAULT 0,
+  user_id TEXT,
+  created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_search_analytics_created ON search_analytics_events (created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_search_analytics_drug_subcity ON search_analytics_events (normalized_drug, sub_city);
+

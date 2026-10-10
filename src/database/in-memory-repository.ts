@@ -6,6 +6,7 @@ import {
   PharmacyVerificationApplication,
   PharmacyPortalAccount,
   AdminUser,
+  DemandIntelligenceItem,
 } from './in-memory-db';
 import { UserSubscription } from '../monetization/subscription.types';
 import { MedicalFuzzyMatcher } from '../matching/medical-fuzzy-matcher';
@@ -264,5 +265,105 @@ export class InMemoryRepository implements IDatabaseRepository {
     }
   ): Promise<PharmacyVerificationApplication | null> {
     return this.db.resubmitVerificationApplication(id, updates);
+  }
+
+  public async logSearchTelemetry(event: {
+    query: string;
+    normalizedDrug: string;
+    coreBrandOrGeneric: string;
+    subCity: string;
+    city?: string;
+    matchedCount: number;
+    userId?: string;
+  }): Promise<void> {
+    const id = `ev-${Math.floor(100000 + Math.random() * 900000)}`;
+    this.db.searchAnalyticsEvents.unshift({
+      id,
+      query: event.query,
+      normalizedDrug: event.normalizedDrug.toLowerCase(),
+      coreBrandOrGeneric: event.coreBrandOrGeneric.toLowerCase(),
+      subCity: event.subCity || 'Bole',
+      city: event.city || 'Addis Ababa',
+      matchedCount: event.matchedCount || 0,
+      userId: event.userId,
+      timestamp: new Date().toISOString(),
+    });
+
+    if (this.db.searchAnalyticsEvents.length > 500) {
+      this.db.searchAnalyticsEvents.length = 500;
+    }
+  }
+
+  public async getDemandIntelligence(params?: {
+    subCity?: string;
+    limit?: number;
+    days?: number;
+  }): Promise<DemandIntelligenceItem[]> {
+    const subFilter = params?.subCity && params.subCity !== 'ALL' ? params.subCity.toLowerCase() : null;
+    const limit = params?.limit || 15;
+
+    // Aggregate counts
+    const map = new Map<string, { drug: string; subCity: string; count: number; lastAt: string }>();
+
+    for (const ev of this.db.searchAnalyticsEvents) {
+      if (subFilter && ev.subCity.toLowerCase() !== subFilter) continue;
+      const key = `${ev.coreBrandOrGeneric}__${ev.subCity}`;
+      const existing = map.get(key);
+      if (existing) {
+        existing.count++;
+      } else {
+        map.set(key, { drug: ev.coreBrandOrGeneric, subCity: ev.subCity, count: 1, lastAt: ev.timestamp });
+      }
+    }
+
+    const allPharmacies = [...this.db.pharmacies];
+    const items: DemandIntelligenceItem[] = [];
+
+    for (const [, item] of map.entries()) {
+      const stocking = allPharmacies.filter((p) => {
+        if (p.isPermanentlyBanned || p.isShadowBanned) return false;
+        if (item.subCity && p.subCity.toLowerCase() !== item.subCity.toLowerCase()) return false;
+        const parsed = MedicalFuzzyMatcher.parseQuery(item.drug);
+        const hasStock = p.inStockItems?.some((it) => MedicalFuzzyMatcher.matchItem(it, parsed).matched);
+        const hasInv = p.inventory?.some((it) => MedicalFuzzyMatcher.matchItem(it.name, parsed).matched);
+        return hasStock || hasInv;
+      }).length;
+
+      const ratio = parseFloat((item.count / (stocking + 1)).toFixed(2));
+      let shortageLevel: 'CRITICAL' | 'HIGH' | 'MODERATE' | 'SUFFICIENT' = 'SUFFICIENT';
+      if (stocking === 0 || ratio >= 5) shortageLevel = 'CRITICAL';
+      else if (ratio >= 2.5) shortageLevel = 'HIGH';
+      else if (ratio >= 1.2) shortageLevel = 'MODERATE';
+
+      const formattedDrug = item.drug.charAt(0).toUpperCase() + item.drug.slice(1);
+      items.push({
+        drugName: formattedDrug,
+        subCity: item.subCity,
+        searchCount: item.count,
+        stockingPharmaciesCount: stocking,
+        unmetDemandRatio: ratio,
+        shortageLevel,
+        estimatedMissedSalesETB: Math.max(item.count * 85, (item.count - stocking * 5) * 320),
+        lastSearchedAt: item.lastAt,
+      });
+    }
+
+    return items.sort((a, b) => b.searchCount - a.searchCount).slice(0, limit);
+  }
+
+  public async setPharmacyAnalyticsAccess(
+    pharmacyId: string,
+    access: {
+      enabled: boolean;
+      allowedSubCities?: string[];
+      tier?: 'BASIC' | 'PRO' | 'ENTERPRISE';
+      expiresAt?: string;
+    }
+  ): Promise<{ success: boolean; pharmacy?: Pharmacy; error?: string }> {
+    const pharm = this.db.pharmacies.find((p) => p.id === pharmacyId);
+    if (!pharm) return { success: false, error: 'Pharmacy not found' };
+
+    pharm.analyticsAccess = access;
+    return { success: true, pharmacy: pharm };
   }
 }

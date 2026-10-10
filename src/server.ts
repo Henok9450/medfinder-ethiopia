@@ -131,9 +131,20 @@ app.post('/api/search', async (req: Request, res: Response) => {
     userLng: Number(userLng),
   });
 
-  if (directMatches.length > 0) {
-    const parsedQuery = MedicalFuzzyMatcher.parseQuery(medicineName);
+  const parsedQuery = MedicalFuzzyMatcher.parseQuery(medicineName);
 
+  // 3B. Background search telemetry logging for Demand Intelligence
+  dbRepo.logSearchTelemetry({
+    query: medicineName,
+    normalizedDrug: parsedQuery.normalizedQuery,
+    coreBrandOrGeneric: parsedQuery.coreBrandOrGeneric,
+    subCity: subCity || 'Bole',
+    city: city || 'Addis Ababa',
+    matchedCount: directMatches.length,
+    userId,
+  }).catch((err: any) => console.warn('[SearchTelemetry] Error:', err.message));
+
+  if (directMatches.length > 0) {
     return res.json({
       success: true,
       mode: 'INSTANT_CATALOG_MATCH',
@@ -1010,10 +1021,11 @@ app.post('/api/admin/config/test-vision-key', requireAdminAuth, requirePrivilege
 app.get('/api/admin/stats', adminController.getStats);
 
 // 6. REGULATORY COMPLIANCE & PHARMACY VERIFICATION DESK
-app.get('/api/admin/pharmacies', (_req: Request, res: Response) => {
+app.get('/api/admin/pharmacies', async (_req: Request, res: Response) => {
+  const pharms = await dbRepo.getAllPharmacies();
   res.json({
     success: true,
-    pharmacies: db.pharmacies.map((p) => ({
+    pharmacies: pharms.map((p) => ({
       id: p.id,
       name: p.name,
       subCity: p.subCity,
@@ -1024,14 +1036,16 @@ app.get('/api/admin/pharmacies', (_req: Request, res: Response) => {
       trustScore: p.trustScore,
       strikeCount: p.strikeCount,
       isPermanentlyBanned: p.isPermanentlyBanned,
+      analyticsAccess: p.analyticsAccess || { enabled: false, tier: 'BASIC' },
     })),
   });
 });
 
-app.get('/api/pharmacies', (_req: Request, res: Response) => {
+app.get('/api/pharmacies', async (_req: Request, res: Response) => {
+  const pharms = await dbRepo.getAllPharmacies();
   res.json({
     success: true,
-    pharmacies: db.pharmacies.map((p) => ({
+    pharmacies: pharms.map((p) => ({
       id: p.id,
       name: p.name,
       subCity: p.subCity,
@@ -1042,6 +1056,7 @@ app.get('/api/pharmacies', (_req: Request, res: Response) => {
       trustScore: p.trustScore,
       strikeCount: p.strikeCount,
       isPermanentlyBanned: p.isPermanentlyBanned,
+      analyticsAccess: p.analyticsAccess || { enabled: false, tier: 'BASIC' },
     })),
   });
 });
@@ -1053,6 +1068,159 @@ app.post('/api/admin/pharmacy/toggle-verification', requireAdminAuth, requirePri
   pharm.isVerified = !pharm.isVerified;
   res.json({ success: true, pharmacyId: pharm.id, isVerified: pharm.isVerified });
 });
+
+// ==========================================
+// 6B. DEMAND INTELLIGENCE & SHORTAGE ANALYTICS
+// ==========================================
+
+// Endpoint for retrieving neighborhood drug demand & stock-out radar
+app.get('/api/analytics/demand', async (req: Request, res: Response) => {
+  try {
+    const pharmacyId = req.query.pharmacyId ? String(req.query.pharmacyId) : undefined;
+    const subCityParam = req.query.subCity ? String(req.query.subCity) : undefined;
+    const days = req.query.days ? parseInt(String(req.query.days), 10) : 14;
+
+    // Check if called with an admin session
+    const adminToken = (req.headers.authorization || '').replace(/^Bearer\s+/i, '') || String(req.query.adminToken || '');
+    let isAdmin = false;
+    if (adminToken) {
+      const admin = (await dbRepo.getAdminBySession(adminToken)) || db.getAdminBySession(adminToken);
+      if (admin) isAdmin = true;
+    }
+
+    let allowedSubCities: string[] | undefined = undefined;
+    let pharmacyTier = 'BASIC';
+    let isPharmacyLocked = false;
+
+    if (pharmacyId && !isAdmin) {
+      const pharmacy = await dbRepo.getPharmacyById(pharmacyId);
+      if (!pharmacy) {
+        return res.status(404).json({ success: false, error: 'Pharmacy not found' });
+      }
+
+      const access = pharmacy.analyticsAccess;
+      if (!access || access.enabled !== true) {
+        isPharmacyLocked = true;
+      } else {
+        pharmacyTier = access.tier || 'PRO';
+        if (access.allowedSubCities && access.allowedSubCities.length > 0) {
+          allowedSubCities = access.allowedSubCities;
+        } else if (pharmacy.subCity) {
+          allowedSubCities = [pharmacy.subCity];
+        }
+      }
+    }
+
+    // If locked for this pharmacy, return teaser metadata with blur
+    if (isPharmacyLocked) {
+      // Get sample teaser data (masked counts)
+      const fullIntel = await dbRepo.getDemandIntelligence({
+        subCity: subCityParam,
+        days: days || 14,
+        limit: 5,
+      });
+
+      const teaserItems = fullIntel.map((item) => ({
+        drugName: item.drugName,
+        subCity: item.subCity,
+        searchCountMasked: '🔒 Premium Tier',
+        stockingPharmaciesCount: item.stockingPharmaciesCount,
+        unmetDemandRatio: '🔒 Locked',
+        shortageLevel: item.shortageLevel,
+        estimatedMissedSalesETB: item.estimatedMissedSalesETB,
+        lastSearchedAt: item.lastSearchedAt,
+      }));
+
+      return res.json({
+        success: true,
+        locked: true,
+        tier: pharmacyTier,
+        message: 'Demand Radar analytics is locked for this pharmacy counter. Upgrade your subscription to unlock real-time patient shortage telemetry.',
+        teaserCount: teaserItems.length,
+        teaser: teaserItems,
+      });
+    }
+
+    // Determine target sub-city filter
+    let effectiveSubCity = subCityParam;
+    if (!isAdmin && allowedSubCities && allowedSubCities.length > 0) {
+      if (effectiveSubCity && effectiveSubCity !== 'ALL' && !allowedSubCities.map((s) => s.toLowerCase()).includes(effectiveSubCity.toLowerCase())) {
+        return res.status(403).json({
+          success: false,
+          error: `Your subscription does not cover analytics for sub-city "${effectiveSubCity}". Allowed: ${allowedSubCities.join(', ')}`,
+        });
+      }
+      if (!effectiveSubCity || effectiveSubCity === 'ALL') {
+        effectiveSubCity = allowedSubCities[0];
+      }
+    }
+
+    const demandItems = await dbRepo.getDemandIntelligence({
+      subCity: effectiveSubCity,
+      days: days || 14,
+      limit: 25,
+    });
+
+    const totalShortagePressure = demandItems.filter((i) => i.shortageLevel === 'CRITICAL' || i.shortageLevel === 'HIGH').length;
+    const totalPotentialOpportunityETB = demandItems.reduce((acc, curr) => acc + (curr.estimatedMissedSalesETB || 0), 0);
+
+    return res.json({
+      success: true,
+      locked: false,
+      tier: pharmacyTier,
+      subCity: effectiveSubCity || 'ALL',
+      allowedSubCities: allowedSubCities || ['ALL'],
+      summary: {
+        totalShortagePressure,
+        totalTrackedDrugs: demandItems.length,
+        totalPotentialOpportunityETB,
+      },
+      items: demandItems,
+    });
+  } catch (err: any) {
+    console.error('[API /analytics/demand] Error:', err);
+    return res.status(500).json({ success: false, error: err.message || 'Analytics query failed' });
+  }
+});
+
+// Admin-only endpoint: Grant, update, or revoke a pharmacy's analytics access
+app.post(
+  '/api/admin/pharmacy/:id/analytics-access',
+  requireAdminAuth,
+  requirePrivilege('canManagePolicies'),
+  async (req: Request, res: Response) => {
+    try {
+      const pharmacyId = String(req.params.id);
+      const { enabled, allowedSubCities, tier, expiresAt } = req.body;
+
+      if (typeof enabled !== 'boolean') {
+        return res.status(400).json({ success: false, error: '"enabled" boolean flag is required' });
+      }
+
+      const accessData = {
+        enabled: Boolean(enabled),
+        allowedSubCities: Array.isArray(allowedSubCities) ? allowedSubCities : undefined,
+        tier: (['BASIC', 'PRO', 'ENTERPRISE'].includes(tier) ? tier : 'PRO') as 'BASIC' | 'PRO' | 'ENTERPRISE',
+        expiresAt: expiresAt ? new Date(expiresAt).toISOString() : undefined,
+      };
+
+      const result = await dbRepo.setPharmacyAnalyticsAccess(pharmacyId, accessData);
+      if (!result.success || !result.pharmacy) {
+        return res.status(404).json({ success: false, error: result.error || 'Pharmacy not found' });
+      }
+
+      return res.json({
+        success: true,
+        pharmacyId: result.pharmacy.id,
+        pharmacyName: result.pharmacy.name,
+        analyticsAccess: result.pharmacy.analyticsAccess,
+      });
+    } catch (err: any) {
+      console.error('[API /admin/pharmacy/:id/analytics-access] Error:', err);
+      return res.status(500).json({ success: false, error: err.message || 'Failed to update access' });
+    }
+  }
+);
 
 // ==========================================
 // 7. TELEGRAM VERIFICATION BOT APIS (CHANNEL B)

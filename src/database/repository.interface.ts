@@ -4,6 +4,7 @@ import {
   PharmacyVerificationApplication,
   PharmacyPortalAccount,
   AdminUser,
+  DemandIntelligenceItem,
 } from './in-memory-db';
 import { UserSubscription } from '../monetization/subscription.types';
 
@@ -226,4 +227,39 @@ export interface IDatabaseRepository {
       note?: string;
     }
   ): Promise<PharmacyVerificationApplication | null>;
+
+  /**
+   * Log search analytics telemetry event
+   */
+  logSearchTelemetry(event: {
+    query: string;
+    normalizedDrug: string;
+    coreBrandOrGeneric: string;
+    subCity: string;
+    city?: string;
+    matchedCount: number;
+    userId?: string;
+  }): Promise<void>;
+
+  /**
+   * Retrieve aggregated demand intelligence (most searched drugs vs stocking pharmacies)
+   */
+  getDemandIntelligence(params?: {
+    subCity?: string;
+    limit?: number;
+    days?: number;
+  }): Promise<DemandIntelligenceItem[]>;
+
+  /**
+   * Configure a pharmacy's analytics access permissions
+   */
+  setPharmacyAnalyticsAccess(
+    pharmacyId: string,
+    access: {
+      enabled: boolean;
+      allowedSubCities?: string[];
+      tier?: 'BASIC' | 'PRO' | 'ENTERPRISE';
+      expiresAt?: string;
+    }
+  ): Promise<{ success: boolean; pharmacy?: Pharmacy; error?: string }>;
 }

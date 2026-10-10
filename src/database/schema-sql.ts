@@ -169,4 +169,20 @@ CREATE TABLE IF NOT EXISTS pharmacy_portal_accounts (
   last_login_at TIMESTAMPTZ,
   session_token TEXT
 );
+
+-- 11. Search Telemetry & Demand Intelligence Events
+CREATE TABLE IF NOT EXISTS search_analytics_events (
+  id TEXT PRIMARY KEY,
+  query TEXT NOT NULL,
+  normalized_drug TEXT NOT NULL,
+  core_brand_or_generic TEXT NOT NULL,
+  sub_city TEXT NOT NULL,
+  city TEXT NOT NULL DEFAULT 'Addis Ababa',
+  matched_count INTEGER NOT NULL DEFAULT 0,
+  user_id TEXT,
+  created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_search_analytics_created ON search_analytics_events (created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_search_analytics_drug_subcity ON search_analytics_events (normalized_drug, sub_city);
 `;

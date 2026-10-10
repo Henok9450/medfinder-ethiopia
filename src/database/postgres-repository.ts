@@ -8,6 +8,7 @@ import {
   PharmacyPortalAccount,
   AdminUser,
   InMemoryDatabase,
+  DemandIntelligenceItem,
 } from './in-memory-db';
 import { UserSubscription } from '../monetization/subscription.types';
 import { MedicalFuzzyMatcher } from '../matching/medical-fuzzy-matcher';
@@ -39,6 +40,9 @@ export class PostgresRepository implements IDatabaseRepository {
       isPermanentlyBanned: Boolean(r.isPermanentlyBanned ?? r.is_permanently_banned),
       inStockItems: Array.isArray(r.inStockItems || r.in_stock_items) ? (r.inStockItems || r.in_stock_items) : [],
       inventory: typeof r.inventory === 'string' ? JSON.parse(r.inventory) : r.inventory || [],
+      analyticsAccess: typeof (r.analyticsAccess || r.analytics_access) === 'string'
+        ? JSON.parse(r.analyticsAccess || r.analytics_access)
+        : (r.analyticsAccess || r.analytics_access || { enabled: false, tier: 'BASIC' }),
       distanceKm: r.distanceKm !== undefined ? parseFloat(r.distanceKm) : undefined,
     };
   }
@@ -76,8 +80,8 @@ export class PostgresRepository implements IDatabaseRepository {
         is_shadow_banned AS "isShadowBanned",
         shadow_ban_until AS "shadowBanUntil",
         is_permanently_banned AS "isPermanentlyBanned",
-        in_stock_items AS "inStockItems",
-        inventory,
+        in_stock_items AS "inStockItems", inventory,
+        analytics_access AS "analyticsAccess",
         ST_Y(location::geometry) AS latitude,
         ST_X(location::geometry) AS longitude,
         ROUND((ST_Distance(location, ST_MakePoint($1, $2)::geography) / 1000.0)::numeric, 2) AS "distanceKm"
@@ -136,6 +140,7 @@ export class PostgresRepository implements IDatabaseRepository {
         is_shadow_banned AS "isShadowBanned", shadow_ban_until AS "shadowBanUntil",
         is_permanently_banned AS "isPermanentlyBanned",
         in_stock_items AS "inStockItems", inventory,
+        analytics_access AS "analyticsAccess",
         ST_Y(location::geometry) AS latitude,
         ST_X(location::geometry) AS longitude
       FROM pharmacies WHERE id = $1`,
@@ -159,6 +164,7 @@ export class PostgresRepository implements IDatabaseRepository {
         is_shadow_banned AS "isShadowBanned", shadow_ban_until AS "shadowBanUntil",
         is_permanently_banned AS "isPermanentlyBanned",
         in_stock_items AS "inStockItems", inventory,
+        analytics_access AS "analyticsAccess",
         ST_Y(location::geometry) AS latitude,
         ST_X(location::geometry) AS longitude
       FROM pharmacies ORDER BY created_at DESC`
@@ -1354,6 +1360,170 @@ export class PostgresRepository implements IDatabaseRepository {
       status: r.status,
       submittedAt: new Date(r.submitted_at).toISOString(),
     };
+  }
+
+  /**
+   * Log search analytics telemetry event
+   */
+  public async logSearchTelemetry(event: {
+    query: string;
+    normalizedDrug: string;
+    coreBrandOrGeneric: string;
+    subCity: string;
+    city?: string;
+    matchedCount: number;
+    userId?: string;
+  }): Promise<void> {
+    const pool = getDbPool();
+    if (!pool) return;
+
+    try {
+      const id = `ev-${crypto.randomBytes(6).toString('hex')}`;
+      await pool.query(
+        `INSERT INTO search_analytics_events (
+          id, query, normalized_drug, core_brand_or_generic, sub_city, city, matched_count, user_id, created_at
+        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, NOW())`,
+        [
+          id,
+          event.query,
+          event.normalizedDrug.toLowerCase(),
+          event.coreBrandOrGeneric.toLowerCase(),
+          event.subCity || 'Bole',
+          event.city || 'Addis Ababa',
+          event.matchedCount || 0,
+          event.userId || null,
+        ]
+      );
+    } catch (err: any) {
+      console.warn('[PostgresRepository] logSearchTelemetry error:', err.message);
+    }
+  }
+
+  /**
+   * Retrieve aggregated demand intelligence (most searched drugs vs stocking pharmacies)
+   */
+  public async getDemandIntelligence(params?: {
+    subCity?: string;
+    limit?: number;
+    days?: number;
+  }): Promise<DemandIntelligenceItem[]> {
+    const pool = getDbPool();
+    if (!pool) return [];
+
+    const limit = params?.limit || 15;
+    const days = params?.days || 14;
+    const subCityFilter = params?.subCity && params.subCity !== 'ALL' ? params.subCity : null;
+
+    try {
+      // 1. Aggregate search events grouped by core_brand_or_generic and sub_city
+      let sql = `
+        SELECT 
+          core_brand_or_generic AS "drugName",
+          sub_city AS "subCity",
+          COUNT(*)::int AS "searchCount",
+          MAX(created_at) AS "lastSearchedAt"
+        FROM search_analytics_events
+        WHERE created_at >= NOW() - INTERVAL '${days} days'
+      `;
+      const queryParams: any[] = [];
+
+      if (subCityFilter) {
+        queryParams.push(subCityFilter);
+        sql += ` AND sub_city = $${queryParams.length}`;
+      }
+
+      sql += ` GROUP BY core_brand_or_generic, sub_city ORDER BY "searchCount" DESC LIMIT ${limit}`;
+
+      const res = await pool.query(sql, queryParams);
+      const rows = res.rows;
+
+      // 2. Fetch all verified pharmacies to compute real stocking counts per drug and sub-city
+      const allPharmacies = await this.getAllPharmacies();
+
+      const items: DemandIntelligenceItem[] = rows.map((r: any) => {
+        const drug = r.drugName;
+        const sub = r.subCity;
+        const searchCount = parseInt(r.searchCount, 10) || 1;
+
+        // Calculate pharmacies in this sub-city having this drug
+        const stockingPharmacies = allPharmacies.filter((p) => {
+          if (p.isPermanentlyBanned || p.isShadowBanned) return false;
+          if (sub && p.subCity.toLowerCase() !== sub.toLowerCase()) return false;
+          const parsed = MedicalFuzzyMatcher.parseQuery(drug);
+          const hasInStock = p.inStockItems?.some((it) => MedicalFuzzyMatcher.matchItem(it, parsed).matched);
+          const hasInInv = p.inventory?.some((it) => MedicalFuzzyMatcher.matchItem(it.name, parsed).matched);
+          return hasInStock || hasInInv;
+        });
+
+        const stockingCount = stockingPharmacies.length;
+        const ratio = parseFloat((searchCount / (stockingCount + 1)).toFixed(2));
+
+        let shortageLevel: 'CRITICAL' | 'HIGH' | 'MODERATE' | 'SUFFICIENT' = 'SUFFICIENT';
+        if (stockingCount === 0 || ratio >= 5) {
+          shortageLevel = 'CRITICAL';
+        } else if (ratio >= 2.5) {
+          shortageLevel = 'HIGH';
+        } else if (ratio >= 1.2) {
+          shortageLevel = 'MODERATE';
+        }
+
+        // Estimate lost sales based on standard ETB tariff ~320 ETB average prescription
+        const estimatedMissedSalesETB = Math.max(0, (searchCount - stockingCount * 5)) * 320;
+
+        // Capitalize drug name nicely e.g. "ventolin" -> "Ventolin"
+        const formattedDrug = drug.charAt(0).toUpperCase() + drug.slice(1);
+
+        return {
+          drugName: formattedDrug,
+          subCity: sub,
+          searchCount,
+          stockingPharmaciesCount: stockingCount,
+          unmetDemandRatio: ratio,
+          shortageLevel,
+          estimatedMissedSalesETB: Math.max(estimatedMissedSalesETB, searchCount * 85),
+          lastSearchedAt: new Date(r.lastSearchedAt).toISOString(),
+        };
+      });
+
+      return items;
+    } catch (err: any) {
+      console.warn('[PostgresRepository] getDemandIntelligence error:', err.message);
+      return [];
+    }
+  }
+
+  /**
+   * Configure a pharmacy's analytics access permissions
+   */
+  public async setPharmacyAnalyticsAccess(
+    pharmacyId: string,
+    access: {
+      enabled: boolean;
+      allowedSubCities?: string[];
+      tier?: 'BASIC' | 'PRO' | 'ENTERPRISE';
+      expiresAt?: string;
+    }
+  ): Promise<{ success: boolean; pharmacy?: Pharmacy; error?: string }> {
+    const pool = getDbPool();
+    if (!pool) return { success: false, error: 'Database not connected' };
+
+    try {
+      const res = await pool.query(
+        `UPDATE pharmacies 
+         SET analytics_access = $1, updated_at = NOW() 
+         WHERE id = $2 
+         RETURNING *, ST_Y(location::geometry) as latitude, ST_X(location::geometry) as longitude`,
+        [JSON.stringify(access), pharmacyId]
+      );
+
+      if (res.rows.length === 0) {
+        return { success: false, error: 'Pharmacy not found' };
+      }
+
+      return { success: true, pharmacy: this.mapPharmacyRow(res.rows[0]) };
+    } catch (err: any) {
+      return { success: false, error: err.message };
+    }
   }
 }
 

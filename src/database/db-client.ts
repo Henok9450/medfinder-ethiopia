@@ -113,6 +113,26 @@ export async function runMigrations(): Promise<{ success: boolean; message: stri
       );
     `);
 
+    // Ensure analytics_access column on pharmacies and search_analytics_events table exist
+    await p.query(`
+      ALTER TABLE pharmacies ADD COLUMN IF NOT EXISTS analytics_access JSONB DEFAULT '{"enabled": false, "tier": "BASIC"}'::jsonb;
+      
+      CREATE TABLE IF NOT EXISTS search_analytics_events (
+        id TEXT PRIMARY KEY,
+        query TEXT NOT NULL,
+        normalized_drug TEXT NOT NULL,
+        core_brand_or_generic TEXT NOT NULL,
+        sub_city TEXT NOT NULL,
+        city TEXT NOT NULL DEFAULT 'Addis Ababa',
+        matched_count INTEGER NOT NULL DEFAULT 0,
+        user_id TEXT,
+        created_at TIMESTAMPTZ DEFAULT NOW()
+      );
+
+      CREATE INDEX IF NOT EXISTS idx_search_analytics_created ON search_analytics_events (created_at DESC);
+      CREATE INDEX IF NOT EXISTS idx_search_analytics_drug_subcity ON search_analytics_events (normalized_drug, sub_city);
+    `);
+
     // Backfill any approved applications missing portal credentials
     try {
       const uncredentialed = await p.query(`
@@ -188,6 +208,40 @@ export async function runMigrations(): Promise<{ success: boolean; message: stri
       ['adm-super-01', defaultUsername, 'Chief Regulatory Administrator (EFDA)', 'admin@efda.gov.et', 'SUPER_ADMIN', privileges, passwordHash]
     );
     console.log('[PostgreSQL] ✅ Master admin user verified/seeded!');
+
+    // Seed initial search analytics telemetry if table is empty
+    try {
+      const evCountRes = await p.query('SELECT COUNT(*) FROM search_analytics_events');
+      if (parseInt(evCountRes.rows[0]?.count || '0', 10) === 0) {
+        const seedTelemetry = [
+          { q: 'Ventolin Inhaler 100mcg', d: 'ventolin', s: 'Bole', c: 48, m: 1 },
+          { q: 'Ventolin Evohaler', d: 'ventolin', s: 'Kirkos', c: 24, m: 1 },
+          { q: 'Insulin Humulin N', d: 'insulin', s: 'Bole', c: 36, m: 2 },
+          { q: 'Augmentin 625mg', d: 'augmentin', s: 'Bole', c: 31, m: 2 },
+          { q: 'Eltroxin 100mcg', d: 'eltroxin', s: 'Bole', c: 42, m: 0 },
+          { q: 'Eltroxin 50mcg', d: 'eltroxin', s: 'Yeka', c: 28, m: 0 },
+          { q: 'Ceftriaxone 1g', d: 'ceftriaxone', s: 'Kirkos', c: 19, m: 1 },
+          { q: 'Metformin 850mg', d: 'metformin', s: 'Bole', c: 25, m: 2 },
+          { q: 'Amlodipine 10mg', d: 'amlodipine', s: 'Bole', c: 18, m: 2 },
+          { q: 'Paracetamol 500mg', d: 'paracetamol', s: 'Bole', c: 15, m: 3 },
+        ];
+
+        for (const item of seedTelemetry) {
+          for (let i = 0; i < item.c; i++) {
+            const evId = `ev-${crypto.randomBytes(4).toString('hex')}`;
+            const daysAgo = Math.floor(Math.random() * 7);
+            await p.query(
+              `INSERT INTO search_analytics_events (id, query, normalized_drug, core_brand_or_generic, sub_city, city, matched_count, user_id, created_at)
+               VALUES ($1, $2, $3, $4, $5, 'Addis Ababa', $6, $7, NOW() - ($8 || ' days')::interval)`,
+              [evId, item.q, item.d, item.d, item.s, item.m, `patient_${Math.floor(1000 + Math.random() * 9000)}`, daysAgo]
+            );
+          }
+        }
+        console.log('[PostgreSQL] ✅ Baseline demand intelligence telemetry seeded!');
+      }
+    } catch (seedEvErr: any) {
+      console.warn('[PostgreSQL] Telemetry seed notice:', seedEvErr.message);
+    }
 
     return { success: true, message: 'Migrations completed successfully.' };
   } catch (err: any) {

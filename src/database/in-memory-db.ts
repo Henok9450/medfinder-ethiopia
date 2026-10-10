@@ -70,6 +70,35 @@ export interface Pharmacy {
   isPermanentlyBanned: boolean; // banned from platform
   inStockItems: string[]; // For backwards-compatible quick text search
   inventory: PharmacyMedicineItem[]; // Full structured inventory
+  analyticsAccess?: {
+    enabled: boolean;
+    allowedSubCities?: string[]; // Empty or undefined = all sub-cities
+    tier?: 'BASIC' | 'PRO' | 'ENTERPRISE';
+    expiresAt?: string;
+  };
+}
+
+export interface SearchAnalyticsEvent {
+  id: string;
+  query: string;
+  normalizedDrug: string;
+  coreBrandOrGeneric: string;
+  subCity: string;
+  city: string;
+  matchedCount: number;
+  userId?: string;
+  timestamp: string;
+}
+
+export interface DemandIntelligenceItem {
+  drugName: string;
+  subCity: string;
+  searchCount: number;
+  stockingPharmaciesCount: number;
+  unmetDemandRatio: number; // Search count / (Stocking + 1)
+  shortageLevel: 'CRITICAL' | 'HIGH' | 'MODERATE' | 'SUFFICIENT';
+  estimatedMissedSalesETB: number;
+  lastSearchedAt: string;
 }
 
 export interface ReservationHold {
@@ -199,11 +228,13 @@ export class InMemoryDatabase {
   public botSessions: Map<string, TelegramBotSession> = new Map(); // Keyed by telegramChatId
   public pharmacyAccounts: Map<string, PharmacyPortalAccount> = new Map(); // Keyed by username
   public adminUsers: Map<string, AdminUser> = new Map(); // Keyed by username
+  public searchAnalyticsEvents: SearchAnalyticsEvent[] = [];
 
   private constructor() {
     this.seedPharmacies();
     this.seedVerificationApplications();
     this.seedDefaultAdmin();
+    this.seedSearchTelemetry();
   }
 
   public static getInstance(): InMemoryDatabase {
@@ -215,6 +246,44 @@ export class InMemoryDatabase {
 
   private seedPharmacies() {
     this.pharmacies = [];
+  }
+
+  private seedSearchTelemetry() {
+    const now = Date.now();
+    const dayMs = 24 * 60 * 60 * 1000;
+    
+    // Seed high-demand searches reflecting actual Ethiopian shortages
+    const seedEvents: Array<{ query: string; drug: string; subCity: string; count: number }> = [
+      { query: 'Ventolin Inhaler 100mcg', drug: 'ventolin', subCity: 'Bole', count: 48 },
+      { query: 'Ventolin Evohaler', drug: 'ventolin', subCity: 'Kirkos', count: 24 },
+      { query: 'Insulin Humulin N', drug: 'insulin', subCity: 'Bole', count: 36 },
+      { query: 'Augmentin 625mg', drug: 'augmentin', subCity: 'Bole', count: 31 },
+      { query: 'Eltroxin 100mcg', drug: 'eltroxin', subCity: 'Bole', count: 42 },
+      { query: 'Eltroxin 50mcg', drug: 'eltroxin', subCity: 'Yeka', count: 28 },
+      { query: 'Ceftriaxone 1g', drug: 'ceftriaxone', subCity: 'Kirkos', count: 19 },
+      { query: 'Metformin 850mg', drug: 'metformin', subCity: 'Bole', count: 25 },
+      { query: 'Amlodipine 10mg', drug: 'amlodipine', subCity: 'Bole', count: 18 },
+      { query: 'Paracetamol 500mg', drug: 'paracetamol', subCity: 'Bole', count: 15 },
+    ];
+
+    this.searchAnalyticsEvents = [];
+    for (const item of seedEvents) {
+      for (let i = 0; i < item.count; i++) {
+        // distribute within last 7 days
+        const offset = Math.floor(Math.random() * 7 * dayMs);
+        this.searchAnalyticsEvents.push({
+          id: `ev-${crypto.randomBytes(4).toString('hex')}`,
+          query: item.query,
+          normalizedDrug: item.drug,
+          coreBrandOrGeneric: item.drug,
+          subCity: item.subCity,
+          city: 'Addis Ababa',
+          matchedCount: item.drug === 'ventolin' ? 1 : item.drug === 'eltroxin' ? 0 : 2,
+          userId: `patient_${Math.floor(1000 + Math.random() * 9000)}`,
+          timestamp: new Date(now - offset).toISOString(),
+        });
+      }
+    }
   }
 
   public getOrCreateSubscription(userId: string): UserSubscription {
