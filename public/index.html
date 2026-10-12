@@ -4322,7 +4322,9 @@
       document.getElementById('inspectModalLocation').innerText = `${app.subCity || 'Bole'} Sub-City, Addis Ababa (${app.addressDetails || 'Physical Location'})`;
       
       document.getElementById('inspectModalLicenseInput').value = app.efdaLicenseNumber || 'EFDA/PH/AA/2024/3297';
-      if (app.requestedInfoReason) {
+      if (app.status === 'RESUBMITTED' && app.pharmacistUpdateNote) {
+        document.getElementById('inspectModalNotes').value = `[Pharmacy Resubmission]: "${app.pharmacistUpdateNote}"\n${app.requestedInfoReason ? `[Previous Request]: "${app.requestedInfoReason}"\n` : ''}${app.adminNotes || ''}`;
+      } else if (app.requestedInfoReason) {
         document.getElementById('inspectModalNotes').value = `[Compliance Request]: "${app.requestedInfoReason}"\n${app.adminNotes || ''}`;
       } else {
         document.getElementById('inspectModalNotes').value = app.adminNotes || 'Wall Certificate CoC verified against EFDA iRIS registry. Physical premise match confirmed.';

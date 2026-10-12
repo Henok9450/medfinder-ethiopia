@@ -1542,10 +1542,32 @@ ${med.strength ? `⚖️ **መጠን (Strength)፦** ${med.strength}\n` : ''}${m
         };
       }
 
-      // 2. Resubmission if Compliance Desk requested info (INFO_REQUESTED)
-      const waitingApp = this.db.verificationApplications.find(
+      // 2. Resubmission if Compliance Desk requested info (INFO_REQUESTED) or applicant uploads photo/updates
+      const allRegisteredApps = (await this.repo.getVerificationApplications()).concat(this.db.verificationApplications);
+      const waitingApp = allRegisteredApps.find(
         (a) => a.telegramChatId === chatId && (a.status === 'INFO_REQUESTED' || a.id === session?.updatingApplicationId)
+      ) || allRegisteredApps.find(
+        (a) => a.telegramChatId === chatId && (a.status === 'RESUBMITTED' || a.status === 'PENDING_REVIEW')
       );
+
+      const isPhotoIntent = cleanText.includes('ፎቶ ላክ') ||
+                            cleanText.toLowerCase().includes('send photo') ||
+                            cleanText.toLowerCase().includes('upload photo') ||
+                            cleanText.toLowerCase().includes('upload license') ||
+                            cleanText.includes('📸');
+
+      if (waitingApp && !photoUrl && !documentUrl && isPhotoIntent) {
+        session.step = 'AWAITING_INFO_UPDATE';
+        session.updatingApplicationId = waitingApp.id;
+        return {
+          chatId,
+          replyText: session.language === 'am'
+            ? `📸 **እባክዎ አዲሱን የEFDA የብቃት ማረጋገጫ (CoC) ፈቃድ ፎቶ አያይዘው ይላኩ፦**\n━━━━━━━━━━━━━━━━━━━━━━━━━━\nየፈቃድ ሰነዱ በግልጽ እንዲነበብ አድርገው በስልክዎ ካሜራ ፎቶ አንስተው ወይም በ📎 (Attachment) ምልክት በመጫን አዲሱን ፎቶ ወይም PDF እዚህ ይላኩ።`
+            : `📸 **Please attach and send your updated EFDA Certificate of Competence (CoC) photo:**\n━━━━━━━━━━━━━━━━━━━━━━━━━━\nTake a clear, focused photo with your phone camera or tap the 📎 (Attachment) icon to send the image or PDF document here.`,
+          quickReplies: ['/status', '/help'],
+          sessionStep: 'AWAITING_INFO_UPDATE',
+        };
+      }
 
       if (waitingApp && (session.step === 'AWAITING_INFO_UPDATE' || waitingApp.status === 'INFO_REQUESTED' || photoUrl || documentUrl)) {
         let updateSummary = '';
@@ -1560,6 +1582,17 @@ ${med.strength ? `⚖️ **መጠን (Strength)፦** ${med.strength}\n` : ''}${m
             photoUrl: newMedia,
             note: 'Pharmacist uploaded updated Certificate of Competence photo via Telegram',
           });
+          waitingApp.efdaDocUrl = newMedia;
+          waitingApp.counterPhotoUrl = newMedia;
+          waitingApp.status = 'RESUBMITTED';
+          const inMemApp = this.db.verificationApplications.find((a) => a.id === waitingApp.id);
+          if (inMemApp) {
+            inMemApp.efdaDocUrl = newMedia;
+            inMemApp.counterPhotoUrl = newMedia;
+            inMemApp.status = 'RESUBMITTED';
+            inMemApp.resubmittedAt = new Date().toISOString();
+          }
+
           updateSummary = session.language === 'am'
             ? `📸 አዲሱ የብቃት ማረጋገጫ (CoC) ፎቶ በተሳካ ሁኔታ ተቀብለናል!`
             : `📸 New Certificate of Competence photo successfully received!`;
@@ -1876,8 +1909,40 @@ Type **/status** at any time to monitor progress.
         return await this.processAccreditationStep(session, cleanText, photoUrl, documentUrl, location, chatId);
       }
 
-      // 8. Standalone Wall Certificate / CoC photo upload outside active registration
+      // 8. Photo upload outside active registration questionnaire
       if (photoUrl || documentUrl) {
+        const newMedia = photoUrl || documentUrl;
+        const allApplications = (await this.repo.getVerificationApplications()).concat(this.db.verificationApplications);
+        const existingApp = allApplications.find((a) => a.telegramChatId === chatId && a.status !== 'APPROVED');
+
+        if (existingApp) {
+          await this.repo.resubmitVerificationApplication(existingApp.id, {
+            photoUrl: newMedia,
+            note: 'Pharmacist attached updated Certificate of Competence photo via Telegram',
+          });
+          this.db.resubmitVerificationApplication(existingApp.id, {
+            photoUrl: newMedia,
+            note: 'Pharmacist attached updated Certificate of Competence photo via Telegram',
+          });
+          existingApp.efdaDocUrl = newMedia;
+          existingApp.counterPhotoUrl = newMedia;
+          existingApp.status = 'RESUBMITTED';
+          const inMemApp = this.db.verificationApplications.find((a) => a.id === existingApp.id);
+          if (inMemApp) {
+            inMemApp.efdaDocUrl = newMedia;
+            inMemApp.counterPhotoUrl = newMedia;
+            inMemApp.status = 'RESUBMITTED';
+            inMemApp.resubmittedAt = new Date().toISOString();
+          }
+
+          return {
+            chatId,
+            replyText: `📸 **አዲሱ የብቃት ማረጋገጫ (CoC) ፎቶ በማመልከቻዎ ላይ ተያይዟል!**\n**Updated Certificate Photo Attached!**\n━━━━━━━━━━━━━━━━━━━━━━━━━━\n• ፋርማሲ፦ **${existingApp.pharmacyName}**\n• ማመልከቻ መለያ፦ **${existingApp.id}**\n• ሁኔታ፦ **🔄 እንደገና በግምገማ ላይ (Resubmitted - Pending Review)**\n\nየEFDA ቁጥጥር ቡድን አዲሱን ፎቶ አይቶ ውሳኔ ይሰጥዎታል።\nሁኔታውን ለመከታተል 👉 **/status** ብለው ይጻፉ።`,
+            quickReplies: ['/status', '/help'],
+            sessionStep: 'START',
+          };
+        }
+
         return {
           chatId,
           replyText: `📸 **የብቃት ማረጋገጫ (CoC) ሰነድ ተቀብለናል!**
@@ -2610,9 +2675,31 @@ ${itemsDisplay}
 
 
     // --- CHECK FOR RESUBMISSION / INFO UPDATE FROM PHARMACIST ---
-    const waitingApp = this.db.verificationApplications.find(
+    const allRegisteredAppsLegacy = (await this.repo.getVerificationApplications()).concat(this.db.verificationApplications);
+    const waitingApp = allRegisteredAppsLegacy.find(
       (a) => a.telegramChatId === chatId && (a.status === 'INFO_REQUESTED' || a.id === session?.updatingApplicationId)
+    ) || allRegisteredAppsLegacy.find(
+      (a) => a.telegramChatId === chatId && (a.status === 'RESUBMITTED' || a.status === 'PENDING_REVIEW')
     );
+
+    const isLegacyPhotoIntent = cleanText.includes('ፎቶ ላክ') ||
+                                cleanText.toLowerCase().includes('send photo') ||
+                                cleanText.toLowerCase().includes('upload photo') ||
+                                cleanText.toLowerCase().includes('upload license') ||
+                                cleanText.includes('📸');
+
+    if (waitingApp && !photoUrl && !documentUrl && isLegacyPhotoIntent) {
+      session.step = 'AWAITING_INFO_UPDATE';
+      session.updatingApplicationId = waitingApp.id;
+      return {
+        chatId,
+        replyText: session.language === 'am'
+          ? `📸 **እባክዎ አዲሱን የEFDA የብቃት ማረጋገጫ (CoC) ፈቃድ ፎቶ አያይዘው ይላኩ፦**\n━━━━━━━━━━━━━━━━━━━━━━━━━━\nየፈቃድ ሰነዱ በግልጽ እንዲነበብ አድርገው በስልክዎ ካሜራ ፎቶ አንስተው ወይም በ📎 (Attachment) ምልክት በመጫን አዲሱን ፎቶ ወይም PDF እዚህ ይላኩ።`
+          : `📸 **Please attach and send your updated EFDA Certificate of Competence (CoC) photo:**\n━━━━━━━━━━━━━━━━━━━━━━━━━━\nTake a clear, focused photo with your phone camera or tap the 📎 (Attachment) icon to send the image or PDF document here.`,
+        quickReplies: ['/status', '/help'],
+        sessionStep: 'AWAITING_INFO_UPDATE',
+      };
+    }
 
     if (waitingApp && (session.step === 'AWAITING_INFO_UPDATE' || waitingApp.status === 'INFO_REQUESTED' || photoUrl || documentUrl)) {
       let updateSummary = '';
@@ -2627,6 +2714,16 @@ ${itemsDisplay}
           photoUrl: newMedia,
           note: 'Pharmacist uploaded updated Certificate of Competence photo via Telegram',
         });
+        waitingApp.efdaDocUrl = newMedia;
+        waitingApp.counterPhotoUrl = newMedia;
+        waitingApp.status = 'RESUBMITTED';
+        const inMemApp = this.db.verificationApplications.find((a) => a.id === waitingApp.id);
+        if (inMemApp) {
+          inMemApp.efdaDocUrl = newMedia;
+          inMemApp.counterPhotoUrl = newMedia;
+          inMemApp.status = 'RESUBMITTED';
+          inMemApp.resubmittedAt = new Date().toISOString();
+        }
         updateSummary = session.language === 'am'
           ? `📸 አዲሱ የብቃት ማረጋገጫ (CoC) ፎቶ በተሳካ ሁኔታ ተቀብለናል!`
           : `📸 New Certificate of Competence photo successfully received!`;
@@ -3167,11 +3264,36 @@ Send **"Confirm"** to submit to the EFDA Compliance Desk.`;
       }
     }
 
-    // Keep in-memory cache synchronized if app has new credentials
-    if (app && (app.portalAccessKey || app.portalUsername)) {
+    // Keep in-memory cache synchronized with latest status & details
+    if (app) {
       const existingIdx = this.db.verificationApplications.findIndex((a) => a.id === app?.id || a.telegramChatId === chatId);
       if (existingIdx >= 0) {
-        this.db.verificationApplications[existingIdx] = { ...this.db.verificationApplications[existingIdx], ...app };
+        this.db.verificationApplications[existingIdx] = {
+          ...this.db.verificationApplications[existingIdx],
+          ...app,
+          status,
+          adminNotes: adminNotes || app.adminNotes,
+          requestedInfoReason: adminNotes || app.requestedInfoReason,
+        };
+      }
+    }
+
+    if (status === 'INFO_REQUESTED') {
+      const sessionKeys = [`PHARMACY:${chatId}`, chatId];
+      for (const k of sessionKeys) {
+        let sess = this.db.botSessions.get(k);
+        if (!sess) {
+          sess = {
+            chatId,
+            step: 'AWAITING_INFO_UPDATE',
+            mode: 'PHARMACY',
+            language: 'am',
+            data: {},
+          };
+          this.db.botSessions.set(k, sess);
+        }
+        sess.step = 'AWAITING_INFO_UPDATE';
+        sess.updatingApplicationId = app?.id;
       }
     }
 

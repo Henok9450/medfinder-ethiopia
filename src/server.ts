@@ -1599,6 +1599,9 @@ app.post('/api/telegram/applications/:id/review', requireAdminAuth, requirePrivi
     return res.status(404).json({ success: false, error: reviewResult.error || 'Application not found' });
   }
 
+  // Synchronize in-memory DB instance
+  db.reviewVerificationApplication(id, status, adminNotes, efdaLicenseNumber);
+
   // Dispatch live notification back to the pharmacy's Telegram chat in background
   telegramBotService.notifyReviewDecision(
     reviewResult.application.telegramChatId,
