@@ -1293,6 +1293,8 @@ export class PostgresRepository implements IDatabaseRepository {
       requestedInfoReason: r.requested_info_reason,
       submittedAt: new Date(r.submitted_at).toISOString(),
       reviewedAt: r.reviewed_at ? new Date(r.reviewed_at).toISOString() : undefined,
+      resubmittedAt: r.resubmitted_at ? new Date(r.resubmitted_at).toISOString() : undefined,
+      pharmacistUpdateNote: r.pharmacist_update_note || undefined,
       approvedPharmacyId: r.approved_pharmacy_id,
       portalUsername: r.portal_username,
       portalTempPassword: r.portal_temp_password,

@@ -1979,7 +1979,7 @@
       <div class="flex-1 grid grid-cols-1 md:grid-cols-12 min-h-0 overflow-hidden">
         
         <!-- LEFT: INTERACTIVE IMAGE LIGHTBOX WITH ZOOM CONTROLS (8 COLS) -->
-        <div class="md:col-span-8 bg-slate-950 flex flex-col relative overflow-hidden select-none">
+        <div class="md:col-span-8 bg-slate-950 flex flex-col relative overflow-hidden select-none min-h-[380px] sm:min-h-[460px]">
           <!-- Zoom & Pan Toolbar -->
           <div class="absolute top-3 left-3 z-10 flex items-center gap-1 bg-slate-900/80 backdrop-blur-md px-2 py-1.5 rounded-lg border border-slate-700 shadow-md">
             <button onclick="zoomDocInspect(0.25)" class="w-7 h-7 rounded text-slate-200 hover:text-white hover:bg-slate-800 flex items-center justify-center transition text-xs" title="Zoom In">
@@ -1997,9 +1997,33 @@
             </span>
           </div>
 
+          <!-- Loading Spinner -->
+          <div id="docInspectLoading" class="hidden absolute inset-0 flex flex-col items-center justify-center bg-slate-950/80 z-20 text-white space-y-2">
+            <i class="fa-solid fa-circle-notch fa-spin text-2xl text-emerald-400"></i>
+            <span class="text-xs text-slate-300 font-medium">Loading document...</span>
+          </div>
+
+          <!-- Error Fallback -->
+          <div id="docInspectError" class="hidden absolute inset-0 flex flex-col items-center justify-center bg-slate-950/90 z-20 text-white p-6 text-center space-y-3">
+            <div class="w-12 h-12 rounded-full bg-rose-500/20 text-rose-400 flex items-center justify-center text-xl border border-rose-500/30">
+              <i class="fa-solid fa-triangle-exclamation"></i>
+            </div>
+            <p class="text-sm font-bold text-white">Document Preview Could Not Be Loaded Directly</p>
+            <p class="text-xs text-slate-400 max-w-sm">Direct preview could not be rendered inside the viewer. You can open or download it directly:</p>
+            <div class="flex items-center gap-2">
+              <a id="docInspectErrorBtn" href="#" target="_blank" class="bg-emerald-600 hover:bg-emerald-500 text-white text-xs px-4 py-2 rounded-lg font-bold transition flex items-center gap-1.5 shadow">
+                <i class="fa-solid fa-arrow-up-right-from-square"></i> Open Photo in New Tab
+              </a>
+              <button onclick="retryDocInspectImg()" class="bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs px-3 py-2 rounded-lg font-medium transition border border-slate-700">
+                <i class="fa-solid fa-rotate-right"></i> Retry
+              </button>
+            </div>
+          </div>
+
           <!-- The Scrollable / Zoomable Document Container -->
-          <div id="docInspectImgWrapper" class="flex-1 overflow-auto flex items-center justify-center p-4">
+          <div id="docInspectImgWrapper" class="flex-1 overflow-auto flex items-center justify-center p-4 w-full h-full min-h-[360px]">
             <img id="docInspectImg" src="" alt="Wall Certificate" class="max-w-full max-h-full object-contain rounded-lg shadow-2xl transition-transform duration-150 origin-center bg-slate-900">
+            <iframe id="docInspectIframe" src="" class="hidden w-full h-full min-h-[500px] border-0 rounded-lg"></iframe>
           </div>
         </div>
 
@@ -4340,14 +4364,59 @@
       }
 
       const imgEl = document.getElementById('docInspectImg');
-      imgEl.src = docUrl;
-      imgEl.style.transform = 'scale(1)';
-      document.getElementById('inspectZoomLevel').innerText = '100%';
+      const iframeEl = document.getElementById('docInspectIframe');
+      const loadingEl = document.getElementById('docInspectLoading');
+      const errorEl = document.getElementById('docInspectError');
+
+      if (loadingEl) loadingEl.classList.remove('hidden');
+      if (errorEl) errorEl.classList.add('hidden');
+
+      const isPdf = docUrl.toLowerCase().includes('.pdf');
+      if (isPdf && iframeEl) {
+        if (imgEl) imgEl.classList.add('hidden');
+        iframeEl.classList.remove('hidden');
+        iframeEl.src = docUrl;
+        if (loadingEl) loadingEl.classList.add('hidden');
+      } else {
+        if (iframeEl) iframeEl.classList.add('hidden');
+        if (imgEl) {
+          imgEl.classList.remove('hidden');
+          // Add timestamp query parameter so the browser always loads fresh bytes
+          const separator = docUrl.includes('?') ? '&' : '?';
+          const freshDocUrl = `${docUrl}${separator}_v=${Date.now()}`;
+
+          imgEl.onload = function() {
+            if (loadingEl) loadingEl.classList.add('hidden');
+            if (errorEl) errorEl.classList.add('hidden');
+          };
+
+          imgEl.onerror = function() {
+            if (loadingEl) loadingEl.classList.add('hidden');
+            if (errorEl) {
+              errorEl.classList.remove('hidden');
+              const errBtn = document.getElementById('docInspectErrorBtn');
+              if (errBtn) errBtn.href = docUrl;
+            }
+          };
+
+          imgEl.src = freshDocUrl;
+        }
+      }
+
+      if (imgEl) imgEl.style.transform = 'scale(1)';
+      const zoomBadge = document.getElementById('inspectZoomLevel');
+      if (zoomBadge) zoomBadge.innerText = '100%';
 
       const newTabLink = document.getElementById('inspectModalNewTabLink');
       if (newTabLink) newTabLink.href = docUrl;
 
       document.getElementById('docInspectModal').classList.remove('hidden');
+    }
+
+    function retryDocInspectImg() {
+      if (currentInspectingAppId) {
+        openDocInspectModal(currentInspectingAppId);
+      }
     }
 
     function closeDocInspectModal() {

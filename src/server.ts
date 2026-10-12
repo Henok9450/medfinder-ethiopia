@@ -1617,6 +1617,22 @@ app.post('/api/telegram/applications/:id/review', requireAdminAuth, requirePrivi
   });
 });
 
+function getMimeTypeFromBuffer(buf: Buffer): string {
+  if (buf.length >= 4 && buf[0] === 0x25 && buf[1] === 0x50 && buf[2] === 0x44 && buf[3] === 0x46) {
+    return 'application/pdf';
+  }
+  if (buf.length >= 8 && buf[0] === 0x89 && buf[1] === 0x50 && buf[2] === 0x4E && buf[3] === 0x47) {
+    return 'image/png';
+  }
+  if (buf.length >= 3 && buf[0] === 0xFF && buf[1] === 0xD8 && buf[2] === 0xFF) {
+    return 'image/jpeg';
+  }
+  if (buf.length >= 12 && buf.toString('ascii', 0, 4) === 'RIFF' && buf.toString('ascii', 8, 12) === 'WEBP') {
+    return 'image/webp';
+  }
+  return 'image/jpeg';
+}
+
 // Telegram Media Proxy & Stream Endpoint (Channel B Wall Certificates & Photos)
 app.get('/api/telegram/media/:fileId', async (req: Request, res: Response) => {
   const fileId = req.params.fileId;
@@ -1632,11 +1648,13 @@ app.get('/api/telegram/media/:fileId', async (req: Request, res: Response) => {
   const sanitizedFileId = fileId.replace(/[^a-zA-Z0-9_-]/g, '');
   const cachedJpg = path.join(uploadsDir, `telegram_${sanitizedFileId}.jpg`);
 
-  // 1. Serve cached JPG if already fetched from Telegram CDN
+  // 1. Serve cached file if already fetched from Telegram CDN
   if (fs.existsSync(cachedJpg)) {
-    res.setHeader('Content-Type', 'image/jpeg');
+    const cachedBuf = await fs.promises.readFile(cachedJpg);
+    const mime = getMimeTypeFromBuffer(cachedBuf);
+    res.setHeader('Content-Type', mime);
     res.setHeader('Cache-Control', 'public, max-age=86400');
-    return res.sendFile(cachedJpg);
+    return res.send(cachedBuf);
   }
 
   // 2. Fetch fresh from Telegram Cloud via Bot Token
@@ -1644,7 +1662,8 @@ app.get('/api/telegram/media/:fileId', async (req: Request, res: Response) => {
     const buffer = await telegramBotService.fetchTelegramFileBuffer(fileId);
     if (buffer && buffer.length > 0) {
       await fs.promises.writeFile(cachedJpg, buffer);
-      res.setHeader('Content-Type', 'image/jpeg');
+      const mime = getMimeTypeFromBuffer(buffer);
+      res.setHeader('Content-Type', mime);
       res.setHeader('Cache-Control', 'public, max-age=86400');
       return res.send(buffer);
     }

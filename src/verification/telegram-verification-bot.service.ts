@@ -452,25 +452,27 @@ export class TelegramVerificationBotService {
    * Fetch image bytes from Telegram API using available bot token
    */
   public async fetchTelegramFileBuffer(fileId: string): Promise<Buffer | null> {
-    const token = this.pharmacyBot.token || this.patientBot.token;
-    if (!token) return null;
-    try {
-      const getFileRes = await fetch(`https://api.telegram.org/bot${token}/getFile?file_id=${fileId}`, {
-        signal: AbortSignal.timeout(3000),
-      });
-      const data = await getFileRes.json() as any;
-      if (data.ok && data.result?.file_path) {
-        const fileUrl = `https://api.telegram.org/file/bot${token}/${data.result.file_path}`;
-        const imgRes = await fetch(fileUrl, { signal: AbortSignal.timeout(4000) });
-        const arrayBuf = await imgRes.arrayBuffer();
-        return Buffer.from(arrayBuf);
+    const tokens = [this.pharmacyBot.token, this.patientBot.token].filter(Boolean) as string[];
+    if (tokens.length === 0) return null;
+
+    for (const token of tokens) {
+      try {
+        const getFileRes = await fetch(`https://api.telegram.org/bot${token}/getFile?file_id=${fileId}`, {
+          signal: AbortSignal.timeout(15000),
+        });
+        const data = await getFileRes.json() as any;
+        if (data.ok && data.result?.file_path) {
+          const fileUrl = `https://api.telegram.org/file/bot${token}/${data.result.file_path}`;
+          const imgRes = await fetch(fileUrl, { signal: AbortSignal.timeout(20000) });
+          const arrayBuf = await imgRes.arrayBuffer();
+          return Buffer.from(arrayBuf);
+        }
+      } catch (err: any) {
+        console.warn(`[TelegramBot] Failed or timed out downloading file ${fileId} with token:`, err.message);
       }
-    } catch (err: any) {
-      console.warn('[TelegramBot] Failed or timed out downloading photo file from Telegram:', err.message);
     }
     return null;
   }
-
 
   /**
    * Process a message that arrived from the real Telegram cloud server
@@ -488,12 +490,34 @@ export class TelegramVerificationBotService {
       const bestPhoto = message.photo[message.photo.length - 1];
       photoUrl = `/api/telegram/media/${bestPhoto.file_id}`;
       if (!text) text = '[Wall Certificate Photo Uploaded]';
+
+      // Eagerly cache photo bytes to disk in the background so it's ready instantly for the reviewer
+      this.fetchTelegramFileBuffer(bestPhoto.file_id).then(async (buf) => {
+        if (buf && buf.length > 0) {
+          const uploadsDir = path.join(__dirname, '../../public/uploads');
+          if (!fs.existsSync(uploadsDir)) fs.mkdirSync(uploadsDir, { recursive: true });
+          const sanitized = bestPhoto.file_id.replace(/[^a-zA-Z0-9_-]/g, '');
+          await fs.promises.writeFile(path.join(uploadsDir, `telegram_${sanitized}.jpg`), buf);
+          console.log(`[TelegramBot] Eagerly cached photo to telegram_${sanitized}.jpg`);
+        }
+      }).catch((e) => console.warn('[EagerCachePhoto] Error:', e.message));
     }
 
     // Handle documents/PDFs
     if (message.document) {
       documentUrl = `/api/telegram/media/${message.document.file_id}`;
       if (!text) text = `[Document Uploaded: ${message.document.file_name || 'license.pdf'}]`;
+
+      // Eagerly cache document bytes in background
+      this.fetchTelegramFileBuffer(message.document.file_id).then(async (buf) => {
+        if (buf && buf.length > 0) {
+          const uploadsDir = path.join(__dirname, '../../public/uploads');
+          if (!fs.existsSync(uploadsDir)) fs.mkdirSync(uploadsDir, { recursive: true });
+          const sanitized = message.document.file_id.replace(/[^a-zA-Z0-9_-]/g, '');
+          await fs.promises.writeFile(path.join(uploadsDir, `telegram_${sanitized}.jpg`), buf);
+          console.log(`[TelegramBot] Eagerly cached document to telegram_${sanitized}.jpg`);
+        }
+      }).catch((e) => console.warn('[EagerCacheDoc] Error:', e.message));
     }
 
     // Handle Location sharing (Native GPS Tap from Telegram)
