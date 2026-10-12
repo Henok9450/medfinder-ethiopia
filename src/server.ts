@@ -1649,95 +1649,37 @@ app.get('/api/telegram/media/:fileId', async (req: Request, res: Response) => {
     console.warn(`[Telegram Media] Live download failed for fileId ${fileId}:`, err.message);
   }
 
-  // 3. Fallback High-Resolution EFDA Certificate of Competence SVG
-  // Ensures compliance desk always has crisp, inspectable document visual even offline or if token expired
-  const matchingApp = db.verificationApplications.find(
-    (a) => (a.efdaDocUrl && a.efdaDocUrl.includes(fileId)) || (a.counterPhotoUrl && a.counterPhotoUrl.includes(fileId))
-  );
-
-  const certSvg = generateSampleCertificateSvg(matchingApp);
+  // 3. Fallback: Return honest "Physical Document Not Available" placeholder
+  // A private platform MUST NOT auto-generate or synthesize an official government EFDA CoC certificate
+  const unavailableSvg = generateDocumentUnavailableSvg(sanitizedFileId);
   const cachedSvg = path.join(uploadsDir, `telegram_${sanitizedFileId}.svg`);
-  fs.writeFileSync(cachedSvg, certSvg, 'utf-8');
+  fs.writeFileSync(cachedSvg, unavailableSvg, 'utf-8');
 
   res.setHeader('Content-Type', 'image/svg+xml');
   res.setHeader('Cache-Control', 'no-cache');
   return res.sendFile(cachedSvg);
 });
 
-function generateSampleCertificateSvg(app?: any): string {
-  const pharmacyName = app?.pharmacyName || 'Azeb Mesfin Pharmacy';
-  const pharmacist = app?.pharmacistName || 'Azeb Mesfin (B.Pharm)';
-  const licNo = app?.efdaLicenseNumber || 'EFDA/PH/AA/2024/3297';
-  const tin = app?.tinNumber || 'TIN-0083920194';
-  const subCity = app?.subCity || 'Bole';
-
-  return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 900 640" width="100%" height="100%">
-    <defs>
-      <linearGradient id="bgGrad" x1="0%" y1="0%" x2="100%" y2="100%">
-        <stop offset="0%" stop-color="#fdfbf7"/>
-        <stop offset="100%" stop-color="#f4ede1"/>
-      </linearGradient>
-      <filter id="shadow" x="-5%" y="-5%" width="110%" height="110%">
-        <feDropShadow dx="0" dy="4" stdDeviation="6" flood-opacity="0.15"/>
-      </filter>
-    </defs>
-    <rect width="900" height="640" fill="url(#bgGrad)"/>
-    <rect x="24" y="24" width="852" height="592" fill="none" stroke="#047857" stroke-width="6"/>
-    <rect x="34" y="34" width="832" height="572" fill="none" stroke="#d97706" stroke-width="2" stroke-dasharray="8 4"/>
-    <rect x="42" y="42" width="816" height="556" fill="none" stroke="#065f46" stroke-width="1.5"/>
-    <circle cx="50" cy="50" r="14" fill="#047857"/>
-    <circle cx="850" cy="50" r="14" fill="#047857"/>
-    <circle cx="50" cy="590" r="14" fill="#047857"/>
-    <circle cx="850" cy="590" r="14" fill="#047857"/>
-    <g transform="translate(450, 85)" text-anchor="middle">
-      <circle cx="0" cy="0" r="32" fill="#047857" filter="url(#shadow)"/>
-      <path d="M-12,-8 L0,-20 L12,-8 L18,12 L-18,12 Z" fill="#fef3c7"/>
-      <text y="7" font-family="sans-serif" font-weight="bold" font-size="20" fill="#f59e0b" text-anchor="middle">✚</text>
-      <text y="48" font-family="'Segoe UI', Arial, sans-serif" font-weight="bold" font-size="12" fill="#047857" letter-spacing="2">FEDERAL DEMOCRATIC REPUBLIC OF ETHIOPIA</text>
-      <text y="66" font-family="'Segoe UI', Arial, sans-serif" font-weight="900" font-size="17" fill="#064e3b" letter-spacing="1">ETHIOPIAN FOOD &amp; DRUG AUTHORITY (EFDA)</text>
-      <text y="84" font-family="'Nyala', 'Abyssinica SIL', sans-serif" font-weight="bold" font-size="14" fill="#047857">የኢትዮጵያ ምግብና መድኃኒት ባለስልጣን</text>
+function generateDocumentUnavailableSvg(mediaId?: string): string {
+  return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 480" width="100%" height="100%">
+    <rect width="800" height="480" fill="#f8fafc"/>
+    <rect x="20" y="20" width="760" height="440" rx="16" fill="#ffffff" stroke="#cbd5e1" stroke-width="2" stroke-dasharray="6 4"/>
+    <g transform="translate(400, 120)" text-anchor="middle">
+      <circle cx="0" cy="0" r="40" fill="#fef2f2"/>
+      <path d="M-14,14 L0,-16 L14,14 Z" fill="none" stroke="#ef4444" stroke-width="3" stroke-linejoin="round"/>
+      <line x1="0" y1="-4" x2="0" y2="4" stroke="#ef4444" stroke-width="3" stroke-linecap="round"/>
+      <circle cx="0" cy="9" r="1.5" fill="#ef4444"/>
     </g>
-    <g transform="translate(450, 215)" text-anchor="middle">
-      <text y="0" font-family="'Georgia', serif" font-weight="bold" font-size="22" fill="#1e293b" letter-spacing="1.5">CERTIFICATE OF COMPETENCE (CoC)</text>
-      <text y="22" font-family="'Nyala', 'Abyssinica SIL', sans-serif" font-weight="bold" font-size="16" fill="#047857">የመድኃኒት ንግድና ሙያ ብቃት ማረጋገጫ ምስክር ወረቀት</text>
-      <line x1="-200" y1="34" x2="200" y2="34" stroke="#d97706" stroke-width="2"/>
-    </g>
-    <g transform="translate(100, 290)" font-family="'Segoe UI', Arial, sans-serif" font-size="14" fill="#1e293b">
-      <text x="0" y="0" fill="#64748b" font-size="12">This is to officially certify that the healthcare premise registered as:</text>
-      <text x="0" y="32" font-weight="900" font-size="22" fill="#065f46">${pharmacyName}</text>
-      <text x="0" y="65" font-size="13" fill="#334155">Premise Location: <tspan font-weight="bold" fill="#0f172a">${subCity} Sub-City, Addis Ababa, Ethiopia</tspan></text>
-      <text x="0" y="90" font-size="13" fill="#334155">Supervising Licensed Pharmacist: <tspan font-weight="bold" fill="#0f172a">${pharmacist}</tspan></text>
-      <text x="0" y="115" font-size="13" fill="#334155">Business TIN: <tspan font-weight="bold" font-family="monospace" fill="#0f172a">${tin}</tspan></text>
-      <rect x="-10" y="132" width="720" height="42" rx="8" fill="#ecfdf5" stroke="#a7f3d0" stroke-width="1.5"/>
-      <text x="10" y="158" font-size="13" font-weight="bold" fill="#065f46">EFDA CoC Serial Registration No: </text>
-      <text x="260" y="159" font-size="16" font-family="monospace" font-weight="900" fill="#047857">${licNo}</text>
-    </g>
-    <g transform="translate(680, 485)">
-      <circle cx="50" cy="50" r="48" fill="none" stroke="#dc2626" stroke-width="2.5" stroke-dasharray="6 3"/>
-      <circle cx="50" cy="50" r="42" fill="none" stroke="#dc2626" stroke-width="1"/>
-      <path id="stampTextPath" d="M 12,50 A 38,38 0 1,1 88,50" fill="none"/>
-      <text font-size="8.5" font-weight="900" fill="#dc2626" letter-spacing="1">
-        <textPath href="#stampTextPath" startOffset="50%" text-anchor="middle">EFDA ADDIS ABABA HEALTH BUREAU</textPath>
-      </text>
-      <text x="50" y="47" font-size="12" font-weight="900" fill="#dc2626" text-anchor="middle">VERIFIED</text>
-      <text x="50" y="60" font-size="8" font-weight="bold" fill="#dc2626" text-anchor="middle">REG. BRANCH</text>
-      <text x="50" y="72" font-size="7.5" font-family="monospace" fill="#dc2626" text-anchor="middle">2024-2026</text>
-    </g>
-    <g transform="translate(100, 520)" font-family="'Segoe UI', Arial, sans-serif" font-size="11" fill="#475569">
-      <line x1="0" y1="0" x2="220" y2="0" stroke="#94a3b8" stroke-width="1.5"/>
-      <text x="0" y="16" font-weight="bold" fill="#0f172a">EFDA Regulatory Inspectorate</text>
-      <text x="0" y="30" fill="#64748b">Directorate of Premise Licensing</text>
-      <text x="0" y="46" font-family="monospace" fill="#047857">Valid Through: November 30, 2026</text>
-    </g>
-    <g transform="translate(360, 520)" font-family="'Segoe UI', Arial, sans-serif" font-size="11" fill="#475569">
-      <rect x="0" y="-30" width="80" height="80" rx="6" fill="#ffffff" stroke="#cbd5e1" stroke-width="1.5"/>
-      <rect x="8" y="-22" width="22" height="22" fill="#0f172a"/>
-      <rect x="50" y="-22" width="22" height="22" fill="#0f172a"/>
-      <rect x="8" y="20" width="22" height="22" fill="#0f172a"/>
-      <rect x="36" y="-6" width="8" height="8" fill="#0f172a"/>
-      <rect x="36" y="8" width="8" height="8" fill="#0f172a"/>
-      <rect x="50" y="20" width="10" height="10" fill="#0f172a"/>
-      <text x="40" y="62" font-size="8" font-family="monospace" font-weight="bold" fill="#047857" text-anchor="middle">iRIS QR VERIFIED</text>
+    <g transform="translate(400, 205)" text-anchor="middle" font-family="'Segoe UI', -apple-system, BlinkMacSystemFont, Roboto, sans-serif">
+      <text y="0" font-weight="800" font-size="20" fill="#0f172a">PHYSICAL DOCUMENT NOT AVAILABLE</text>
+      <text y="28" font-size="13" fill="#64748b">No photograph or document was uploaded, or the Telegram media could not be retrieved.</text>
+      <g transform="translate(0, 65)">
+        <rect x="-270" y="-18" width="540" height="76" rx="8" fill="#fffbeb" stroke="#fcd34d" stroke-width="1.5"/>
+        <text y="6" font-size="12" font-weight="700" fill="#b45309">⚠️ REGULATORY COMPLIANCE WARNING</text>
+        <text y="28" font-size="11.5" fill="#92400e">Do NOT approve this premise without inspecting a physical EFDA wall license.</text>
+        <text y="46" font-size="11" fill="#78350f">Request applicant to upload their official Certificate of Competence (CoC) via Telegram bot.</text>
+      </g>
+      ${mediaId ? `<text y="185" font-size="11" font-family="monospace" fill="#94a3b8">Media Reference: ${mediaId}</text>` : ''}
     </g>
   </svg>`;
 }

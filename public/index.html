@@ -4077,7 +4077,7 @@
           }
 
           tbody.innerHTML = apps.map(a => {
-            const docThumbUrl = a.efdaDocUrl || a.counterPhotoUrl || '/api/telegram/media/AgACAgQAAxkBAAMVar4JCCIcXLlv1JhWQ0SePYd-FyEAAlcPaxvYU_BRoZjmQdTeWWQBAAMCAAN5AAM9BA';
+            const docThumbUrl = a.efdaDocUrl || a.counterPhotoUrl || '';
             return `
             <tr class="hover:bg-slate-50 transition">
               <td class="p-3">
@@ -4094,12 +4094,19 @@
               </td>
               <td class="p-3">
                 <div class="flex items-start gap-2.5">
-                  <div class="relative group cursor-pointer flex-shrink-0" onclick="openDocInspectModal('${a.id}')" title="Click to inspect wall certificate in high-resolution lightbox">
-                    <img src="${docThumbUrl}" alt="Certificate Photo" class="w-12 h-12 object-cover rounded-lg border-2 border-sky-300 shadow-sm group-hover:scale-105 group-hover:border-emerald-500 transition duration-150 bg-slate-100" onerror="this.onerror=null; this.src='https://images.unsplash.com/photo-1589829545856-d10d557cf95f?auto=format&fit=crop&w=400&q=80'">
-                    <span class="absolute inset-0 bg-slate-900/40 opacity-0 group-hover:opacity-100 rounded-lg flex items-center justify-center text-white transition text-xs">
-                      <i class="fa-solid fa-magnifying-glass-plus"></i>
-                    </span>
-                  </div>
+                  ${docThumbUrl ? `
+                    <div class="relative group cursor-pointer flex-shrink-0" onclick="openDocInspectModal('${a.id}')" title="Click to inspect wall certificate in high-resolution lightbox">
+                      <img src="${docThumbUrl}" alt="Certificate Photo" class="w-12 h-12 object-cover rounded-lg border-2 border-sky-300 shadow-sm group-hover:scale-105 group-hover:border-emerald-500 transition duration-150 bg-slate-100" onerror="this.onerror=null; this.src='/api/telegram/media/${a.id}'">
+                      <span class="absolute inset-0 bg-slate-900/40 opacity-0 group-hover:opacity-100 rounded-lg flex items-center justify-center text-white transition text-xs">
+                        <i class="fa-solid fa-magnifying-glass-plus"></i>
+                      </span>
+                    </div>
+                  ` : `
+                    <div class="w-12 h-12 rounded-lg border-2 border-dashed border-amber-300 bg-amber-50 flex flex-col items-center justify-center text-amber-600 flex-shrink-0 cursor-pointer" onclick="openDocInspectModal('${a.id}')" title="No photo uploaded by applicant">
+                      <i class="fa-solid fa-camera-slash text-xs"></i>
+                      <span class="text-[8px] font-bold mt-0.5">No Photo</span>
+                    </div>
+                  `}
                   <div class="space-y-1">
                     <button onclick="openDocInspectModal('${a.id}')" class="text-[11px] font-bold text-sky-700 hover:text-emerald-700 hover:underline flex items-center gap-1">
                       <i class="fa-solid fa-file-shield text-emerald-600"></i>
@@ -4326,11 +4333,8 @@
       if (presetSelect) presetSelect.value = '';
 
       let docUrl = app.efdaDocUrl || app.counterPhotoUrl;
-      if (!docUrl && app.telegramChatId) {
-        docUrl = `/api/telegram/media/${app.id}`;
-      }
       if (!docUrl) {
-        docUrl = 'https://images.unsplash.com/photo-1589829545856-d10d557cf95f?auto=format&fit=crop&w=1200&q=80';
+        docUrl = `/api/telegram/media/${app.id}`;
       }
 
       const imgEl = document.getElementById('docInspectImg');
