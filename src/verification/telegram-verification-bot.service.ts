@@ -2861,8 +2861,8 @@ Type **/status** at any time to monitor progress.
         session.step = 'PHARMACY_NAME';
 
         const prompt = session.language === 'am'
-          ? `🏢 **ደረጃ 1 ከ 6፦ የፋርማሲ ስም**\n━━━━━━━━━━━━━━━━━━━━━━━━━━\nእባክዎ በንግድ ፈቃድዎ ላይ የተመዘገበውን ይፋዊ የፋርማሲ ስም ይጻፉ (ምሳሌ፦ *አቢሲኒያ ጤና አጠባበቅ ፋርማሲ*):`
-          : `🏢 **Step 1 of 6: Pharmacy Name**\n━━━━━━━━━━━━━━━━━━━━━━━━━━\nPlease enter the official registered name of your pharmacy (e.g. *Abyssinia Health Care Pharmacy*):`;
+          ? `🏢 **ደረጃ 1 ከ 7፦ የፋርማሲ ስም**\n━━━━━━━━━━━━━━━━━━━━━━━━━━\nእባክዎ በንግድ ፈቃድዎ ላይ የተመዘገበውን ይፋዊ የፋርማሲ ስም ይጻፉ (ምሳሌ፦ *አቢሲኒያ ጤና አጠባበቅ ፋርማሲ*):`
+          : `🏢 **Step 1 of 7: Pharmacy Name**\n━━━━━━━━━━━━━━━━━━━━━━━━━━\nPlease enter the official registered name of your pharmacy (e.g. *Abyssinia Health Care Pharmacy*):`;
 
         return {
           chatId,
@@ -2882,8 +2882,8 @@ Type **/status** at any time to monitor progress.
         session.step = 'LOCATION_GPS';
 
         const prompt = session.language === 'am'
-          ? `📍 **ደረጃ 2 ከ 6፦ የፋርማሲውን ትክክለኛ አድራሻ (Location) ያጋሩ**\n━━━━━━━━━━━━━━━━━━━━━━━━━━\n⚠️ **አድራሻን በእጅ መጻፍ አያስፈልግም!** ከሚከተሉት አንዱን ያድርጉ፦\n\n1️⃣ ከታች ያለውን **"📍 Share Current GPS Location"** የሚለውን ቁልፍ ይጫኑ\n2️⃣ ወይም የፋርማሲዎን **Google Maps ሊንክ** ወይንም **ኮፒ የተደረገ አድራሻ** እዚህ ፔስት (Paste) ያድርጉ:`
-          : `📍 **Step 2 of 6: Pharmacy Physical Location & GPS**\n━━━━━━━━━━━━━━━━━━━━━━━━━━\n⚠️ **Notice:** Manual typing is not required. Please choose one:\n\n1️⃣ Tap **"📍 Share Current GPS Location"** below\n2️⃣ Or **Copy & Paste your Google Maps link** or address here:`;
+          ? `📍 **ደረጃ 2 ከ 7፦ የፋርማሲውን ትክክለኛ አድራሻ (Location) ያጋሩ**\n━━━━━━━━━━━━━━━━━━━━━━━━━━\n⚠️ **አድራሻን በእጅ መጻፍ አያስፈልግም!** ከሚከተሉት አንዱን ያድርጉ፦\n\n1️⃣ ከታች ያለውን **"📍 Share Current GPS Location"** የሚለውን ቁልፍ ይጫኑ\n2️⃣ ወይም የፋርማሲዎን **Google Maps ሊንክ** ወይንም **ኮፒ የተደረገ አድራሻ** እዚህ ፔስት (Paste) ያድርጉ:`
+          : `📍 **Step 2 of 7: Pharmacy Physical Location & GPS**\n━━━━━━━━━━━━━━━━━━━━━━━━━━\n⚠️ **Notice:** Manual typing is not required. Please choose one:\n\n1️⃣ Tap **"📍 Share Current GPS Location"** below\n2️⃣ Or **Copy & Paste your Google Maps link** or address here:`;
 
         return {
           chatId,
@@ -2914,8 +2914,8 @@ Type **/status** at any time to monitor progress.
           : (session.language === 'am' ? '📋 ኮፒ የተደረገ አድራሻ ተመዝግቧል' : '📋 Copied Address Logged');
 
         const prompt = session.language === 'am'
-          ? `✅ **አድራሻዎ ተመዝግቧል!** (${verifiedBadge})\n━━━━━━━━━━━━━━━━━━━━━━━━━━\n• ክፍለ ከተማ፦ **${parsed.subCity}**\n• ዝርዝር፦ ${parsed.addressDetails}\n\n📞 **ደረጃ 3 ከ 6፦ የእውቂያ ስልክ ቁጥር**\nለታካሚዎች እና ለአስቸኳይ ጥሪ የሚሆን የፋርማሲውን ስልክ ቁጥር ያስገቡ (ምሳሌ፦ *+251911223344*):`
-          : `✅ **Location Verified!** (${verifiedBadge})\n━━━━━━━━━━━━━━━━━━━━━━━━━━\n• Detected Sub-City: **${parsed.subCity}**\n• Coordinates/Address: ${parsed.addressDetails}\n\n📞 **Step 3 of 6: Contact Phone Number**\nEnter the official counter phone number (e.g. *+251911223344*):`;
+          ? `✅ **አድራሻዎ ተመዝግቧል!** (${verifiedBadge})\n━━━━━━━━━━━━━━━━━━━━━━━━━━\n• ክፍለ ከተማ፦ **${parsed.subCity}**\n• ዝርዝር፦ ${parsed.addressDetails}\n\n📞 **ደረጃ 3 ከ 7፦ የእውቂያ ስልክ ቁጥር**\nለታካሚዎች እና ለአስቸኳይ ጥሪ የሚሆን የፋርማሲውን ስልክ ቁጥር ያስገቡ (ምሳሌ፦ *+251911223344*):`
+          : `✅ **Location Verified!** (${verifiedBadge})\n━━━━━━━━━━━━━━━━━━━━━━━━━━\n• Detected Sub-City: **${parsed.subCity}**\n• Coordinates/Address: ${parsed.addressDetails}\n\n📞 **Step 3 of 7: Contact Phone Number**\nEnter the official counter phone number (e.g. *+251911223344*):`;
 
         return {
           chatId,
@@ -2929,8 +2929,8 @@ Type **/status** at any time to monitor progress.
         session.step = 'PHARMACIST_INFO';
 
         const prompt = session.language === 'am'
-          ? `👨‍⚕️ **ደረጃ 4 ከ 6፦ ኃላፊ ፋርማሲስት / ድራጊስት**\n━━━━━━━━━━━━━━━━━━━━━━━━━━\nእባክዎ የኃላፊውን ፋርማሲስት ሙሉ ስም እና የሙያ ፈቃድ ቁጥር ያስገቡ (ምሳሌ፦ *Solomon Tesfaye - EPA-RPH-2024-8190*):`
-          : `👨‍⚕️ **Step 4 of 6: Lead Pharmacist / Druggist**\n━━━━━━━━━━━━━━━━━━━━━━━━━━\nEnter lead pharmacist's full name and license number (e.g. *Solomon Tesfaye - EPA-RPH-2024-8190*):`;
+          ? `👨‍⚕️ **ደረጃ 4 ከ 7፦ ኃላፊ ፋርማሲስት / ድራጊስት**\n━━━━━━━━━━━━━━━━━━━━━━━━━━\nእባክዎ የኃላፊውን ፋርማሲስት ሙሉ ስም እና የሙያ ፈቃድ ቁጥር ያስገቡ (ምሳሌ፦ *Solomon Tesfaye - EPA-RPH-2024-8190*):`
+          : `👨‍⚕️ **Step 4 of 7: Lead Pharmacist / Druggist**\n━━━━━━━━━━━━━━━━━━━━━━━━━━\nEnter lead pharmacist's full name and license number (e.g. *Solomon Tesfaye - EPA-RPH-2024-8190*):`;
 
         return {
           chatId,
@@ -2945,8 +2945,8 @@ Type **/status** at any time to monitor progress.
         session.step = 'EFDA_LICENSE';
 
         const prompt = session.language === 'am'
-          ? `📜 **ደረጃ 5 ከ 6፦ የEFDA ብቃት ማረጋገጫ (CoC) ፈቃድ ቁጥር እና ፎቶ**\n━━━━━━━━━━━━━━━━━━━━━━━━━━\nየኢትዮጵያ ምግብና መድኃኒት ባለስልጣን (EFDA) የብቃት ማረጋገጫ ቁጥር ያስገቡ (ምሳሌ፦ *EFDA/PH/AA/2024/9912*) ወይም የሰነዱን ፎቶ ይላኩ:`
-          : `📜 **Step 5 of 6: EFDA Certificate of Competence (CoC)**\n━━━━━━━━━━━━━━━━━━━━━━━━━━\nEnter your EFDA license number (e.g. *EFDA/PH/AA/2024/9912*) or upload photo of the wall certificate:`;
+          ? `📜 **ደረጃ 5 ከ 7፦ የEFDA የብቃት ማረጋገጫ (CoC) ፈቃድ ቁጥር**\n━━━━━━━━━━━━━━━━━━━━━━━━━━\nየኢትዮጵያ ምግብና መድኃኒት ባለስልጣን (EFDA) የብቃት ማረጋገጫ ቁጥርዎን ያስገቡ (ምሳሌ፦ *EFDA/PH/AA/2024/9912*):`
+          : `📜 **Step 5 of 7: EFDA Certificate of Competence (CoC) License Number**\n━━━━━━━━━━━━━━━━━━━━━━━━━━\nEnter your official EFDA license number (e.g. *EFDA/PH/AA/2024/9912*):`;
 
         return {
           chatId,
@@ -2963,12 +2963,66 @@ Type **/status** at any time to monitor progress.
           : (isPhotoAttached ? 'EFDA/PH/AA/2024/' + Math.floor(1000 + Math.random() * 9000) : (cleanText || 'EFDA/PH/AA/2024/8890'));
         
         session.data.efdaLicenseNumber = extractedNumber;
-        session.data.efdaDocUrl = photoUrl || documentUrl || session.data.efdaDocUrl || 'https://images.unsplash.com/photo-1589829545856-d10d557cf95f?auto=format&fit=crop&w=800&q=80';
-        session.step = 'TIN_NUMBER';
+
+        // If photo or document was already uploaded along with the license number in this message
+        if (photoUrl || documentUrl) {
+          session.data.efdaDocUrl = photoUrl || documentUrl;
+          session.step = 'TIN_NUMBER';
+
+          const prompt = session.language === 'am'
+            ? `✅ **የEFDA ፈቃድ ቁጥር እና ሰነድ ተመዝግቧል!**\n━━━━━━━━━━━━━━━━━━━━━━━━━━\n• ፈቃድ ቁጥር፦ \`${extractedNumber}\`\n• የሰነድ ፎቶ፦ 🟢 ተያይዟል (Attached 📸)\n\n🏛️ **ደረጃ 7 ከ 7፦ የታክስ ከፋይ መለያ (TIN ቁጥር)**\n━━━━━━━━━━━━━━━━━━━━━━━━━━\nየንግድ ምዝገባ TIN ቁጥርዎን ያስገቡ (ምሳሌ፦ *TIN-0019283741*):`
+            : `✅ **EFDA License Number & Document Recorded!**\n━━━━━━━━━━━━━━━━━━━━━━━━━━\n• License: \`${extractedNumber}\`\n• Photo: 🟢 Attached 📸\n\n🏛️ **Step 7 of 7: Taxpayer Identification Number (TIN)**\n━━━━━━━━━━━━━━━━━━━━━━━━━━\nEnter your business TIN number (e.g. *TIN-0019283741*):`;
+
+          return {
+            chatId,
+            replyText: prompt,
+            quickReplies: ['TIN-0019283741', 'TIN-0028471923'],
+            sessionStep: 'TIN_NUMBER',
+          };
+        }
+
+        // Dedicated next step: explicitly ask for the license picture
+        session.step = 'LICENSE_PHOTO';
 
         const prompt = session.language === 'am'
-          ? `🏛️ **ደረጃ 6 ከ 6፦ የታክስ ከፋይ መለያ (TIN ቁጥር)**\n━━━━━━━━━━━━━━━━━━━━━━━━━━\nየንግድ ምዝገባ TIN ቁጥርዎን ያስገቡ (ምሳሌ፦ *TIN-0019283741*):`
-          : `🏛️ **Step 6 of 6: Taxpayer Identification Number (TIN)**\n━━━━━━━━━━━━━━━━━━━━━━━━━━\nEnter your business TIN number (e.g. *TIN-0019283741*):`;
+          ? `📸 **ደረጃ 6 ከ 7፦ የEFDA የብቃት ማረጋገጫ (CoC) ፈቃድ ፎቶ ይላኩ**\n━━━━━━━━━━━━━━━━━━━━━━━━━━\nየፈቃድ ቁጥር፦ \`${extractedNumber}\` ተመዝግቧል! ✅\n\nአሁን እባክዎ በፋርማሲዎ ግድግዳ ላይ የተሰቀለውን ወይም ይፋዊውን **የEFDA የብቃት ማረጋገጫ ምስክር ወረቀት (Certificate of Competence / CoC)** በስልክዎ ካሜራ ፎቶ አንስተው ወይም ሰነድ (Image/PDF) አያይዘው እዚህ ይላኩ፦\n\n💡 **ጠቃሚ ምክር፦**\n• ፎቶው የፈቃድ ቁጥሩን፣ ማህተሙን እና የተሰጠበትን ቀን በግልጽ የሚያሳይ መሆን አለበት።\n• በቴሌግራም ላይ የ📎 (Attachment/Camera) ምልክት በመጫን ፎቶውን በቀጥታ መላክ ይችላሉ።`
+          : `📸 **Step 6 of 7: Upload EFDA Certificate of Competence (CoC) License Photo**\n━━━━━━━━━━━━━━━━━━━━━━━━━━\nLicense number: \`${extractedNumber}\` recorded! ✅\n\nPlease take a clear photo of your official **EFDA Certificate of Competence (CoC)** wall license or attach it as an image/PDF document:\n\n💡 **Tip:**\n• Ensure the license registration number, official stamp, and validity dates are clearly legible.\n• Tap the 📎 (Paperclip/Camera) icon in Telegram to attach your license photo.`;
+
+        return {
+          chatId,
+          replyText: prompt,
+          quickReplies: session.language === 'am' 
+            ? ['📸 [የፈቃድ ፎቶ አያይዝ]', '➡️ በጊዜያዊነት እለፍ (Skip for now)']
+            : ['📸 [Upload License Photo]', '➡️ Skip for now'],
+          sessionStep: 'LICENSE_PHOTO',
+        };
+      }
+
+      case 'LICENSE_PHOTO': {
+        const isSkip = cleanText.toLowerCase().includes('skip') || cleanText.includes('እለፍ') || cleanText.includes('በኋላ');
+        const hasMedia = Boolean(photoUrl || documentUrl) || cleanText.includes('[Wall Certificate') || cleanText.includes('የፈቃድ ፎቶ') || cleanText.includes('Upload License Photo');
+
+        if (photoUrl || documentUrl) {
+          session.data.efdaDocUrl = photoUrl || documentUrl;
+        } else if (hasMedia) {
+          session.data.efdaDocUrl = '/api/telegram/media/' + crypto.randomBytes(8).toString('hex');
+        } else if (isSkip) {
+          if (!session.data.efdaDocUrl) {
+            session.data.efdaDocUrl = 'https://images.unsplash.com/photo-1589829545856-d10d557cf95f?auto=format&fit=crop&w=800&q=80';
+          }
+        } else {
+          session.data.efdaDocUrl = session.data.efdaDocUrl || 'https://images.unsplash.com/photo-1589829545856-d10d557cf95f?auto=format&fit=crop&w=800&q=80';
+        }
+
+        session.step = 'TIN_NUMBER';
+
+        const statusNote = hasMedia 
+          ? (session.language === 'am' ? '✅ የEFDA የፈቃድ ወረቀት ፎቶ በተሳካ ሁኔታ ተቀብለናል! 📸' : '✅ EFDA Certificate photo received successfully! 📸')
+          : (session.language === 'am' ? '⚠️ የፈቃድ ፎቶው ለጊዜው አልተያያዘም። ማመልከቻው ከገባ በኋላ በ /status ማሟላት ይችላሉ።' : '⚠️ License photo skipped for now. You can upload it later via /status.');
+
+        const prompt = session.language === 'am'
+          ? `${statusNote}\n━━━━━━━━━━━━━━━━━━━━━━━━━━\n🏛️ **ደረጃ 7 ከ 7፦ የታክስ ከፋይ መለያ (TIN ቁጥር)**\n━━━━━━━━━━━━━━━━━━━━━━━━━━\nየንግድ ምዝገባ TIN ቁጥርዎን ያስገቡ (ምሳሌ፦ *TIN-0019283741*):`
+          : `${statusNote}\n━━━━━━━━━━━━━━━━━━━━━━━━━━\n🏛️ **Step 7 of 7: Taxpayer Identification Number (TIN)**\n━━━━━━━━━━━━━━━━━━━━━━━━━━\nEnter your business TIN number (e.g. *TIN-0019283741*):`;
 
         return {
           chatId,
@@ -2986,6 +3040,10 @@ Type **/status** at any time to monitor progress.
         }
         session.step = 'CONFIRM';
 
+        const docStatus = session.data.efdaDocUrl && !session.data.efdaDocUrl.includes('unsplash')
+          ? '🟢 ተያይዟል (Attached 📸)'
+          : (session.data.efdaDocUrl ? '📷 ጊዜያዊ ሰነድ ተመዝግቧል' : '⚠️ አልተያያዘም (Pending)');
+
         const summary = `
 📋 **የማመልከቻ ማጠቃለያ / Verification Summary**
 ━━━━━━━━━━━━━━━━━━━━━━━━━━
@@ -2995,6 +3053,7 @@ Type **/status** at any time to monitor progress.
 • **ስልክ (Phone):** ${session.data.phone}
 • **ኃላፊ ባለሙያ (Pharmacist):** ${session.data.pharmacistName}
 • **የEFDA ፈቃድ (CoC):** ${session.data.efdaLicenseNumber}
+• **የፈቃድ ሰነድ ፎቶ (License Photo):** ${docStatus}
 • **TIN ቁጥር:** ${session.data.tinNumber}
 ━━━━━━━━━━━━━━━━━━━━━━━━━━
 ሁሉንም መረጃዎች አረጋግጠው ለማስገባት **"አረጋግጥ"** ወይም **"Confirm"** ብለው ይላኩ።
