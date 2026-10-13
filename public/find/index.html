@@ -29,14 +29,14 @@
     .hide-scrollbar::-webkit-scrollbar { display: none; }
     .hide-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
     .safe-area-bottom {
-      padding-bottom: calc(0.5rem + env(safe-area-inset-bottom, 0px));
+      padding-bottom: calc(0.6rem + env(safe-area-inset-bottom, 0px)) !important;
     }
     .main-mobile-pad {
-      padding-bottom: calc(5.25rem + env(safe-area-inset-bottom, 0px));
+      padding-bottom: calc(6.25rem + env(safe-area-inset-bottom, 0px)) !important;
     }
     @media (min-width: 640px) {
       .main-mobile-pad {
-        padding-bottom: 1.5rem;
+        padding-bottom: 2rem !important;
       }
     }
     @media (max-width: 640px) {
@@ -98,7 +98,7 @@
   </div>
 
   <!-- MAIN PATIENT RADAR CONTAINER -->
-  <main class="max-w-xl mx-auto w-full px-3.5 sm:px-4 py-3.5 sm:py-4 space-y-4 flex-1 main-mobile-pad">
+  <main class="max-w-xl mx-auto w-full px-3.5 sm:px-4 pt-3.5 sm:pt-4 space-y-4 flex-1 main-mobile-pad">
 
     <!-- SEARCH HERO CARD -->
     <section class="bg-gradient-to-br from-slate-900 via-slate-800 to-emerald-950 rounded-3xl p-4 sm:p-5 text-white shadow-xl relative overflow-hidden space-y-3.5">
@@ -232,23 +232,32 @@
       </div>
     </div>
 
-    <!-- BENEFIT CARDS (ANTI-SCAM PRICE LOCK) -->
-    <section class="grid grid-cols-1 xs:grid-cols-2 sm:grid-cols-2 gap-3 text-xs">
-      <div class="p-3.5 bg-white rounded-2xl border border-slate-200 shadow-xs space-y-1">
-        <div class="w-7 h-7 rounded-lg bg-emerald-100 text-emerald-700 flex items-center justify-center text-xs font-bold mb-1">
-          <i class="fa-solid fa-clock"></i>
+    <!-- BENEFIT CARDS (ANTI-SCAM PRICE LOCK & TELEGRAM RESTOCK ALERTS) -->
+    <section class="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
+      <div onclick="focusSearchInput()" class="cursor-pointer p-3.5 bg-white hover:border-emerald-300 rounded-2xl border border-slate-200 shadow-xs space-y-1.5 active:scale-[0.99] transition">
+        <div class="flex items-center justify-between">
+          <div class="w-8 h-8 rounded-xl bg-emerald-100 text-emerald-700 flex items-center justify-center text-sm font-bold">
+            <i class="fa-solid fa-clock"></i>
+          </div>
+          <span class="text-[10px] font-bold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-200">Anti-Gouging</span>
         </div>
-        <strong class="text-slate-900 block text-[11px]">60-Min Counter Price Lock</strong>
-        <p class="text-[10px] text-slate-500">Lock the shelf price before traveling so pharmacies cannot raise rates upon arrival.</p>
+        <strong class="text-slate-900 block text-xs">60-Min Counter Price Lock</strong>
+        <p class="text-[11px] text-slate-500 leading-relaxed">Lock the shelf price before traveling so pharmacies cannot raise rates upon arrival.</p>
       </div>
 
-      <div class="p-3.5 bg-white rounded-2xl border border-slate-200 shadow-xs space-y-1">
-        <div class="w-7 h-7 rounded-lg bg-sky-100 text-sky-700 flex items-center justify-center text-xs font-bold mb-1">
-          <i class="fa-brands fa-telegram"></i>
+      <a href="https://t.me/MedFinder_ET_bot" target="_blank" class="block p-3.5 bg-white hover:border-sky-300 rounded-2xl border border-slate-200 shadow-xs space-y-1.5 active:scale-[0.99] transition">
+        <div class="flex items-center justify-between">
+          <div class="w-8 h-8 rounded-xl bg-sky-100 text-sky-700 flex items-center justify-center text-sm font-bold">
+            <i class="fa-brands fa-telegram"></i>
+          </div>
+          <span class="text-[10px] font-bold text-sky-700 bg-sky-50 px-2 py-0.5 rounded-full border border-sky-200 flex items-center gap-1">
+            <span>Open Bot</span>
+            <i class="fa-solid fa-arrow-up-right-from-square text-[8px]"></i>
+          </span>
         </div>
-        <strong class="text-slate-900 block text-[11px]">Telegram Restock Alerts</strong>
-        <p class="text-[10px] text-slate-500">If a rare chronic medicine is out of stock, get an automated ping when restocked.</p>
-      </div>
+        <strong class="text-slate-900 block text-xs">Telegram Restock Alerts</strong>
+        <p class="text-[11px] text-slate-500 leading-relaxed">If a rare or chronic medicine is sold out, our bot broadcasts your request to nearby pharmacies and pings you on Telegram the moment a pharmacist confirms stock.</p>
+      </a>
     </section>
 
   </main>

@@ -50,14 +50,14 @@
     .hide-scrollbar::-webkit-scrollbar { display: none; }
     .hide-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
     .safe-area-bottom {
-      padding-bottom: calc(0.5rem + env(safe-area-inset-bottom, 0px));
+      padding-bottom: calc(0.6rem + env(safe-area-inset-bottom, 0px)) !important;
     }
     .main-mobile-pad {
-      padding-bottom: calc(5.5rem + env(safe-area-inset-bottom, 0px));
+      padding-bottom: calc(6.25rem + env(safe-area-inset-bottom, 0px)) !important;
     }
     @media (min-width: 768px) {
       .main-mobile-pad {
-        padding-bottom: 2rem;
+        padding-bottom: 2rem !important;
       }
     }
     /* Prevent iOS auto-zoom on form inputs while keeping desktop compact */
