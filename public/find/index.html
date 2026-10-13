@@ -1584,6 +1584,13 @@
     window.addEventListener('DOMContentLoaded', () => {
       try {
         const params = new URLSearchParams(window.location.search);
+        const subCityParam = params.get('subcity') || params.get('subCity');
+        if (subCityParam) {
+          const select = document.getElementById('subCitySelect');
+          if (select) {
+            select.value = subCityParam;
+          }
+        }
         const q = params.get('q') || params.get('search');
         if (q) {
           const input = document.getElementById('medicineInput');

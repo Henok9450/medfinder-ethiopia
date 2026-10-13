@@ -1993,12 +1993,18 @@ app.get('/miniapp', (_req: Request, res: Response) => {
   res.sendFile(path.join(__dirname, '../public/miniapp.html'));
 });
 
+// Dedicated Regulatory & Admin Portal Routes
+app.get(['/admin', '/admin/index.html'], (_req: Request, res: Response) => {
+  res.sendFile(path.join(__dirname, '../public/admin/index.html'));
+});
+
 // Dedicated Patient Medicine Finder PWA Routes
 app.get(['/find', '/find/index.html', '/search', '/search/index.html'], (_req: Request, res: Response) => {
   res.sendFile(path.join(__dirname, '../public/find/index.html'));
 });
 
-app.get('/', (req: Request, res: Response) => {
+// Public Landing Page
+app.get(['/', '/index.html'], (req: Request, res: Response) => {
   res.sendFile(path.join(__dirname, '../public/index.html'));
 });
 
