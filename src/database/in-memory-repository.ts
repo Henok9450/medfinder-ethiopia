@@ -490,4 +490,21 @@ export class InMemoryRepository implements IDatabaseRepository {
   public async deleteWholesaleListing(listingId: string): Promise<boolean> {
     return this.db.deleteWholesaleListing(listingId);
   }
+
+  public async registerWholesaler(data: {
+    name: string;
+    subCity: string;
+    city?: string;
+    phone: string;
+    efdaWholesaleLicense: string;
+    tinNumber?: string;
+    deliveryTerms?: string;
+    minimumOrderValueETB?: number;
+  }): Promise<{ success: boolean; wholesaler?: Wholesaler; error?: string }> {
+    return this.db.registerWholesaler(data);
+  }
+
+  public async deleteWholesaler(wholesalerId: string): Promise<boolean> {
+    return this.db.deleteWholesaler(wholesalerId);
+  }
 }

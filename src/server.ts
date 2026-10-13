@@ -1691,6 +1691,61 @@ app.delete('/api/wholesaler/:wholesalerId/listings/:listingId', async (req: Requ
   }
 });
 
+// Admin Wholesaler Provisioning & Management Endpoints
+app.post('/api/admin/wholesalers/register', async (req: Request, res: Response) => {
+  try {
+    const { name, subCity, city, phone, efdaWholesaleLicense, tinNumber, deliveryTerms, minimumOrderValueETB } = req.body;
+    if (!name || !phone || !efdaWholesaleLicense) {
+      return res.status(400).json({
+        success: false,
+        error: 'Wholesaler name, contact phone, and EFDA wholesale license are required.',
+      });
+    }
+
+    const result = await dbRepo.registerWholesaler({
+      name: String(name),
+      subCity: String(subCity || 'Bole'),
+      city: String(city || 'Addis Ababa'),
+      phone: String(phone),
+      efdaWholesaleLicense: String(efdaWholesaleLicense),
+      tinNumber: tinNumber ? String(tinNumber) : undefined,
+      deliveryTerms: deliveryTerms ? String(deliveryTerms) : undefined,
+      minimumOrderValueETB: minimumOrderValueETB ? Number(minimumOrderValueETB) : undefined,
+    });
+
+    if (!result.success || !result.wholesaler) {
+      return res.status(400).json({ success: false, error: result.error || 'Failed to register wholesaler' });
+    }
+
+    const ws = result.wholesaler;
+    const directStudioUrl = `http://localhost:3000/wholesaler/?key=${ws.accessKey}`;
+    const telegramLink = `https://t.me/MedFinder_Verifier_bot?start=${ws.id}`;
+
+    res.json({
+      success: true,
+      message: `Wholesaler ${ws.name} registered and provisioned successfully!`,
+      wholesaler: ws,
+      credentials: {
+        accessKey: ws.accessKey,
+        directStudioUrl,
+        telegramLink,
+      },
+    });
+  } catch (err: any) {
+    res.status(500).json({ success: false, error: err.message || 'Error registering wholesaler' });
+  }
+});
+
+app.delete('/api/admin/wholesalers/:id', async (req: Request, res: Response) => {
+  try {
+    const id = String(req.params.id);
+    const deleted = await dbRepo.deleteWholesaler(id);
+    res.json({ success: deleted });
+  } catch (err: any) {
+    res.status(500).json({ success: false, error: err.message || 'Error deleting wholesaler' });
+  }
+});
+
 // Dedicated Wholesaler Supply Studio PWA direct route
 app.get(['/wholesaler', '/wholesaler/setup', '/wholesaler/index.html'], (_req: Request, res: Response) => {
   res.sendFile(path.join(__dirname, '../public/wholesaler/index.html'));

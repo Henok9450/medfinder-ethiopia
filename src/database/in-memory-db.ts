@@ -1857,6 +1857,54 @@ export class InMemoryDatabase {
     return [...this.wholesalers];
   }
 
+  public registerWholesaler(data: {
+    name: string;
+    subCity: string;
+    city?: string;
+    phone: string;
+    efdaWholesaleLicense: string;
+    tinNumber?: string;
+    deliveryTerms?: string;
+    minimumOrderValueETB?: number;
+  }): { success: boolean; wholesaler?: Wholesaler; error?: string } {
+    if (!data.name || !data.phone || !data.efdaWholesaleLicense) {
+      return { success: false, error: 'Name, phone, and EFDA wholesale license are required' };
+    }
+
+    const cleanSlug = data.name.toLowerCase().replace(/[^a-z0-9]+/g, '_').substring(0, 16).replace(/_$/, '');
+    const randSuffix = Math.floor(1000 + Math.random() * 9000);
+    const id = `wholesaler_${cleanSlug}_${randSuffix}`;
+    const accessKey = `mf_ws_${cleanSlug.split('_')[0] || 'dist'}_${randSuffix}`;
+
+    const wholesaler: Wholesaler = {
+      id,
+      name: data.name.trim(),
+      subCity: data.subCity ? data.subCity.trim() : 'Bole',
+      city: data.city ? data.city.trim() : 'Addis Ababa',
+      phone: data.phone.trim(),
+      telegramChatId: `tg_${id}`,
+      accessKey,
+      efdaWholesaleLicense: data.efdaWholesaleLicense.trim(),
+      tinNumber: data.tinNumber ? data.tinNumber.trim() : `TIN-${Math.floor(1000000000 + Math.random() * 9000000000)}`,
+      isVerified: true,
+      trustScore: 98,
+      deliveryTerms: data.deliveryTerms ? data.deliveryTerms.trim() : 'Same-Day Dispatch (Within 3 Hours) • EFDA Cold-Chain Certified',
+      minimumOrderValueETB: data.minimumOrderValueETB ? Number(data.minimumOrderValueETB) : 2000,
+    };
+
+    this.wholesalers.unshift(wholesaler);
+    return { success: true, wholesaler };
+  }
+
+  public deleteWholesaler(wholesalerId: string): boolean {
+    const idx = this.wholesalers.findIndex((w) => w.id === wholesalerId);
+    if (idx === -1) return false;
+    this.wholesalers.splice(idx, 1);
+    // Also remove listings
+    this.wholesaleListings = this.wholesaleListings.filter((l) => l.wholesalerId !== wholesalerId);
+    return true;
+  }
+
   public getB2BCommissionReport(): { totalGrossVolumeETB: number; totalPlatformFeesETB: number; ordersCount: number; orders: WholesalePurchaseOrder[] } {
     const activeOrders = this.wholesalePurchaseOrders.filter((o) => o.status !== 'CANCELLED');
     const totalGrossVolumeETB = activeOrders.reduce((sum, o) => sum + o.totalPriceETB, 0);

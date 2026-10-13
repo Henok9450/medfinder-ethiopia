@@ -1097,6 +1097,48 @@
             </div>
           </div>
 
+          <!-- B2B CERTIFIED WHOLESALERS & IMPORTERS PROVISIONING DESK -->
+          <div class="mt-6 pt-5 border-t border-slate-200 space-y-4">
+            <div class="flex flex-wrap items-center justify-between gap-3">
+              <div class="flex items-center space-x-2">
+                <i class="fa-solid fa-truck-ramp-box text-indigo-600 text-lg"></i>
+                <h4 class="font-bold text-sm text-slate-900">Certified Wholesalers & Importers Desk (MedSupply B2B)</h4>
+                <span id="adminWholesalerCountBadge" class="text-[10px] bg-indigo-100 text-indigo-800 font-bold px-2 py-0.5 rounded-full">3 Registered</span>
+              </div>
+              <div class="flex items-center space-x-2">
+                <button onclick="openRegisterWholesalerModal()" class="bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold px-3 py-1.5 rounded-xl shadow-xs transition flex items-center space-x-1.5">
+                  <i class="fa-solid fa-plus text-[10px]"></i>
+                  <span>Register Wholesaler</span>
+                </button>
+                <button onclick="loadAdminWholesalers()" class="text-xs text-indigo-700 hover:text-indigo-900 font-semibold flex items-center space-x-1">
+                  <i class="fa-solid fa-rotate-right text-[10px]"></i>
+                  <span>Refresh</span>
+                </button>
+              </div>
+            </div>
+            <p class="text-xs text-slate-500">
+              Regulatory-vetted Ethiopian pharmaceutical importers & distributors. Generate 1-Click Access Keys for their <strong>Wholesaler Studio PWA</strong> and connect warehouse Telegram bots.
+            </p>
+
+            <div class="overflow-x-auto rounded-xl border border-indigo-200 bg-indigo-50/20">
+              <table class="w-full text-left text-xs">
+                <thead class="bg-indigo-50 text-indigo-950 font-semibold border-b border-indigo-100">
+                  <tr>
+                    <th class="p-3">Wholesaler Entity & City</th>
+                    <th class="p-3">EFDA Wholesale License</th>
+                    <th class="p-3">TIN Number</th>
+                    <th class="p-3">1-Click Access Key & PWA Link</th>
+                    <th class="p-3">Telegram Dispatch Bot</th>
+                    <th class="p-3 text-right">Actions</th>
+                  </tr>
+                </thead>
+                <tbody id="adminWholesalersTbody" class="divide-y divide-indigo-100/60 bg-white">
+                  <tr><td colspan="6" class="p-4 text-center text-slate-400">Loading wholesalers...</td></tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+
           <!-- INCOMING TELEGRAM VERIFICATION APPLICATIONS QUEUE -->
           <div class="mt-6 pt-5 border-t border-slate-200 space-y-3">
             <div class="flex items-center justify-between">
@@ -2217,6 +2259,117 @@
           <button type="submit" id="saveAnalyticsAccessBtn" class="px-5 py-2 bg-indigo-600 hover:bg-indigo-700 text-white font-bold rounded-xl shadow-md transition flex items-center gap-1.5">
             <i class="fa-solid fa-floppy-disk"></i>
             <span>Save Analytics Access</span>
+          </button>
+        </div>
+      </form>
+
+    </div>
+  </div>
+
+  <!-- ============================================================== -->
+  <!-- MODAL: REGISTER VETTED WHOLESALER & IMPORTER (ADMIN)           -->
+  <!-- ============================================================== -->
+  <div id="registerWholesalerModal" class="hidden fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-3 sm:p-6">
+    <div class="bg-white rounded-3xl max-w-lg w-full shadow-2xl flex flex-col overflow-hidden border border-slate-200">
+      
+      <!-- MODAL HEADER -->
+      <div class="px-6 py-4 bg-gradient-to-r from-slate-900 to-indigo-950 text-white flex items-center justify-between border-b border-slate-800">
+        <div class="flex items-center space-x-3">
+          <div class="w-10 h-10 rounded-xl bg-indigo-500/20 text-indigo-400 border border-indigo-400/30 flex items-center justify-center text-lg">
+            <i class="fa-solid fa-truck-ramp-box"></i>
+          </div>
+          <div>
+            <h3 class="font-bold text-sm text-white">Register Certified Wholesaler</h3>
+            <span class="text-xs text-indigo-200">Provision B2B MedSupply Studio Access Key</span>
+          </div>
+        </div>
+        <button onclick="closeModal('registerWholesalerModal')" class="text-slate-400 hover:text-white transition">
+          <i class="fa-solid fa-xmark text-lg"></i>
+        </button>
+      </div>
+
+      <!-- MODAL FORM BODY -->
+      <form onsubmit="handleRegisterWholesalerSubmit(event)" class="p-6 space-y-3.5 text-xs">
+        <div>
+          <label class="block font-semibold text-slate-700 mb-1">Company / Importer Name *</label>
+          <input type="text" id="wsRegName" placeholder="e.g. Novartis Ethiopia / Cadila Pharma" required
+            class="w-full bg-slate-50 border border-slate-300 rounded-xl px-3.5 py-2 text-slate-900 focus:outline-none focus:ring-2 focus:ring-indigo-500">
+        </div>
+
+        <div class="grid grid-cols-2 gap-3">
+          <div>
+            <label class="block font-semibold text-slate-700 mb-1">Sub-City Location *</label>
+            <select id="wsRegSubCity" class="w-full bg-slate-50 border border-slate-300 rounded-xl px-3 py-2 text-slate-900 focus:outline-none focus:ring-2 focus:ring-indigo-500">
+              <option value="Kirkos">Kirkos</option>
+              <option value="Bole" selected>Bole</option>
+              <option value="Nifas Silk">Nifas Silk</option>
+              <option value="Lemi Kura">Lemi Kura</option>
+              <option value="Yeka">Yeka</option>
+              <option value="Arada">Arada</option>
+              <option value="Lideta">Lideta</option>
+              <option value="Addis Ketema">Addis Ketema</option>
+              <option value="Akaki Kaliti">Akaki Kaliti</option>
+            </select>
+          </div>
+          <div>
+            <label class="block font-semibold text-slate-700 mb-1">Contact Phone *</label>
+            <input type="tel" id="wsRegPhone" placeholder="0911-203490" required
+              class="w-full bg-slate-50 border border-slate-300 rounded-xl px-3.5 py-2 text-slate-900 focus:outline-none focus:ring-2 focus:ring-indigo-500">
+          </div>
+        </div>
+
+        <div class="grid grid-cols-2 gap-3">
+          <div>
+            <label class="block font-semibold text-slate-700 mb-1">EFDA Wholesale License *</label>
+            <input type="text" id="wsRegLicense" placeholder="EFDA/WHOLESALE/AA-9901" required
+              class="w-full bg-slate-50 border border-slate-300 rounded-xl px-3.5 py-2 text-slate-900 font-mono focus:outline-none focus:ring-2 focus:ring-indigo-500">
+          </div>
+          <div>
+            <label class="block font-semibold text-slate-700 mb-1">Business TIN Number</label>
+            <input type="text" id="wsRegTin" placeholder="TIN-0098234125"
+              class="w-full bg-slate-50 border border-slate-300 rounded-xl px-3.5 py-2 text-slate-900 font-mono focus:outline-none focus:ring-2 focus:ring-indigo-500">
+          </div>
+        </div>
+
+        <div>
+          <label class="block font-semibold text-slate-700 mb-1">Minimum Order Value (ETB)</label>
+          <input type="number" id="wsRegMoq" value="2000" step="500"
+            class="w-full bg-slate-50 border border-slate-300 rounded-xl px-3.5 py-2 text-slate-900 font-mono focus:outline-none focus:ring-2 focus:ring-indigo-500">
+        </div>
+
+        <div>
+          <label class="block font-semibold text-slate-700 mb-1">Delivery Terms & Commitment</label>
+          <input type="text" id="wsRegDelivery" placeholder="Same-Day Dispatch (Within 3 Hours) • EFDA Cold-Chain Certified"
+            class="w-full bg-slate-50 border border-slate-300 rounded-xl px-3.5 py-2 text-slate-900 focus:outline-none focus:ring-2 focus:ring-indigo-500">
+        </div>
+
+        <!-- Success credentials callout after creation -->
+        <div id="wsCreatedCredentialsBox" class="hidden p-3.5 bg-emerald-50 border border-emerald-200 rounded-xl space-y-2 text-[11px]">
+          <div class="font-bold text-emerald-900 flex items-center space-x-1.5">
+            <i class="fa-solid fa-circle-check text-emerald-600"></i>
+            <span>Wholesaler Provisioned Successfully!</span>
+          </div>
+          <div>
+            <span class="text-slate-500 block">1-Click Wholesaler Key:</span>
+            <code id="wsCreatedKeyText" class="font-bold text-indigo-700 text-xs">mf_ws_...</code>
+          </div>
+          <div>
+            <span class="text-slate-500 block">Wholesaler Studio Direct Link:</span>
+            <a id="wsCreatedStudioLink" href="#" target="_blank" class="text-indigo-600 font-mono hover:underline break-all"></a>
+          </div>
+          <div>
+            <span class="text-slate-500 block">Telegram Driver Bot Deep Link:</span>
+            <a id="wsCreatedTelegramLink" href="#" target="_blank" class="text-sky-600 font-mono hover:underline break-all"></a>
+          </div>
+        </div>
+
+        <div class="pt-3 border-t border-slate-100 flex items-center justify-end gap-2">
+          <button type="button" onclick="closeModal('registerWholesalerModal')" class="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 font-semibold rounded-xl transition">
+            Close
+          </button>
+          <button type="submit" id="saveWholesalerBtn" class="px-5 py-2 bg-indigo-600 hover:bg-indigo-700 text-white font-bold rounded-xl shadow-md transition flex items-center gap-1.5">
+            <i class="fa-solid fa-floppy-disk"></i>
+            <span>Register & Generate Key</span>
           </button>
         </div>
       </form>
@@ -3911,6 +4064,7 @@
     async function reloadAdminPolicy() {
       await fetchPolicy();
       loadAdminPharmacies();
+      loadAdminWholesalers();
       loadTelegramApplications();
       checkRealBotStatus();
       if (!currentPolicy) return;
@@ -4878,6 +5032,141 @@
         }
       } catch (err) {
         alert('Action failed: ' + err.message);
+      }
+    }
+
+    // --- ADMIN WHOLESALER & IMPORTER MANAGEMENT LOGIC ---
+    let adminCachedWholesalers = [];
+
+    async function loadAdminWholesalers() {
+      const tbody = document.getElementById('adminWholesalersTbody');
+      if (!tbody) return;
+      tbody.innerHTML = `<tr><td colspan="6" class="p-4 text-center text-slate-400">Loading certified wholesalers...</td></tr>`;
+
+      try {
+        const res = await fetch('/api/b2b/wholesalers');
+        const data = await res.json();
+        if (data.success && Array.isArray(data.wholesalers)) {
+          adminCachedWholesalers = data.wholesalers;
+          const badge = document.getElementById('adminWholesalerCountBadge');
+          if (badge) badge.innerText = `${adminCachedWholesalers.length} Registered`;
+
+          if (adminCachedWholesalers.length === 0) {
+            tbody.innerHTML = `<tr><td colspan="6" class="p-4 text-center text-slate-400">No wholesalers registered yet. Click "Register Wholesaler" above.</td></tr>`;
+            return;
+          }
+
+          tbody.innerHTML = adminCachedWholesalers.map(w => {
+            const studioUrl = `http://localhost:3000/wholesaler/?key=${w.accessKey}`;
+            const tgLink = `https://t.me/MedFinder_Verifier_bot?start=${w.id}`;
+
+            return `
+              <tr class="hover:bg-indigo-50/40 transition">
+                <td class="p-3">
+                  <div class="font-bold text-slate-900">${w.name}</div>
+                  <div class="text-[10px] text-slate-500">📍 ${w.subCity}, ${w.city || 'Addis Ababa'} • 📞 ${w.phone}</div>
+                </td>
+                <td class="p-3 font-mono font-medium text-slate-800">
+                  <span class="px-2 py-0.5 rounded bg-emerald-50 text-emerald-800 border border-emerald-200 text-[10px]">${w.efdaWholesaleLicense}</span>
+                </td>
+                <td class="p-3 font-mono text-slate-600 text-[11px]">
+                  ${w.tinNumber || '—'}
+                </td>
+                <td class="p-3">
+                  <div class="flex items-center space-x-1.5">
+                    <code class="text-[11px] font-bold text-indigo-700 bg-indigo-50 px-1.5 py-0.5 rounded border border-indigo-200">${w.accessKey}</code>
+                    <a href="${studioUrl}" target="_blank" title="Launch Wholesaler Studio" class="text-indigo-600 hover:text-indigo-800 p-1">
+                      <i class="fa-solid fa-arrow-up-right-from-square text-xs"></i>
+                    </a>
+                  </div>
+                </td>
+                <td class="p-3">
+                  <a href="${tgLink}" target="_blank" class="inline-flex items-center space-x-1 px-2.5 py-1 rounded-lg bg-sky-50 text-sky-700 border border-sky-200 text-[10px] font-semibold hover:bg-sky-100 transition">
+                    <i class="fa-brands fa-telegram text-sky-600"></i>
+                    <span>Connect Bot</span>
+                  </a>
+                </td>
+                <td class="p-3 text-right">
+                  <button onclick="deleteAdminWholesaler('${w.id}', '${escapeHtml(w.name)}')" title="Remove Wholesaler" class="p-1.5 rounded-lg bg-rose-50 text-rose-600 hover:bg-rose-100 transition">
+                    <i class="fa-solid fa-trash-can text-xs"></i>
+                  </button>
+                </td>
+              </tr>
+            `;
+          }).join('');
+        }
+      } catch (err) {
+        tbody.innerHTML = `<tr><td colspan="6" class="p-4 text-center text-rose-500">Failed to load wholesalers: ${err.message}</td></tr>`;
+      }
+    }
+
+    function openRegisterWholesalerModal() {
+      document.getElementById('wsCreatedCredentialsBox').classList.add('hidden');
+      document.getElementById('wsRegName').value = '';
+      document.getElementById('wsRegPhone').value = '';
+      document.getElementById('wsRegLicense').value = '';
+      document.getElementById('wsRegTin').value = '';
+      document.getElementById('registerWholesalerModal').classList.remove('hidden');
+    }
+
+    async function handleRegisterWholesalerSubmit(event) {
+      event.preventDefault();
+      const btn = document.getElementById('saveWholesalerBtn');
+      btn.disabled = true;
+
+      const payload = {
+        name: document.getElementById('wsRegName').value.trim(),
+        subCity: document.getElementById('wsRegSubCity').value,
+        phone: document.getElementById('wsRegPhone').value.trim(),
+        efdaWholesaleLicense: document.getElementById('wsRegLicense').value.trim(),
+        tinNumber: document.getElementById('wsRegTin').value.trim() || undefined,
+        minimumOrderValueETB: parseFloat(document.getElementById('wsRegMoq').value) || 2000,
+        deliveryTerms: document.getElementById('wsRegDelivery').value.trim() || undefined
+      };
+
+      try {
+        const res = await fetch('/api/admin/wholesalers/register', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload)
+        });
+        const data = await res.json();
+
+        if (data.success && data.wholesaler) {
+          const creds = data.credentials;
+          document.getElementById('wsCreatedKeyText').innerText = creds.accessKey;
+          const studioLinkEl = document.getElementById('wsCreatedStudioLink');
+          studioLinkEl.innerText = creds.directStudioUrl;
+          studioLinkEl.href = creds.directStudioUrl;
+
+          const tgLinkEl = document.getElementById('wsCreatedTelegramLink');
+          tgLinkEl.innerText = creds.telegramLink;
+          tgLinkEl.href = creds.telegramLink;
+
+          document.getElementById('wsCreatedCredentialsBox').classList.remove('hidden');
+          await loadAdminWholesalers();
+        } else {
+          alert('Registration failed: ' + (data.error || 'Server error'));
+        }
+      } catch (err) {
+        alert('Network error registering wholesaler: ' + err.message);
+      } finally {
+        btn.disabled = false;
+      }
+    }
+
+    async function deleteAdminWholesaler(id, name) {
+      if (!confirm(`Are you sure you want to remove "${name}" from certified wholesalers?`)) return;
+      try {
+        const res = await fetch(`/api/admin/wholesalers/${id}`, { method: 'DELETE' });
+        const data = await res.json();
+        if (data.success) {
+          await loadAdminWholesalers();
+        } else {
+          alert('Failed to remove wholesaler');
+        }
+      } catch (err) {
+        alert('Network error deleting wholesaler');
       }
     }
 
@@ -5989,6 +6278,7 @@
     // Init on load
     fetchPolicy();
     loadAdminPharmacies();
+    loadAdminWholesalers();
     loadTelegramApplications();
     initGlobalAuth();
 

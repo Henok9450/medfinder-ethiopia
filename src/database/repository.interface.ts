@@ -354,6 +354,21 @@ export interface IDatabaseRepository {
   deleteWholesaleListing(listingId: string): Promise<boolean>;
 
   /**
+   * B2B MedSupply Exchange: Admin Wholesaler Provisioning & Management
+   */
+  registerWholesaler(data: {
+    name: string;
+    subCity: string;
+    city?: string;
+    phone: string;
+    efdaWholesaleLicense: string;
+    tinNumber?: string;
+    deliveryTerms?: string;
+    minimumOrderValueETB?: number;
+  }): Promise<{ success: boolean; wholesaler?: Wholesaler; error?: string }>;
+  deleteWholesaler(wholesalerId: string): Promise<boolean>;
+
+  /**
    * B2B MedSupply Exchange: Platform fee and gross merchandise volume report (2% fee telemetry)
    */
   getB2BCommissionReport(): Promise<{
