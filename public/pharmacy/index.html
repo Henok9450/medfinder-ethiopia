@@ -136,50 +136,43 @@
   <main class="flex-1 max-w-7xl w-full mx-auto p-3 sm:p-4 md:p-6 space-y-4 sm:space-y-6 main-mobile-pad">
 
     <!-- ============================================================== -->
-    <!-- VIEW 1: STANDALONE AUTHENTICATION & EFDA ONBOARDING PORTAL     -->
+    <!-- VIEW 1: AUTHENTICATION CONTAINER (PASSWORDLESS & 1-CLICK KEY) -->
     <!-- ============================================================== -->
-    <section id="authSection" class="max-w-lg mx-auto my-4 sm:my-8 space-y-5">
+    <section id="authSection" class="max-w-md mx-auto my-6 sm:my-8 space-y-6">
       
       <!-- Card Container -->
-      <div class="bg-white p-5 sm:p-7 rounded-3xl border border-slate-200 shadow-xl space-y-5">
+      <div class="bg-white p-6 sm:p-8 rounded-3xl border border-slate-200 shadow-xl space-y-6">
         
         <div class="text-center space-y-1.5">
-          <div class="w-13 h-13 sm:w-14 sm:h-14 rounded-2xl bg-emerald-50 text-emerald-700 flex items-center justify-center text-2xl mx-auto shadow-inner border border-emerald-100">
-            <i class="fa-solid fa-mortar-pestle"></i>
+          <div class="w-14 h-14 rounded-2xl bg-emerald-50 text-emerald-700 flex items-center justify-center text-2xl mx-auto shadow-inner border border-emerald-100">
+            <i class="fa-solid fa-key"></i>
           </div>
           <h2 id="authHeading" class="text-lg sm:text-xl font-extrabold text-slate-900 tracking-tight">Pharmacy Counter Studio</h2>
           <p id="authSubheading" class="text-xs text-slate-500">
-            100% Standalone Pharmacy PWA — Sign in, check EFDA status, or register your pharmacy directly in-app.
+            Passwordless Counter Access — 6-Month persistent counter session for verified Ethiopian pharmacies.
           </p>
         </div>
 
-        <!-- 3-TAB STANDALONE NAVIGATION: 1-Click Key | Phone Login | Register / Status -->
-        <div class="grid grid-cols-3 gap-1 p-1 bg-slate-100 rounded-xl text-[11px] sm:text-xs font-semibold">
-          <button id="tabBtnMagicKey" onclick="switchAuthMode('key')" class="py-2 px-1.5 rounded-lg bg-white shadow-sm text-slate-900 font-bold transition text-center">
+        <!-- AUTH TABS: 1-Click Key vs Instant Phone OTP -->
+        <div class="flex p-1 bg-slate-100 rounded-xl text-xs font-semibold">
+          <button id="tabBtnMagicKey" onclick="switchAuthMode('key')" class="flex-1 py-2 rounded-lg bg-white shadow-sm text-slate-900 font-bold transition">
             🔑 1-Click Key
           </button>
-          <button id="tabBtnPhoneOtp" onclick="switchAuthMode('otp')" class="py-2 px-1.5 rounded-lg text-slate-500 hover:text-slate-800 transition text-center">
+          <button id="tabBtnPhoneOtp" onclick="switchAuthMode('otp')" class="flex-1 py-2 rounded-lg text-slate-500 hover:text-slate-800 transition">
             📱 Phone OTP
-          </button>
-          <button id="tabBtnRegister" onclick="switchAuthMode('register')" class="py-2 px-1.5 rounded-lg text-slate-500 hover:text-slate-800 transition text-center">
-            🛡️ Register / Status
           </button>
         </div>
 
         <!-- TAB 1: 1-CLICK MAGIC KEY -->
         <div id="panelMagicKey" class="space-y-4">
-          <div class="p-3.5 bg-emerald-50/80 border border-emerald-200 rounded-2xl text-emerald-950 text-xs space-y-2">
+          <div class="p-3.5 bg-emerald-50/80 border border-emerald-200 rounded-2xl text-emerald-950 text-xs space-y-1.5">
             <div class="flex items-center space-x-2 font-bold text-emerald-900">
               <i class="fa-solid fa-bolt text-emerald-600 text-sm"></i>
-              <span>Instant 1-Click Counter Access</span>
+              <span>Instant 1-Click Counter Unlock</span>
             </div>
             <p class="text-[11px] text-emerald-800 leading-relaxed">
-              Paste your approved 1-Click Access Key (<code class="font-mono font-bold">mf_key_...</code>) below to unlock your counter studio for <strong>6 months</strong>, or retrieve your approved key using your phone number.
+              Upon EFDA approval, your verified Telegram bot issued you a 1-click counter link. Clicking that link or pasting your key below unlocks this studio on this counter for <strong>6 months</strong> without any passwords!
             </p>
-            <button type="button" onclick="switchAuthMode('register')" class="w-full inline-flex items-center justify-center space-x-1.5 bg-emerald-700 hover:bg-emerald-800 active:scale-95 text-white font-bold py-2 rounded-xl text-xs transition shadow-sm">
-              <i class="fa-solid fa-magnifying-glass-check"></i>
-              <span>Check EFDA Status / Retrieve Key by Phone</span>
-            </button>
           </div>
 
           <form id="keyForm" onsubmit="handleMagicKeySubmit(event)" class="space-y-3">
@@ -205,7 +198,7 @@
           <div class="p-3 bg-emerald-50 border border-emerald-200 rounded-2xl text-emerald-950 text-xs flex items-start space-x-2">
             <i class="fa-solid fa-shield-halved text-emerald-600 mt-0.5"></i>
             <span class="text-[11px] leading-relaxed">
-              Enter your verified pharmacy phone number to generate an instant 4-digit verification code right inside this app.
+              Enter your verified pharmacy contact phone number. A 4-digit instant login code will be delivered to your verified Telegram bot and SMS.
             </span>
           </div>
 
@@ -220,8 +213,8 @@
             </div>
 
             <button type="submit" id="otpPhoneBtn" class="w-full bg-slate-900 hover:bg-black active:scale-95 text-white font-bold text-xs py-3 rounded-xl shadow-md transition flex items-center justify-center space-x-2">
-              <i class="fa-solid fa-bolt text-emerald-400"></i>
-              <span>Generate 4-Digit Login Code</span>
+              <i class="fa-solid fa-paper-plane text-emerald-400"></i>
+              <span>Send 4-Digit Login Code</span>
             </button>
           </form>
 
@@ -245,138 +238,25 @@
           <div id="otpAlertBox" class="hidden p-3 rounded-xl text-xs"></div>
         </div>
 
-        <!-- TAB 3: STANDALONE EFDA REGISTRATION, STATUS CHECK & CoC PHOTO RESUBMISSION -->
-        <div id="panelRegister" class="hidden space-y-5">
-
-          <!-- SECTION A: CHECK APPLICATION STATUS / RETRIEVE KEY / RESUBMIT CoC PHOTO -->
-          <div class="p-4 bg-slate-50 rounded-2xl border border-slate-200 space-y-3">
-            <div class="flex items-center justify-between">
-              <h3 class="text-xs font-extrabold text-slate-900 flex items-center gap-1.5">
-                <i class="fa-solid fa-clipboard-check text-emerald-600"></i>
-                <span>Check EFDA Status / Resubmit CoC Photo</span>
-              </h3>
-              <span class="text-[10px] font-bold bg-emerald-100 text-emerald-800 px-2 py-0.5 rounded-full">In-App Live</span>
-            </div>
-            <p class="text-[11px] text-slate-500 leading-relaxed">
-              Already applied? Enter your pharmacy phone number to check your verification status, upload a clearer CoC photo if requested by the compliance officer, or unlock your approved studio with 1 click.
-            </p>
-            <div class="flex gap-2">
-              <input type="tel" id="statusCheckPhoneInput" placeholder="Enter phone (e.g. 0911...)" class="flex-1 text-xs px-3 py-2.5 rounded-xl border border-slate-300 bg-white outline-none focus:ring-2 focus:ring-emerald-500">
-              <button type="button" id="statusCheckBtn" onclick="checkPwaOnboardingStatus(false)" class="bg-slate-900 hover:bg-black active:scale-95 text-white font-bold text-xs px-4 py-2.5 rounded-xl transition shrink-0 flex items-center gap-1.5">
-                <i class="fa-solid fa-magnifying-glass"></i>
-                <span>Check Status</span>
-              </button>
-            </div>
-
-            <!-- Dynamic Status / Resubmission / 1-Click Unlock Result Box -->
-            <div id="pwaStatusResultBox" class="hidden pt-2"></div>
-          </div>
-
-          <!-- SECTION B: REGISTER NEW PHARMACY & UPLOAD EFDA CoC PHOTO -->
-          <div class="border-t border-slate-200 pt-4 space-y-3">
-            <div class="flex items-center justify-between">
-              <h3 class="text-xs font-extrabold text-slate-900 flex items-center gap-1.5">
-                <i class="fa-solid fa-hospital-user text-teal-600"></i>
-                <span>New Pharmacy EFDA Onboarding</span>
-              </h3>
-              <span class="text-[10px] text-slate-400 font-semibold">Takes 60 sec</span>
-            </div>
-
-            <form id="pwaRegForm" onsubmit="handlePwaRegistrationSubmit(event)" class="space-y-3 text-xs">
-              <div class="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
-                <div>
-                  <label class="block font-semibold text-slate-700 mb-1">Pharmacy Name *</label>
-                  <input type="text" id="regPharmacyName" required placeholder="e.g. St. Gabriel Pharmacy" class="w-full px-3 py-2.5 rounded-xl border border-slate-300 outline-none focus:ring-2 focus:ring-emerald-500">
-                </div>
-                <div>
-                  <label class="block font-semibold text-slate-700 mb-1">Chief Pharmacist Name *</label>
-                  <input type="text" id="regPharmacistName" required placeholder="e.g. Pharm. Dawit Tadesse" class="w-full px-3 py-2.5 rounded-xl border border-slate-300 outline-none focus:ring-2 focus:ring-emerald-500">
-                </div>
-              </div>
-
-              <div class="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
-                <div>
-                  <label class="block font-semibold text-slate-700 mb-1">Sub-City *</label>
-                  <select id="regSubCity" class="w-full px-3 py-2.5 rounded-xl border border-slate-300 bg-white outline-none focus:ring-2 focus:ring-emerald-500">
-                    <option value="Bole">Bole</option>
-                    <option value="Kirkos">Kirkos</option>
-                    <option value="Yeka">Yeka</option>
-                    <option value="Arada">Arada</option>
-                    <option value="Lideta">Lideta</option>
-                    <option value="Nifas Silk-Lafto">Nifas Silk-Lafto</option>
-                    <option value="Gullele">Gullele</option>
-                    <option value="Kolfe Keranio">Kolfe Keranio</option>
-                    <option value="Addis Ketema">Addis Ketema</option>
-                    <option value="Akaky Kaliti">Akaky Kaliti</option>
-                    <option value="Lemi Kura">Lemi Kura</option>
-                  </select>
-                </div>
-                <div>
-                  <label class="block font-semibold text-slate-700 mb-1">Counter Phone Number *</label>
-                  <input type="tel" id="regPhone" required placeholder="0911223344" class="w-full px-3 py-2.5 rounded-xl border border-slate-300 outline-none focus:ring-2 focus:ring-emerald-500">
-                </div>
-              </div>
-
-              <div>
-                <label class="block font-semibold text-slate-700 mb-1">Landmark / Street Address *</label>
-                <input type="text" id="regAddress" required placeholder="e.g. Bole Medhanialem, Opposite Edna Mall" class="w-full px-3 py-2.5 rounded-xl border border-slate-300 outline-none focus:ring-2 focus:ring-emerald-500">
-              </div>
-
-              <div class="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
-                <div>
-                  <label class="block font-semibold text-slate-700 mb-1">EFDA License # *</label>
-                  <input type="text" id="regEfdaInput" required placeholder="EFDA/PH/AA/2025/..." class="w-full px-3 py-2.5 rounded-xl border border-slate-300 font-mono outline-none focus:ring-2 focus:ring-emerald-500">
-                </div>
-                <div>
-                  <label class="block font-semibold text-slate-700 mb-1">Ethiopian TIN # *</label>
-                  <input type="text" id="regTinInput" required placeholder="0048291029" class="w-full px-3 py-2.5 rounded-xl border border-slate-300 font-mono outline-none focus:ring-2 focus:ring-emerald-500">
-                </div>
-              </div>
-
-              <!-- Counter GPS Lock -->
-              <div class="flex items-center justify-between p-2.5 bg-slate-50 rounded-xl border border-slate-200">
-                <div class="text-[11px]">
-                  <span class="font-bold text-slate-800 block">📍 Counter GPS Coordinates</span>
-                  <span id="regGpsStatusTxt" class="text-slate-500">Tap to lock exact pharmacy location</span>
-                </div>
-                <button type="button" onclick="captureRegGps()" class="bg-emerald-100 hover:bg-emerald-200 text-emerald-900 font-bold text-xs px-3 py-2 rounded-xl transition shrink-0 flex items-center gap-1">
-                  <i class="fa-solid fa-location-crosshairs"></i>
-                  <span>Lock GPS</span>
-                </button>
-              </div>
-
-              <!-- EFDA CoC Wall License Photo Upload -->
-              <div class="p-3 bg-emerald-50/60 border border-dashed border-emerald-300 rounded-2xl space-y-2">
-                <label class="block font-bold text-emerald-950 text-xs">
-                  📸 Upload EFDA Certificate of Competence (CoC) Photo *
-                </label>
-                <p class="text-[11px] text-slate-600">
-                  Take a clear photo or select an image of your physical EFDA license certificate for compliance review.
-                </p>
-                <input type="file" id="regCocPhotoInput" accept="image/*" onchange="handleRegPhotoSelected(event)" required class="w-full text-xs text-slate-600 file:mr-3 file:py-2 file:px-3 file:rounded-xl file:border-0 file:text-xs file:font-bold file:bg-emerald-600 file:text-white hover:file:bg-emerald-700">
-                <div id="regCocPhotoPreviewWrap" class="hidden pt-1">
-                  <img id="regCocPhotoPreview" src="" alt="CoC Preview" class="max-h-36 rounded-xl border border-emerald-200 object-contain mx-auto">
-                </div>
-              </div>
-
-              <div id="pwaRegAlertBox" class="hidden p-3 rounded-xl text-xs"></div>
-
-              <button type="submit" id="pwaRegSubmitBtn" class="w-full bg-emerald-600 hover:bg-emerald-700 active:scale-95 text-white font-bold text-xs py-3 rounded-xl shadow-md transition flex items-center justify-center gap-2">
-                <i class="fa-solid fa-paper-plane"></i>
-                <span>Submit Pharmacy for EFDA Verification</span>
-              </button>
-            </form>
-          </div>
-        </div>
-
         <!-- Security & Persistence Guarantee Badge -->
         <div class="p-3 bg-slate-50 rounded-2xl border border-slate-100 flex items-center space-x-3 text-slate-600">
           <div class="w-8 h-8 rounded-xl bg-white shadow-sm flex items-center justify-center text-emerald-600 text-sm border border-slate-200 shrink-0">
             <i class="fa-solid fa-lock"></i>
           </div>
           <div class="text-[11px] leading-tight">
-            <span class="font-bold text-slate-800">100% Standalone PWA:</span> Register, verify, and stay signed in for <strong>6 Months (180 days)</strong> without leaving the app.
+            <span class="font-bold text-slate-800">Zero Password Burden:</span> Counter device remains logged in for <strong>6 Months (180 days)</strong>.
           </div>
+        </div>
+
+        <!-- Onboarding via Telegram Bot Callout (One-Time Verification Setup) -->
+        <div class="pt-3 border-t border-slate-100 text-center space-y-2">
+          <p class="text-[11px] text-slate-500 leading-snug">
+            Need EFDA verification? New pharmacies complete their one-time credential check on the bot to receive a 1-Click Key.
+          </p>
+          <a href="https://t.me/MedFinder_Verifier_bot?start=verify" target="_blank" class="inline-flex items-center space-x-1.5 text-xs font-bold text-sky-700 hover:text-sky-800 hover:underline">
+            <i class="fa-brands fa-telegram text-sky-600"></i>
+            <span>Register & Verify on @MedFinder_Verifier_bot</span>
+          </a>
         </div>
       </div>
     </section>
@@ -1415,25 +1295,24 @@
       }
     });
 
-    // --- STANDALONE AUTHENTICATION & ONBOARDING FLOWS ---
+    // --- PASSWORDLESS AUTHENTICATION & NATIVE COUNTER ALERTS ---
     function switchAuthMode(mode) {
       const tabKey = document.getElementById('tabBtnMagicKey');
       const tabOtp = document.getElementById('tabBtnPhoneOtp');
-      const tabReg = document.getElementById('tabBtnRegister');
       const panelKey = document.getElementById('panelMagicKey');
       const panelOtp = document.getElementById('panelPhoneOtp');
-      const panelReg = document.getElementById('panelRegister');
 
-      const activeCls = 'py-2 px-1.5 rounded-lg bg-white shadow-sm text-slate-900 font-bold transition text-center';
-      const inactiveCls = 'py-2 px-1.5 rounded-lg text-slate-500 hover:text-slate-800 transition text-center';
-
-      if (tabKey) tabKey.className = mode === 'key' ? activeCls : inactiveCls;
-      if (tabOtp) tabOtp.className = mode === 'otp' ? activeCls : inactiveCls;
-      if (tabReg) tabReg.className = mode === 'register' ? activeCls : inactiveCls;
-
-      if (panelKey) panelKey.classList.toggle('hidden', mode !== 'key');
-      if (panelOtp) panelOtp.classList.toggle('hidden', mode !== 'otp');
-      if (panelReg) panelReg.classList.toggle('hidden', mode !== 'register');
+      if (mode === 'key') {
+        tabKey.className = 'flex-1 py-2 rounded-lg bg-white shadow-sm text-slate-900 font-bold transition';
+        tabOtp.className = 'flex-1 py-2 rounded-lg text-slate-500 hover:text-slate-800 transition';
+        panelKey.classList.remove('hidden');
+        panelOtp.classList.add('hidden');
+      } else {
+        tabOtp.className = 'flex-1 py-2 rounded-lg bg-white shadow-sm text-slate-900 font-bold transition';
+        tabKey.className = 'flex-1 py-2 rounded-lg text-slate-500 hover:text-slate-800 transition';
+        panelOtp.classList.remove('hidden');
+        panelKey.classList.add('hidden');
+      }
     }
 
     function enableCounterNotifications() {
@@ -1458,306 +1337,6 @@
           alert('Audible In-App Counter Siren is active while this PWA is open.');
         }
       });
-    }
-
-    // --- STANDALONE PWA EFDA REGISTRATION, STATUS CHECK & CoC RESUBMISSION ---
-    let regCapturedGps = null;
-    let regCocPhotoDataUrl = null;
-    let resubCocPhotoDataUrl = null;
-    let statusPollTimer = null;
-
-    function captureRegGps() {
-      const txt = document.getElementById('regGpsStatusTxt');
-      if (!navigator.geolocation) {
-        if (txt) txt.innerText = 'Geolocation not supported on this browser';
-        return;
-      }
-      if (txt) txt.innerText = 'Locking GPS satellites...';
-      navigator.geolocation.getCurrentPosition(
-        (pos) => {
-          regCapturedGps = { lat: pos.coords.latitude, lng: pos.coords.longitude };
-          if (txt) {
-            txt.className = 'text-emerald-700 font-bold';
-            txt.innerText = `🟢 Locked (${regCapturedGps.lat.toFixed(4)}, ${regCapturedGps.lng.toFixed(4)})`;
-          }
-        },
-        () => {
-          if (txt) txt.innerText = '⚠️ Could not lock GPS (using Sub-City default)';
-        },
-        { enableHighAccuracy: true, timeout: 10000 }
-      );
-    }
-
-    function compressImageFileToDataUrl(file, callback) {
-      const reader = new FileReader();
-      reader.onload = function(evt) {
-        const img = new Image();
-        img.onload = function() {
-          const canvas = document.createElement('canvas');
-          const maxDim = 1280;
-          let w = img.width;
-          let h = img.height;
-          if (w > maxDim || h > maxDim) {
-            if (w > h) {
-              h = Math.round((h * maxDim) / w);
-              w = maxDim;
-            } else {
-              w = Math.round((w * maxDim) / h);
-              h = maxDim;
-            }
-          }
-          canvas.width = w;
-          canvas.height = h;
-          const ctx = canvas.getContext('2d');
-          ctx.drawImage(img, 0, 0, w, h);
-          callback(canvas.toDataURL('image/jpeg', 0.84));
-        };
-        img.src = evt.target.result;
-      };
-      reader.readAsDataURL(file);
-    }
-
-    function handleRegPhotoSelected(event) {
-      const file = event.target.files && event.target.files[0];
-      if (!file) return;
-      compressImageFileToDataUrl(file, (dataUrl) => {
-        regCocPhotoDataUrl = dataUrl;
-        const wrap = document.getElementById('regCocPhotoPreviewWrap');
-        const img = document.getElementById('regCocPhotoPreview');
-        if (img) img.src = dataUrl;
-        if (wrap) wrap.classList.remove('hidden');
-      });
-    }
-
-    function handlePwaResubmitPhotoSelected(event) {
-      const file = event.target.files && event.target.files[0];
-      if (!file) return;
-      compressImageFileToDataUrl(file, (dataUrl) => {
-        resubCocPhotoDataUrl = dataUrl;
-        const wrap = document.getElementById('resubCocPreviewWrap');
-        const img = document.getElementById('resubCocPreviewImg');
-        if (img) img.src = dataUrl;
-        if (wrap) wrap.classList.remove('hidden');
-      });
-    }
-
-    async function handlePwaRegistrationSubmit(e) {
-      e.preventDefault();
-      const alertBox = document.getElementById('pwaRegAlertBox');
-      const btn = document.getElementById('pwaRegSubmitBtn');
-
-      if (!regCocPhotoDataUrl) {
-        alertBox.className = 'p-3 rounded-xl text-xs bg-rose-50 text-rose-800 border border-rose-200';
-        alertBox.innerText = '⚠️ Please upload a clear photo of your EFDA Certificate of Competence (CoC).';
-        alertBox.classList.remove('hidden');
-        return;
-      }
-
-      const phoneVal = document.getElementById('regPhone').value.trim();
-      btn.disabled = true;
-      btn.innerHTML = `<i class="fa-solid fa-spinner fa-spin"></i><span>Uploading CoC & Submitting...</span>`;
-      alertBox.classList.add('hidden');
-
-      try {
-        const res = await fetch('/api/pharmacy/onboarding/register', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            pharmacyName: document.getElementById('regPharmacyName').value.trim(),
-            pharmacistName: document.getElementById('regPharmacistName').value.trim(),
-            subCity: document.getElementById('regSubCity').value,
-            phone: phoneVal,
-            address: document.getElementById('regAddress').value.trim(),
-            efdaLicenseNumber: document.getElementById('regEfdaInput').value.trim(),
-            tinNumber: document.getElementById('regTinInput').value.trim(),
-            latitude: regCapturedGps?.lat,
-            longitude: regCapturedGps?.lng,
-            licensePhotoBase64: regCocPhotoDataUrl,
-          })
-        });
-        const data = await res.json();
-
-        if (data.success && data.application) {
-          localStorage.setItem('medfinder_pwa_onboarding_phone', phoneVal);
-          document.getElementById('statusCheckPhoneInput').value = phoneVal;
-          alertBox.className = 'p-3 rounded-xl text-xs bg-emerald-50 text-emerald-900 border border-emerald-200 font-semibold';
-          alertBox.innerHTML = `✅ Application <strong>${data.application.id}</strong> submitted! Live status tracker activated above.`;
-          alertBox.classList.remove('hidden');
-          document.getElementById('pwaRegForm').reset();
-          document.getElementById('regCocPhotoPreviewWrap').classList.add('hidden');
-          regCocPhotoDataUrl = null;
-          await checkPwaOnboardingStatus(false);
-        } else {
-          alertBox.className = 'p-3 rounded-xl text-xs bg-rose-50 text-rose-800 border border-rose-200';
-          alertBox.innerText = `⚠️ ${data.error || 'Submission failed'}`;
-          alertBox.classList.remove('hidden');
-        }
-      } catch (err) {
-        alertBox.className = 'p-3 rounded-xl text-xs bg-rose-50 text-rose-800 border border-rose-200';
-        alertBox.innerText = `Network error: ${err.message}`;
-        alertBox.classList.remove('hidden');
-      } finally {
-        btn.disabled = false;
-        btn.innerHTML = `<i class="fa-solid fa-paper-plane"></i><span>Submit Pharmacy for EFDA Verification</span>`;
-      }
-    }
-
-    async function checkPwaOnboardingStatus(silent = false) {
-      const phoneInput = document.getElementById('statusCheckPhoneInput');
-      const phone = (phoneInput?.value || localStorage.getItem('medfinder_pwa_onboarding_phone') || '').trim();
-      const box = document.getElementById('pwaStatusResultBox');
-      if (!phone || !box) return;
-
-      if (phoneInput && !phoneInput.value) phoneInput.value = phone;
-      localStorage.setItem('medfinder_pwa_onboarding_phone', phone);
-
-      if (!silent) {
-        box.classList.remove('hidden');
-        box.innerHTML = `<div class="p-3 text-center text-xs text-slate-500"><i class="fa-solid fa-spinner fa-spin mr-1"></i> Checking EFDA verification status...</div>`;
-      }
-
-      try {
-        const res = await fetch(`/api/pharmacy/onboarding/status?phone=${encodeURIComponent(phone)}`);
-        const data = await res.json();
-
-        if (!data.success || !data.application) {
-          if (!silent) {
-            box.innerHTML = `<div class="p-3 rounded-xl bg-amber-50 border border-amber-200 text-amber-900 text-xs">${data.error || 'No application found for this phone number.'}</div>`;
-          }
-          return;
-        }
-
-        const app = data.application;
-        const accessKey = data.accessKey || app.portalAccessKey;
-        box.classList.remove('hidden');
-
-        if (app.status === 'APPROVED' && accessKey) {
-          if (statusPollTimer) { clearInterval(statusPollTimer); statusPollTimer = null; }
-          box.innerHTML = `
-            <div class="p-4 rounded-2xl bg-emerald-50 border-2 border-emerald-400 text-emerald-950 space-y-3 shadow-sm">
-              <div class="flex items-center justify-between">
-                <span class="text-xs font-black text-emerald-800 flex items-center gap-1.5">
-                  <i class="fa-solid fa-circle-check text-emerald-600 text-sm"></i>
-                  EFDA APPROVED & VERIFIED!
-                </span>
-                <span class="text-[10px] font-mono bg-emerald-200/80 text-emerald-900 px-2 py-0.5 rounded font-bold">${app.id}</span>
-              </div>
-              <p class="text-xs text-emerald-900 leading-relaxed">
-                Congratulations! <strong>${app.pharmacyName}</strong> is approved. Tap below to unlock your Counter Studio right now:
-              </p>
-              <div class="p-2 bg-white rounded-xl border border-emerald-200 font-mono text-[11px] text-slate-700 break-all select-all">
-                ${accessKey}
-              </div>
-              <button type="button" onclick="performMagicLogin('${accessKey}')" class="w-full bg-emerald-600 hover:bg-emerald-700 active:scale-95 text-white font-black text-xs py-3 rounded-xl shadow-md transition flex items-center justify-center gap-2">
-                <i class="fa-solid fa-rocket"></i>
-                <span>Unlock Counter Studio Now (1-Click)</span>
-              </button>
-            </div>
-          `;
-        } else if (app.status === 'INFO_REQUESTED') {
-          if (statusPollTimer) { clearInterval(statusPollTimer); statusPollTimer = null; }
-          box.innerHTML = `
-            <div class="p-4 rounded-2xl bg-amber-50 border-2 border-amber-300 text-amber-950 space-y-3">
-              <div class="flex items-center justify-between">
-                <span class="text-xs font-extrabold text-amber-900 flex items-center gap-1.5">
-                  <i class="fa-solid fa-camera-rotate text-amber-600"></i>
-                  Action Required: Clearer CoC Photo Requested
-                </span>
-                <span class="text-[10px] font-mono bg-amber-200/70 text-amber-900 px-2 py-0.5 rounded font-bold">${app.id}</span>
-              </div>
-              <p class="text-xs text-amber-900 bg-white/80 p-2.5 rounded-xl border border-amber-200">
-                <strong>Compliance Officer Note:</strong> ${app.requestedInfoReason || app.adminNotes || 'Please upload a clearer, high-resolution photo of your EFDA Certificate of Competence (CoC).'}
-              </p>
-              <div class="space-y-2 pt-1">
-                <label class="block text-xs font-bold text-slate-800">📸 Select / Capture New Clear CoC Photo *</label>
-                <input type="file" accept="image/*" onchange="handlePwaResubmitPhotoSelected(event)" class="w-full text-xs text-slate-600 file:mr-2 file:py-1.5 file:px-3 file:rounded-xl file:border-0 file:text-xs file:font-bold file:bg-amber-600 file:text-white">
-                <div id="resubCocPreviewWrap" class="hidden pt-1">
-                  <img id="resubCocPreviewImg" src="" alt="Resubmit Preview" class="max-h-36 rounded-xl border border-amber-300 mx-auto object-contain">
-                </div>
-                <input type="text" id="resubNoteInput" placeholder="Optional note to EFDA officer (e.g. Clearer close-up photo attached)" class="w-full text-xs px-3 py-2 rounded-xl border border-amber-300 bg-white outline-none">
-                <button type="button" id="resubSubmitBtn" onclick="submitPwaCoCResubmission('${app.id}', '${phone}')" class="w-full bg-amber-600 hover:bg-amber-700 active:scale-95 text-white font-bold text-xs py-2.5 rounded-xl shadow transition flex items-center justify-center gap-1.5">
-                  <i class="fa-solid fa-cloud-arrow-up"></i>
-                  <span>Submit New CoC Photo to Compliance Officer</span>
-                </button>
-              </div>
-            </div>
-          `;
-        } else if (app.status === 'REJECTED') {
-          if (statusPollTimer) { clearInterval(statusPollTimer); statusPollTimer = null; }
-          box.innerHTML = `
-            <div class="p-3.5 rounded-2xl bg-rose-50 border border-rose-200 text-rose-900 text-xs space-y-1.5">
-              <div class="font-bold">❌ Application Declined (${app.id})</div>
-              <p>${app.adminNotes || 'Your application could not be verified. You may submit a corrected application below.'}</p>
-            </div>
-          `;
-        } else {
-          // PENDING_REVIEW or RESUBMITTED — auto-poll every 8 seconds so approval unlocks in real time!
-          box.innerHTML = `
-            <div class="p-3.5 rounded-2xl bg-sky-50 border border-sky-200 text-sky-950 text-xs space-y-1.5">
-              <div class="flex items-center justify-between">
-                <span class="font-extrabold text-sky-900 flex items-center gap-1.5">
-                  <span class="w-2 h-2 rounded-full bg-sky-500 animate-ping"></span>
-                  Status: ${app.status === 'RESUBMITTED' ? 'RESUBMITTED (Under Officer Review)' : 'PENDING EFDA REVIEW'}
-                </span>
-                <span class="font-mono text-[10px] bg-sky-100 px-2 py-0.5 rounded font-bold">${app.id}</span>
-              </div>
-              <p class="text-[11px] text-sky-800 leading-relaxed">
-                <strong>${app.pharmacyName}</strong> is in the EFDA compliance queue. This page checks automatically every 8 seconds — as soon as the officer approves, your <strong>1-Click Unlock</strong> button will appear right here!
-              </p>
-            </div>
-          `;
-          if (!statusPollTimer) {
-            statusPollTimer = setInterval(() => checkPwaOnboardingStatus(true), 8000);
-          }
-        }
-      } catch (err) {
-        if (!silent) {
-          box.innerHTML = `<div class="p-3 rounded-xl bg-rose-50 text-rose-800 text-xs">Failed to check status: ${err.message}</div>`;
-        }
-      }
-    }
-
-    async function submitPwaCoCResubmission(applicationId, phone) {
-      if (!resubCocPhotoDataUrl) {
-        alert('Please select or capture a clear photo of your EFDA CoC first.');
-        return;
-      }
-      const btn = document.getElementById('resubSubmitBtn');
-      const note = document.getElementById('resubNoteInput')?.value || '';
-      if (btn) {
-        btn.disabled = true;
-        btn.innerHTML = `<i class="fa-solid fa-spinner fa-spin"></i><span>Uploading New Photo...</span>`;
-      }
-
-      try {
-        const res = await fetch('/api/pharmacy/onboarding/resubmit', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            applicationId,
-            phone,
-            licensePhotoBase64: resubCocPhotoDataUrl,
-            note,
-          })
-        });
-        const data = await res.json();
-        if (data.success) {
-          resubCocPhotoDataUrl = null;
-          await checkPwaOnboardingStatus(false);
-        } else {
-          alert('Failed to resubmit photo: ' + (data.error || 'Unknown error'));
-          if (btn) {
-            btn.disabled = false;
-            btn.innerHTML = `<i class="fa-solid fa-cloud-arrow-up"></i><span>Submit New CoC Photo to Compliance Officer</span>`;
-          }
-        }
-      } catch (err) {
-        alert('Network error: ' + err.message);
-        if (btn) {
-          btn.disabled = false;
-          btn.innerHTML = `<i class="fa-solid fa-cloud-arrow-up"></i><span>Submit New CoC Photo to Compliance Officer</span>`;
-        }
-      }
     }
 
     function extractCleanKey(raw) {
@@ -1795,7 +1374,6 @@
         const data = await res.json();
 
         if (data.success && data.token) {
-          if (statusPollTimer) { clearInterval(statusPollTimer); statusPollTimer = null; }
           currentAuthSession = data;
           localStorage.setItem('medfinder_pharmacy_token', data.token);
           activateStudioDashboard(data);
@@ -1803,7 +1381,7 @@
           showAuthView();
           if (alertBox) {
             alertBox.className = 'p-3 rounded-xl text-xs bg-rose-50 text-rose-800 border border-rose-200';
-            alertBox.innerHTML = `<i class="fa-solid fa-circle-exclamation mr-1"></i> ${data.error || 'Invalid or expired counter key. Use the Phone OTP or Register / Status tab above to retrieve your key.'}`;
+            alertBox.innerHTML = `<i class="fa-solid fa-circle-exclamation mr-1"></i> ${data.error || 'Invalid or expired counter key. Use the Phone OTP tab above or check your key on @MedFinder_Verifier_bot.'}`;
             alertBox.classList.remove('hidden');
           }
         }
@@ -1840,7 +1418,7 @@
       const alertBox = document.getElementById('otpAlertBox');
 
       btn.disabled = true;
-      btn.innerHTML = `<i class="fa-solid fa-spinner fa-spin"></i><span>Generating Code...</span>`;
+      btn.innerHTML = `<i class="fa-solid fa-spinner fa-spin"></i><span>Sending Code...</span>`;
       alertBox.classList.add('hidden');
 
       try {
@@ -1853,21 +1431,17 @@
 
         if (data.success) {
           currentOtpPhone = phone;
-          const codeToShow = data.otpCode || data.demoCode;
           alertBox.className = 'p-3 rounded-xl text-xs bg-emerald-50 text-emerald-800 border border-emerald-200';
-          alertBox.innerHTML = `✅ ${data.message || 'Verification code ready.'}` +
-            (codeToShow ? ` <br><span class="font-mono font-black text-sm text-emerald-950">Your In-App Verification Code: ${codeToShow}</span>` : '');
+          alertBox.innerHTML = `✅ ${data.message || 'Login code sent to your verified Telegram bot & SMS.'}` +
+            (data.demoCode ? ` <br><span class="font-mono font-bold text-emerald-900">Demo Code: ${data.demoCode}</span>` : '');
           alertBox.classList.remove('hidden');
 
           document.getElementById('otpPhoneForm').classList.add('hidden');
           document.getElementById('otpVerifyForm').classList.remove('hidden');
-          if (codeToShow) {
-            document.getElementById('otpCodeInput').value = codeToShow;
-          }
           document.getElementById('otpCodeInput').focus();
         } else {
           alertBox.className = 'p-3 rounded-xl text-xs bg-rose-50 text-rose-800 border border-rose-200';
-          alertBox.innerHTML = `⚠️ ${data.error || 'Failed to generate code'}`;
+          alertBox.innerHTML = `⚠️ ${data.error || 'Failed to send code'}`;
           alertBox.classList.remove('hidden');
         }
       } catch (err) {
@@ -1876,7 +1450,7 @@
         alertBox.classList.remove('hidden');
       } finally {
         btn.disabled = false;
-        btn.innerHTML = `<i class="fa-solid fa-bolt text-emerald-400"></i><span>Generate 4-Digit Login Code</span>`;
+        btn.innerHTML = `<i class="fa-solid fa-paper-plane text-emerald-400"></i><span>Send 4-Digit Login Code</span>`;
       }
     }
 
@@ -1948,11 +1522,6 @@
       document.getElementById('authHeaderControls').classList.add('hidden');
       const mobNav = document.getElementById('mobileBottomNav');
       if (mobNav) mobNav.classList.add('hidden');
-      const savedOnboardingPhone = localStorage.getItem('medfinder_pwa_onboarding_phone');
-      if (savedOnboardingPhone) {
-        const inp = document.getElementById('statusCheckPhoneInput');
-        if (inp) inp.value = savedOnboardingPhone;
-      }
     }
 
     function activateStudioDashboard(session) {
