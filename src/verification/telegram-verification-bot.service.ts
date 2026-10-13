@@ -1818,8 +1818,44 @@ Type **/status** at any time to monitor progress.
         };
       }
 
-      // 3. Welcome / Reset Command (/start)
-      if (cleanText === '/start' || cleanText.toLowerCase() === 'reset') {
+      // 3. Welcome / Reset Command (/start) or Wholesaler Connect Deep Link (/start wholesaler_<id>)
+      if (cleanText.startsWith('/start') || cleanText.toLowerCase() === 'reset') {
+        const startParam = cleanText.replace(/^\/start\s*/, '').trim();
+
+        // 3A. Handle Wholesaler 1-Click Bot Linking (e.g. /start wholesaler_epharm or /start wholesaler_cadila)
+        if (startParam.startsWith('wholesaler_')) {
+          const wsSlug = startParam.toLowerCase();
+          const wholesaler = this.db.wholesalers.find((w) =>
+            w.id.toLowerCase() === wsSlug ||
+            w.id.toLowerCase().replace(/^wholesaler_/, '') === wsSlug.replace(/^wholesaler_/, '') ||
+            (w.accessKey && w.accessKey.toLowerCase().includes(wsSlug.replace(/^wholesaler_/, '')))
+          );
+
+          if (wholesaler) {
+            wholesaler.telegramChatId = chatId;
+            session.mode = 'PHARMACY';
+            session.step = 'START';
+
+            const studioUrl = `http://localhost:3000/wholesaler/?key=${wholesaler.accessKey}`;
+            return {
+              chatId,
+              replyText: `🚚 **እንኳን ወደ MedSupply B2B የጅምላ አከፋፋይ ቦት በደህና መጡ!**\n` +
+                `━━━━━━━━━━━━━━━━━━━━━━━━━━\n` +
+                `🏢 **አከፋፋይ፦** **${wholesaler.name}**\n` +
+                `📍 **መጋዘን፦** ${wholesaler.subCity}, ${wholesaler.city}\n` +
+                `🔑 **የይለፍ ቁልፍ፦** \`${wholesaler.accessKey}\`\n\n` +
+                `✅ **የቴሌግራም የማንቂያ ደወል በተሳካ ሁኔታ ተገናኝቷል!**\n` +
+                `የችርቻሮ ፋርማሲዎች አዲስ የመድኃኒት ትዕዛዝ (Bulk PO) ሲያቀርቡ ወዲያውኑ እዚህ ቻት ላይ ጮክ ያለ የማንቂያ ደወል ይደርስዎታል።\n\n` +
+                `👇 **የክምችትና የትዕዛዝ ማዕከል (Wholesaler Supply Studio) ለመክፈት፦**`,
+              quickReplies: ['/status', '/help'],
+              inlineKeyboard: [
+                [{ text: '🖥️ Open Wholesaler Supply Studio PWA', url: studioUrl }]
+              ],
+              sessionStep: 'START',
+            };
+          }
+        }
+
         session.step = 'START';
         const existingApp = this.db.verificationApplications.find((a) => a.telegramChatId === chatId);
 
