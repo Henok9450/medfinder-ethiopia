@@ -81,18 +81,19 @@ export interface TelegramBotResponse {
   applicationId?: string;
 }
 
-// Addis Ababa Sub-Cities & Core Landmarks for Automatic Geo-Detection
+// Addis Ababa Sub-Cities & Core Landmarks for Automatic Geo-Detection (Including 11th Sub-City: Lemi Kura)
 const ADDIS_SUB_CITIES = [
-  { name: 'Bole', lat: 9.0015, lng: 38.7845, keywords: ['bole', 'edna', 'airport', 'medhanialem', 'rwanda', 'atlas', 'gerji', 'bulbula', 'hayahulet', '22'] },
-  { name: 'Kirkos', lat: 9.0105, lng: 38.7455, keywords: ['kirkos', 'mexico', 'kazanchis', 'meskel', 'wabi', 'lagar', 'leghar', 'beklobet', 'gotera', 'olympia'] },
-  { name: 'Yeka', lat: 9.0201, lng: 38.8021, keywords: ['yeka', 'megenagna', 'shola', 'kotebe', 'ferensay', 'lamberet', 'signal', 'kara'] },
-  { name: 'Arada', lat: 9.0345, lng: 38.7512, keywords: ['arada', 'piazza', 'churchill', 'arat kilo', '4 kilo', 'somali tera', 'piassa'] },
-  { name: 'Nifas Silk', lat: 8.9567, lng: 38.7612, keywords: ['nifas silk', 'saris', 'lafto', 'jemo', 'kera', 'lebua', 'hana mariam'] },
-  { name: 'Lideta', lat: 9.0080, lng: 38.7300, keywords: ['lideta', 'balcha', 'tor hailoch', 'kochera', 'abinet', 'geja'] },
-  { name: 'Gullele', lat: 9.0600, lng: 38.7300, keywords: ['gullele', 'shiromeda', 'addisu gebeya', 'wingate', 'paulos', 'shumeta'] },
-  { name: 'Addis Ketema', lat: 9.0300, lng: 38.7350, keywords: ['addis ketema', 'merkato', 'mercato', 'autobus tera', 'sebategna'] },
-  { name: 'Kolfe Keranio', lat: 9.0100, lng: 38.7000, keywords: ['kolfe', 'keranio', 'ayertena', 'ashero tera', 'torhailoch', 'zenebework'] },
-  { name: 'Akaky Kaliti', lat: 8.8900, lng: 38.7700, keywords: ['akaki', 'kaliti', 'kality', 'tulu dimtu', 'koye feche'] },
+  { name: 'Bole', lat: 9.0015, lng: 38.7845, keywords: ['bole', 'edna', 'airport', 'medhanialem', 'rwanda', 'atlas', 'gerji', 'bulbula', 'hayahulet', '22', 'ቦሌ', 'ገርጂ', 'ቡልቡላ', 'ሃያሁለት'] },
+  { name: 'Lemi Kura', lat: 9.0200, lng: 38.8500, keywords: ['lemi kura', 'lemikura', 'ayat', 'summit', 'meri', 'cmc', 'goro', 'figa', 'koye feche', 'ለሚ ኩራ', 'ለሚኩራ', 'አያት', 'ሰሚት', 'መሪ', 'ሲኤምሲ', 'ጎሮ', 'ፊጋ'] },
+  { name: 'Kirkos', lat: 9.0105, lng: 38.7455, keywords: ['kirkos', 'mexico', 'kazanchis', 'meskel', 'wabi', 'lagar', 'leghar', 'beklobet', 'gotera', 'olympia', 'ቂርቆስ', 'ሜክሲኮ', 'ካዛንቺስ', 'መስቀል', 'ለገሃር', 'ጎተራ'] },
+  { name: 'Yeka', lat: 9.0350, lng: 38.8000, keywords: ['yeka', 'megenagna', 'shola', 'kotebe', 'ferensay', 'lamberet', 'signal', 'kara', 'የካ', 'መገናኛ', 'ሾላ', 'ኮተቤ', 'ፈረንሳይ', 'ላምበረት'] },
+  { name: 'Arada', lat: 9.0345, lng: 38.7512, keywords: ['arada', 'piazza', 'churchill', 'arat kilo', '4 kilo', 'somali tera', 'piassa', 'አራዳ', 'ፒያሳ', 'አራት ኪሎ'] },
+  { name: 'Nifas Silk', lat: 8.9567, lng: 38.7612, keywords: ['nifas silk', 'saris', 'lafto', 'jemo', 'kera', 'lebua', 'hana mariam', 'ንፋስ ስልክ', 'ሳሪስ', 'ላፍቶ', 'ጀሞ', 'ቄራ', 'ለቡ'] },
+  { name: 'Lideta', lat: 9.0080, lng: 38.7300, keywords: ['lideta', 'balcha', 'tor hailoch', 'kochera', 'abinet', 'geja', 'ልደታ', 'ባልቻ', 'ጦር ኃይሎች', 'አብነት'] },
+  { name: 'Gullele', lat: 9.0600, lng: 38.7300, keywords: ['gullele', 'shiromeda', 'addisu gebeya', 'wingate', 'paulos', 'shumeta', 'ጉለሌ', 'ሽሮሜዳ', 'አዲሱ ገበያ', 'ዊንጌት', 'ጳውሎስ'] },
+  { name: 'Addis Ketema', lat: 9.0300, lng: 38.7350, keywords: ['addis ketema', 'merkato', 'mercato', 'autobus tera', 'sebategna', 'አዲስ ከተማ', 'መርካቶ', 'አውቶቡስ ተራ', 'ሰባተኛ'] },
+  { name: 'Kolfe Keranio', lat: 9.0100, lng: 38.7000, keywords: ['kolfe', 'keranio', 'ayertena', 'ashero tera', 'torhailoch', 'zenebework', 'ኮልፌ', 'ቀራኒዮ', 'አየር ጤና', 'ዘነበወርቅ'] },
+  { name: 'Akaky Kaliti', lat: 8.8900, lng: 38.7700, keywords: ['akaki', 'kaliti', 'kality', 'tulu dimtu', 'koye feche', 'አቃቂ', 'ቃሊቲ', 'ቱሉ ዲምቱ'] },
 ];
 
 function detectSubCityFromCoordinates(lat: number, lng: number): string {
@@ -108,13 +109,45 @@ function detectSubCityFromCoordinates(lat: number, lng: number): string {
   return closest;
 }
 
-function parseLocationOrAddress(text: string, location?: { latitude: number; longitude: number }): {
+/**
+ * Resolves Google Maps shortened URLs (e.g. maps.app.goo.gl or goo.gl/maps) to their expanded destination
+ * and extracts place landmarks or coordinates to prevent misclassifying locations.
+ */
+async function resolveGoogleShortUrlToText(text: string): Promise<string> {
+  const shortMapMatch = text.match(/https?:\/\/(?:maps\.app\.goo\.gl|goo\.gl\/maps)\/[A-Za-z0-9_-]+/i);
+  if (!shortMapMatch) return text;
+
+  return new Promise((resolve) => {
+    try {
+      const req = https.get(shortMapMatch[0], { headers: { 'User-Agent': 'curl/7.84.0' } }, (res) => {
+        const redirectUrl = res.headers.location || '';
+        req.destroy();
+        if (!redirectUrl) return resolve(text);
+
+        const decoded = decodeURIComponent(redirectUrl);
+        const placeMatch = decoded.match(/place\/([^/?&]+)/);
+        const placeName = placeMatch ? placeMatch[1].replace(/\+/g, ' ') : '';
+        const augmented = `${text} ${placeName} ${decoded}`.trim();
+        resolve(augmented);
+      });
+      req.on('error', () => resolve(text));
+      req.setTimeout(3000, () => {
+        req.destroy();
+        resolve(text);
+      });
+    } catch {
+      resolve(text);
+    }
+  });
+}
+
+async function parseLocationOrAddress(text: string, location?: { latitude: number; longitude: number }): Promise<{
   subCity: string;
   latitude: number;
   longitude: number;
   addressDetails: string;
   isVerifiedGps: boolean;
-} {
+}> {
   // 1. Direct GPS Location sent from Telegram app / Phone sensor
   if (location && typeof location.latitude === 'number' && typeof location.longitude === 'number') {
     const lat = location.latitude;
@@ -129,9 +162,12 @@ function parseLocationOrAddress(text: string, location?: { latitude: number; lon
     };
   }
 
+  // 1B. Expand shortened Google Maps URL if present
+  const resolvedText = await resolveGoogleShortUrlToText(text || '');
+
   // 2. Check for Google Maps URL or raw coordinate pair in text
   // e.g. maps.google.com/?q=9.0015,38.7845 or @9.0015,38.7845 or 9.0015, 38.7845
-  const coordMatch = text.match(/(?:[?&]q=|@|\s|^)(-?\d{1,2}\.\d+)[,\s]+(-?\d{1,3}\.\d+)/);
+  const coordMatch = resolvedText.match(/(?:[?&]q=|@|\s|^)(-?\d{1,2}\.\d+)[,\s]+(-?\d{1,3}\.\d+)/);
   if (coordMatch) {
     const lat = parseFloat(coordMatch[1]);
     const lng = parseFloat(coordMatch[2]);
@@ -147,8 +183,8 @@ function parseLocationOrAddress(text: string, location?: { latitude: number; lon
     }
   }
 
-  // 3. Keyword matching for copied/pasted address text
-  const lower = text.toLowerCase();
+  // 3. Keyword matching for copied/pasted address text or place name from resolved URL
+  const lower = resolvedText.toLowerCase();
   for (const sc of ADDIS_SUB_CITIES) {
     for (const kw of sc.keywords) {
       if (lower.includes(kw)) {
@@ -1697,7 +1733,7 @@ ${med.strength ? `⚖️ **መጠን (Strength)፦** ${med.strength}\n` : ''}${m
             ? `📸 አዲሱ የብቃት ማረጋገጫ (CoC) ፎቶ በተሳካ ሁኔታ ተቀብለናል!`
             : `📸 New Certificate of Competence photo successfully received!`;
         } else if (location) {
-          const parsedLoc = parseLocationOrAddress(cleanText || '', location);
+          const parsedLoc = await parseLocationOrAddress(cleanText || '', location);
           await this.repo.resubmitVerificationApplication(waitingApp.id, {
             location: {
               latitude: parsedLoc.latitude,
@@ -2352,6 +2388,7 @@ Type **/status** at any time to monitor progress.
         replyText: `📍 **የሚገኙበትን ክፍለ ከተማ ይምረጡ (Select Sub-City)**\n━━━━━━━━━━━━━━━━━━━━━━━━━━\nበአቅራቢያዎ ያሉትን ፋርማሲዎች በትክክል ለማግኘት ከታች ካሉት ይምረጡ፦`,
         quickReplies: [
           '📍 Bole (ቦሌ)',
+          '📍 Lemi Kura (ለሚ ኩራ/አያት)',
           '📍 Kirkos (ቂርቆስ)',
           '📍 Yeka (የካ)',
           '📍 Arada (ፒያሳ)',
@@ -2362,19 +2399,23 @@ Type **/status** at any time to monitor progress.
         inlineKeyboard: [
           [
             { text: '📍 Bole (ቦሌ)', callback_data: 'subcity_Bole' },
+            { text: '📍 Lemi Kura (ለሚ ኩራ/አያት)', callback_data: 'subcity_LemiKura' },
+          ],
+          [
             { text: '📍 Kirkos (ቂርቆስ/ሜክሲኮ)', callback_data: 'subcity_Kirkos' },
-          ],
-          [
             { text: '📍 Yeka (የካ/መገናኛ)', callback_data: 'subcity_Yeka' },
+          ],
+          [
             { text: '📍 Arada (ፒያሳ)', callback_data: 'subcity_Arada' },
-          ],
-          [
             { text: '📍 Nifas Silk (ሳሪስ)', callback_data: 'subcity_NifasSilk' },
-            { text: '📍 Lideta (ልደታ)', callback_data: 'subcity_Lideta' },
           ],
           [
+            { text: '📍 Lideta (ልደታ)', callback_data: 'subcity_Lideta' },
             { text: '📍 Kolfe Keranio (ኮልፌ)', callback_data: 'subcity_Kolfe' },
+          ],
+          [
             { text: '📍 Gullele (ጉለሌ)', callback_data: 'subcity_Gullele' },
+            { text: '📍 Akaky Kaliti (ቃሊቲ)', callback_data: 'subcity_AkakyKaliti' },
           ],
         ],
         sessionStep: 'PATIENT_SEARCH',
@@ -2816,7 +2857,7 @@ ${itemsDisplay}
           ? `📸 አዲሱ የብቃት ማረጋገጫ (CoC) ፎቶ በተሳካ ሁኔታ ተቀብለናል!`
           : `📸 New Certificate of Competence photo successfully received!`;
       } else if (location) {
-        const parsedLoc = parseLocationOrAddress(cleanText || '', location);
+        const parsedLoc = await parseLocationOrAddress(cleanText || '', location);
         await this.repo.resubmitVerificationApplication(waitingApp.id, {
           location: {
             latitude: parsedLoc.latitude,
@@ -3086,7 +3127,7 @@ Type **/status** at any time to monitor progress.
       }
 
       case 'LOCATION_GPS': {
-        const parsed = parseLocationOrAddress(cleanText, location);
+        const parsed = await parseLocationOrAddress(cleanText, location);
         session.data.subCity = parsed.subCity;
         session.data.latitude = parsed.latitude;
         session.data.longitude = parsed.longitude;
