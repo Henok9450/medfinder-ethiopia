@@ -243,7 +243,7 @@ export class InMemoryRepository implements IDatabaseRepository {
   public async authenticateAdmin(
     username: string,
     password: string
-  ): Promise<{ success: boolean; admin?: Omit<AdminUser, 'passwordHash'>; token?: string; error?: string }> {
+  ): Promise<{ success: boolean; admin?: Omit<AdminUser, 'passwordHash'>; token?: string; sessionExpiresAt?: string; error?: string }> {
     return this.db.authenticateAdmin(username, password);
   }
 

@@ -1034,6 +1034,7 @@ app.post('/api/auth/login', async (req: Request, res: Response) => {
       success: true,
       userType: 'ADMIN',
       token: adminAuth.token,
+      sessionExpiresAt: adminAuth.sessionExpiresAt,
       user: {
         ...adminAuth.admin,
         type: 'ADMIN'
@@ -1059,6 +1060,7 @@ app.get('/api/auth/session', async (req: Request, res: Response) => {
     return res.json({
       success: true,
       userType: 'ADMIN',
+      sessionExpiresAt: admin.sessionExpiresAt,
       user: { ...safeAdmin, type: 'ADMIN' }
     });
   }
@@ -1119,6 +1121,7 @@ app.post('/api/admin/auth/login', async (req: Request, res: Response) => {
   return res.json({
     success: true,
     token: result.token,
+    sessionExpiresAt: result.sessionExpiresAt,
     admin: result.admin,
   });
 });
@@ -1128,6 +1131,7 @@ app.get('/api/admin/auth/session', requireAdminAuth, (req: Request, res: Respons
   const { passwordHash, ...safeAdmin } = admin;
   res.json({
     success: true,
+    sessionExpiresAt: admin.sessionExpiresAt,
     admin: safeAdmin,
   });
 });

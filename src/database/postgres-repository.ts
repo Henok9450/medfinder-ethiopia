@@ -1144,7 +1144,7 @@ export class PostgresRepository implements IDatabaseRepository {
   public async authenticateAdmin(
     username: string,
     password: string
-  ): Promise<{ success: boolean; admin?: Omit<AdminUser, 'passwordHash'>; token?: string; error?: string }> {
+  ): Promise<{ success: boolean; admin?: Omit<AdminUser, 'passwordHash'>; token?: string; sessionExpiresAt?: string; error?: string }> {
     const pool = getDbPool();
     if (!pool) return { success: false, error: 'Database offline' };
 
@@ -1162,14 +1162,16 @@ export class PostgresRepository implements IDatabaseRepository {
     }
 
     const token = 'adm_sess_' + crypto.randomBytes(16).toString('hex');
+    const sessionExpiresAt = new Date(Date.now() + 30 * 60 * 1000).toISOString();
     await pool.query(
-      `UPDATE admin_users SET session_token = $1, last_login_at = NOW() WHERE id = $2`,
-      [token, user.id]
+      `UPDATE admin_users SET session_token = $1, session_expires_at = $2, last_login_at = NOW() WHERE id = $3`,
+      [token, sessionExpiresAt, user.id]
     );
 
     return {
       success: true,
       token,
+      sessionExpiresAt,
       admin: {
         id: user.id,
         username: user.username,
@@ -1179,6 +1181,7 @@ export class PostgresRepository implements IDatabaseRepository {
         privileges: typeof user.privileges === 'string' ? JSON.parse(user.privileges) : user.privileges,
         createdAt: new Date(user.created_at).toISOString(),
         sessionToken: token,
+        sessionExpiresAt,
       },
     };
   }
@@ -1194,6 +1197,12 @@ export class PostgresRepository implements IDatabaseRepository {
     if (res.rows.length === 0) return null;
     const user = res.rows[0];
 
+    // Enforce 30-minute short-lived session expiry in Postgres
+    if (user.session_expires_at && new Date(user.session_expires_at).getTime() < Date.now()) {
+      await pool.query('UPDATE admin_users SET session_token = NULL, session_expires_at = NULL WHERE id = $1', [user.id]);
+      return null; // Session expired
+    }
+
     return {
       id: user.id,
       username: user.username,
@@ -1205,6 +1214,7 @@ export class PostgresRepository implements IDatabaseRepository {
       createdAt: new Date(user.created_at).toISOString(),
       lastLoginAt: user.last_login_at ? new Date(user.last_login_at).toISOString() : undefined,
       sessionToken: user.session_token,
+      sessionExpiresAt: user.session_expires_at ? new Date(user.session_expires_at).toISOString() : undefined,
     };
   }
 

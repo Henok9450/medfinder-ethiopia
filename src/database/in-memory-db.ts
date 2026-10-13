@@ -21,6 +21,7 @@ export interface AdminUser {
   createdAt: string;
   lastLoginAt?: string;
   sessionToken?: string;
+  sessionExpiresAt?: string; // Strict short-lived admin session expiry (30 mins)
 }
 
 export interface PharmacyPortalAccount {
@@ -1192,7 +1193,7 @@ export class InMemoryDatabase {
     this.adminUsers.set(defaultUsername, masterAdmin);
   }
 
-  public authenticateAdmin(username: string, password: string): { success: boolean; admin?: Omit<AdminUser, 'passwordHash'>; token?: string; error?: string } {
+  public authenticateAdmin(username: string, password: string): { success: boolean; admin?: Omit<AdminUser, 'passwordHash'>; token?: string; sessionExpiresAt?: string; error?: string } {
     const user = this.adminUsers.get(username.trim().toLowerCase());
     if (!user) {
       return { success: false, error: 'Invalid administrator credentials' };
@@ -1203,7 +1204,10 @@ export class InMemoryDatabase {
       return { success: false, error: 'Invalid administrator credentials' };
     }
 
+    // Strict 30-minute short session expiry for administrators
+    const sessionExpiresAt = new Date(Date.now() + 30 * 60 * 1000).toISOString();
     user.sessionToken = 'adm_sess_' + crypto.randomBytes(16).toString('hex');
+    user.sessionExpiresAt = sessionExpiresAt;
     user.lastLoginAt = new Date().toISOString();
 
     const { passwordHash, ...safeAdmin } = user;
@@ -1211,13 +1215,22 @@ export class InMemoryDatabase {
       success: true,
       admin: safeAdmin,
       token: user.sessionToken,
+      sessionExpiresAt,
     };
   }
 
   public getAdminBySession(token: string): AdminUser | undefined {
     if (!token) return undefined;
     for (const adm of this.adminUsers.values()) {
-      if (adm.sessionToken === token) return adm;
+      if (adm.sessionToken === token) {
+        // Enforce short-lived expiration (30 minutes)
+        if (adm.sessionExpiresAt && new Date(adm.sessionExpiresAt).getTime() < Date.now()) {
+          adm.sessionToken = undefined;
+          adm.sessionExpiresAt = undefined;
+          return undefined; // Session expired
+        }
+        return adm;
+      }
     }
     return undefined;
   }

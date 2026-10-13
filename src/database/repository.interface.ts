@@ -172,7 +172,7 @@ export interface IDatabaseRepository {
   authenticateAdmin(
     username: string,
     password: string
-  ): Promise<{ success: boolean; admin?: Omit<AdminUser, 'passwordHash'>; token?: string; error?: string }>;
+  ): Promise<{ success: boolean; admin?: Omit<AdminUser, 'passwordHash'>; token?: string; sessionExpiresAt?: string; error?: string }>;
 
   /**
    * Get admin user by session token
