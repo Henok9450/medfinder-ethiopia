@@ -422,8 +422,9 @@ app.post('/api/pharmacy/auth/send-otp', async (req: Request, res: Response) => {
 
   res.json({
     success: true,
-    message: 'Login code dispatched to your verified Telegram bot and SMS.',
-    demoCode: process.env.NODE_ENV !== 'production' ? result.otpCode : undefined,
+    message: '4-digit verification code generated for your Pharmacy PWA session.',
+    otpCode: result.otpCode,
+    demoCode: result.otpCode,
   });
 });
 
@@ -526,7 +527,7 @@ app.get('/api/pharmacy/auth/session', async (req: Request, res: Response) => {
   if (!token) return res.status(401).json({ success: false, error: 'Not authenticated' });
 
   const account = (await dbRepo.getAccountBySession(token)) || db.getAccountBySession(token);
-  if (!account) return res.status(401).json({ success: false, error: 'Session expired (6-month limit reached) or invalid. Use your Telegram 1-click key to reconnect.' });
+  if (!account) return res.status(401).json({ success: false, error: 'Session expired (6-month limit reached) or invalid. Use your 1-Click Key or Phone Login to reconnect.' });
 
   const pharmacy = (await dbRepo.getPharmacyById(account.pharmacyId)) ||
     db.pharmacies.find((p) => p.id === account.pharmacyId);
@@ -567,6 +568,214 @@ app.post('/api/pharmacy/auth/logout', async (req: Request, res: Response) => {
     }
   }
   res.json({ success: true, message: 'Counter session logged out successfully.' });
+});
+
+// ==========================================
+// STANDALONE PHARMACY PWA ONBOARDING, STATUS & RESUBMISSION
+// ==========================================
+app.post('/api/pharmacy/onboarding/register', async (req: Request, res: Response) => {
+  try {
+    const {
+      pharmacyName,
+      pharmacistName,
+      subCity,
+      address,
+      phone,
+      efdaLicenseNumber,
+      tinNumber,
+      latitude,
+      longitude,
+      licensePhotoBase64,
+    } = req.body;
+
+    if (!pharmacyName || !pharmacistName || !phone || !efdaLicenseNumber || !tinNumber) {
+      return res.status(400).json({
+        success: false,
+        error: 'Pharmacy Name, Chief Pharmacist Name, Phone, EFDA License #, and TIN # are required.',
+      });
+    }
+
+    if (!licensePhotoBase64 || typeof licensePhotoBase64 !== 'string') {
+      return res.status(400).json({
+        success: false,
+        error: 'Please upload a clear photo of your physical EFDA Certificate of Competence (CoC).',
+      });
+    }
+
+    const uploadsDir = path.join(__dirname, '../public/uploads');
+    if (!fs.existsSync(uploadsDir)) {
+      fs.mkdirSync(uploadsDir, { recursive: true });
+    }
+
+    const fileId = `pwa_coc_${Date.now()}_${Math.floor(Math.random() * 1000)}`;
+    const base64Clean = licensePhotoBase64.replace(/^data:[^;]+;base64,/, '');
+    const imgBuf = Buffer.from(base64Clean, 'base64');
+    await fs.promises.writeFile(path.join(uploadsDir, `telegram_${fileId}.jpg`), imgBuf);
+    const photoUrl = `/api/telegram/media/${fileId}`;
+
+    const cleanDigits = String(phone).replace(/[^0-9]/g, '').slice(-9);
+    const latNum = latitude !== undefined ? Number(latitude) : 9.0054;
+    const lngNum = longitude !== undefined ? Number(longitude) : 38.7636;
+
+    const appData = {
+      telegramChatId: `pwa_${cleanDigits || Date.now()}`,
+      telegramUsername: 'Pharmacy_PWA',
+      pharmacyName: String(pharmacyName).trim(),
+      subCity: String(subCity || 'Bole').trim(),
+      addressDetails: String(address || subCity || 'Addis Ababa').trim(),
+      latitude: !isNaN(latNum) ? latNum : 9.0054,
+      longitude: !isNaN(lngNum) ? lngNum : 38.7636,
+      gpsLocationVerified: latitude !== undefined && longitude !== undefined,
+      phone: String(phone).trim(),
+      pharmacistName: String(pharmacistName).trim(),
+      pharmacistLicenseNumber: String(efdaLicenseNumber).trim(),
+      efdaLicenseNumber: String(efdaLicenseNumber).trim(),
+      tinNumber: String(tinNumber).trim(),
+      counterPhotoUrl: photoUrl,
+      efdaDocUrl: photoUrl,
+    };
+
+    const application = await dbRepo.submitVerificationApplication(appData);
+    // Sync with in-memory db if not already present
+    if (!db.verificationApplications.some((a) => a.id === application.id)) {
+      db.verificationApplications.unshift(application);
+    }
+
+    res.json({
+      success: true,
+      application,
+    });
+  } catch (err: any) {
+    console.error('[PWA Onboarding Register Error]:', err);
+    res.status(500).json({ success: false, error: err.message || 'Failed to submit registration' });
+  }
+});
+
+app.get('/api/pharmacy/onboarding/status', async (req: Request, res: Response) => {
+  try {
+    const rawPhone = String(req.query.phone || '').trim();
+    const cleanDigits = rawPhone.replace(/[^0-9]/g, '').slice(-9);
+    if (!cleanDigits || cleanDigits.length < 7) {
+      return res.status(400).json({ success: false, error: 'Please enter a valid Ethiopian phone number.' });
+    }
+
+    const allApps = await dbRepo.getVerificationApplications();
+    const combinedApps = [...allApps];
+    for (const memApp of db.verificationApplications) {
+      if (!combinedApps.some((a) => a.id === memApp.id)) {
+        combinedApps.push(memApp);
+      }
+    }
+
+    // Find latest matching application by last 9 phone digits
+    const matchingApps = combinedApps.filter((a) => {
+      const pDigits = String(a.phone || '').replace(/[^0-9]/g, '').slice(-9);
+      return pDigits === cleanDigits;
+    });
+
+    const application = matchingApps[0] || null;
+
+    // Also check if an active verified pharmacy/portal account already exists for this phone
+    const allPharmacies = await dbRepo.getAllPharmacies();
+    const matchedPharmacy = allPharmacies.find((p) => {
+      const pDigits = String(p.phone || '').replace(/[^0-9]/g, '').slice(-9);
+      return pDigits === cleanDigits;
+    }) || db.pharmacies.find((p) => {
+      const pDigits = String(p.phone || '').replace(/[^0-9]/g, '').slice(-9);
+      return pDigits === cleanDigits;
+    });
+
+    let matchedAccount = matchedPharmacy
+      ? await dbRepo.createOrGetPharmacyAccount(matchedPharmacy)
+      : Array.from(db.pharmacyAccounts.values()).find((acc) => {
+          const pDigits = String(acc.phone || '').replace(/[^0-9]/g, '').slice(-9);
+          return pDigits === cleanDigits;
+        });
+
+    let accessKey = application?.portalAccessKey || matchedAccount?.accessKey || undefined;
+
+    if (!application && !matchedAccount) {
+      return res.status(404).json({
+        success: false,
+        error: 'No pharmacy registration or active account found for this phone number. You can register your pharmacy right below!',
+      });
+    }
+
+    res.json({
+      success: true,
+      application: application || {
+        id: matchedAccount?.pharmacyId || 'VERIFIED',
+        pharmacyName: matchedAccount?.pharmacyName || 'Verified Pharmacy',
+        subCity: matchedAccount?.subCity || 'Addis Ababa',
+        phone: matchedAccount?.phone || rawPhone,
+        status: 'APPROVED',
+        portalAccessKey: matchedAccount?.accessKey,
+      },
+      accessKey,
+    });
+  } catch (err: any) {
+    res.status(500).json({ success: false, error: err.message || 'Failed to check status' });
+  }
+});
+
+app.post('/api/pharmacy/onboarding/resubmit', async (req: Request, res: Response) => {
+  try {
+    const { applicationId, phone, licensePhotoBase64, efdaLicenseNumber, note } = req.body;
+
+    if (!licensePhotoBase64 || typeof licensePhotoBase64 !== 'string') {
+      return res.status(400).json({
+        success: false,
+        error: 'Please select or capture a clear photo of your EFDA Certificate of Competence (CoC) to resubmit.',
+      });
+    }
+
+    let targetId = applicationId ? String(applicationId).trim() : '';
+    if (!targetId && phone) {
+      const cleanDigits = String(phone).replace(/[^0-9]/g, '').slice(-9);
+      const allApps = await dbRepo.getVerificationApplications();
+      const found = allApps.find((a) => String(a.phone || '').replace(/[^0-9]/g, '').slice(-9) === cleanDigits);
+      if (found) targetId = found.id;
+    }
+
+    if (!targetId) {
+      return res.status(400).json({ success: false, error: 'Application ID or registered phone number is required.' });
+    }
+
+    const uploadsDir = path.join(__dirname, '../public/uploads');
+    if (!fs.existsSync(uploadsDir)) {
+      fs.mkdirSync(uploadsDir, { recursive: true });
+    }
+
+    const fileId = `pwa_resub_${Date.now()}_${Math.floor(Math.random() * 1000)}`;
+    const base64Clean = licensePhotoBase64.replace(/^data:[^;]+;base64,/, '');
+    const imgBuf = Buffer.from(base64Clean, 'base64');
+    await fs.promises.writeFile(path.join(uploadsDir, `telegram_${fileId}.jpg`), imgBuf);
+    const photoUrl = `/api/telegram/media/${fileId}`;
+
+    const updated = await dbRepo.resubmitVerificationApplication(targetId, {
+      photoUrl,
+      efdaLicenseNumber: efdaLicenseNumber ? String(efdaLicenseNumber).trim() : undefined,
+      note: note ? String(note).trim() : 'Resubmitted clearer EFDA CoC photo via Pharmacy Counter PWA',
+    });
+
+    db.resubmitVerificationApplication(targetId, {
+      photoUrl,
+      efdaLicenseNumber: efdaLicenseNumber ? String(efdaLicenseNumber).trim() : undefined,
+      note: note ? String(note).trim() : 'Resubmitted clearer EFDA CoC photo via Pharmacy Counter PWA',
+    });
+
+    if (!updated) {
+      return res.status(404).json({ success: false, error: 'Application not found for resubmission.' });
+    }
+
+    res.json({
+      success: true,
+      application: updated,
+    });
+  } catch (err: any) {
+    console.error('[PWA Onboarding Resubmit Error]:', err);
+    res.status(500).json({ success: false, error: err.message || 'Failed to resubmit CoC photo' });
+  }
 });
 
 // Dedicated Pharmacy PWA direct route
