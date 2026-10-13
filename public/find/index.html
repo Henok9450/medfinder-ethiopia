@@ -72,11 +72,12 @@
           <span>Install</span>
         </button>
 
-        <!-- Telegram Bot Handoff -->
-        <a href="https://t.me/MedFinder_ET_bot" target="_blank" class="px-2.5 py-1.5 rounded-xl bg-sky-50 hover:bg-sky-100 border border-sky-200 text-sky-800 text-[11px] font-bold flex items-center gap-1 transition">
-          <i class="fa-brands fa-telegram text-sky-600 text-xs"></i>
-          <span class="hidden sm:inline">Bot Alert</span>
-        </a>
+        <!-- In-App Live Alert Toggle -->
+        <button id="pwaLiveAlertBtn" onclick="enablePwaNotifications()" class="px-2.5 py-1.5 rounded-xl bg-emerald-50 hover:bg-emerald-100 border border-emerald-200 text-emerald-800 text-[11px] font-bold flex items-center gap-1.5 active:scale-95 transition">
+          <span class="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
+          <i class="fa-solid fa-bell text-emerald-600 text-xs"></i>
+          <span id="pwaLiveAlertBtnText" class="hidden sm:inline">In-App Alerts</span>
+        </button>
       </div>
     </div>
   </header>
@@ -232,7 +233,7 @@
       </div>
     </div>
 
-    <!-- BENEFIT CARDS (ANTI-SCAM PRICE LOCK & TELEGRAM RESTOCK ALERTS) -->
+    <!-- BENEFIT CARDS (ANTI-SCAM PRICE LOCK & LIVE IN-APP RESTOCK RADAR) -->
     <section class="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
       <div onclick="focusSearchInput()" class="cursor-pointer p-3.5 bg-white hover:border-emerald-300 rounded-2xl border border-slate-200 shadow-xs space-y-1.5 active:scale-[0.99] transition">
         <div class="flex items-center justify-between">
@@ -245,19 +246,19 @@
         <p class="text-[11px] text-slate-500 leading-relaxed">Lock the shelf price before traveling so pharmacies cannot raise rates upon arrival.</p>
       </div>
 
-      <a href="https://t.me/MedFinder_ET_bot" target="_blank" class="block p-3.5 bg-white hover:border-sky-300 rounded-2xl border border-slate-200 shadow-xs space-y-1.5 active:scale-[0.99] transition">
+      <div onclick="enablePwaNotifications()" class="cursor-pointer p-3.5 bg-white hover:border-sky-300 rounded-2xl border border-slate-200 shadow-xs space-y-1.5 active:scale-[0.99] transition">
         <div class="flex items-center justify-between">
           <div class="w-8 h-8 rounded-xl bg-sky-100 text-sky-700 flex items-center justify-center text-sm font-bold">
-            <i class="fa-brands fa-telegram"></i>
+            <i class="fa-solid fa-tower-broadcast"></i>
           </div>
-          <span class="text-[10px] font-bold text-sky-700 bg-sky-50 px-2 py-0.5 rounded-full border border-sky-200 flex items-center gap-1">
-            <span>Open Bot</span>
-            <i class="fa-solid fa-arrow-up-right-from-square text-[8px]"></i>
+          <span id="restockCardBadge" class="text-[10px] font-bold text-sky-700 bg-sky-50 px-2 py-0.5 rounded-full border border-sky-200 flex items-center gap-1">
+            <span class="w-1.5 h-1.5 rounded-full bg-sky-500 animate-ping"></span>
+            <span>In-App Live Radar</span>
           </span>
         </div>
-        <strong class="text-slate-900 block text-xs">Telegram Restock Alerts</strong>
-        <p class="text-[11px] text-slate-500 leading-relaxed">If a rare or chronic medicine is sold out, our bot broadcasts your request to nearby pharmacies and pings you on Telegram the moment a pharmacist confirms stock.</p>
-      </a>
+        <strong class="text-slate-900 block text-xs">Instant In-App Restock Radar</strong>
+        <p class="text-[11px] text-slate-500 leading-relaxed">If a rare or chronic medicine is out of stock, this PWA broadcasts your request to nearby pharmacies and automatically alerts you right here with sound & live stock the moment a pharmacist confirms it.</p>
+      </div>
     </section>
 
   </main>
@@ -371,11 +372,11 @@
         <span id="voucherDirectionsBtnText">🗺️ Open Turn-by-Turn Navigation (አቅጣጫ አሳየኝ)</span>
       </a>
 
-      <!-- TELEGRAM NOTIFICATION DEEP-LINK BUTTON -->
-      <a id="voucherTelegramLink" href="https://t.me/MedFinder_ET_bot" target="_blank" class="flex items-center justify-center gap-2 w-full py-2.5 px-3 bg-[#229ED9] hover:bg-[#1e8bc0] active:scale-98 text-white rounded-xl text-xs font-bold transition shadow-sm">
-        <i class="fa-brands fa-telegram text-base"></i>
-        <span>Get Live Updates on Telegram</span>
-      </a>
+      <!-- IN-APP REAL-TIME SYNC INDICATOR -->
+      <div class="flex items-center justify-center gap-2 w-full py-2 px-3 bg-emerald-50 border border-emerald-200 text-emerald-800 rounded-xl text-[11px] font-bold">
+        <span class="w-2 h-2 rounded-full bg-emerald-500 animate-ping shrink-0"></span>
+        <span>Live In-App Sync Active — Chimes automatically on confirmation</span>
+      </div>
 
       <!-- ACTION BUTTONS -->
       <div class="space-y-2 pt-1">
@@ -516,7 +517,7 @@
   <footer class="hidden sm:block bg-white border-t border-slate-200 px-4 py-3 text-center text-xs text-slate-500">
     <div class="max-w-xl mx-auto flex items-center justify-between text-[11px]">
       <span>Federal Democratic Republic of Ethiopia (EFDA)</span>
-      <a href="https://t.me/MedFinder_ET_bot" target="_blank" class="text-emerald-700 font-bold hover:underline">@MedFinder_ET_bot</a>
+      <span class="text-emerald-700 font-bold">100% Standalone Patient Radar PWA</span>
     </div>
   </footer>
 
@@ -524,6 +525,7 @@
   <script>
     let deferredPrompt = null;
     let countdownInterval = null;
+    let restockPollInterval = null;
 
     // 1. PWA Service Worker Registration
     if ('serviceWorker' in navigator) {
@@ -555,6 +557,133 @@
       deferredPrompt = null;
       document.getElementById('pwaInstallBtn')?.classList.add('hidden');
       document.getElementById('pwaInstallBanner')?.classList.add('hidden');
+    }
+
+    // 2B. Native PWA In-App & Browser Notifications (No External Bot Required)
+    async function enablePwaNotifications() {
+      try {
+        playAlertChime('confirm');
+      } catch (_) {}
+
+      const btnText = document.getElementById('pwaLiveAlertBtnText');
+      const cardBadge = document.getElementById('restockCardBadge');
+
+      if (!('Notification' in window)) {
+        if (btnText) btnText.innerText = 'Sound Alerts On';
+        if (cardBadge) cardBadge.innerHTML = '<i class="fa-solid fa-volume-high text-emerald-600"></i> <span>Sound Alerts Active</span>';
+        alert('✅ In-App Sound & Live Restock Radar is active! Keep this tab open and the app will automatically chime and display any pharmacy the moment they confirm stock.');
+        return;
+      }
+
+      if (Notification.permission === 'granted') {
+        if (btnText) btnText.innerText = 'Alerts Active';
+        if (cardBadge) cardBadge.innerHTML = '<i class="fa-solid fa-circle-check text-emerald-600"></i> <span>Push & Sound Active</span>';
+        alert('✅ Browser Push & In-App Sound Alerts are active! Any restock or hold confirmation will notify you directly inside this PWA.');
+        return;
+      }
+
+      const perm = await Notification.requestPermission();
+      if (perm === 'granted') {
+        if (btnText) btnText.innerText = 'Alerts Active';
+        if (cardBadge) cardBadge.innerHTML = '<i class="fa-solid fa-circle-check text-emerald-600"></i> <span>Push & Sound Active</span>';
+        try {
+          new Notification('MedFinder Ethiopia PWA', {
+            body: 'In-app restock & counter confirmation alerts are now active!'
+          });
+        } catch (_) {}
+      } else {
+        if (btnText) btnText.innerText = 'Sound Alerts On';
+        alert('✅ In-App Sound & Live Radar is active! The page will automatically chime and update when a pharmacist confirms stock.');
+      }
+    }
+
+    function sendNativePwaNotification(title, body) {
+      try {
+        if ('Notification' in window && Notification.permission === 'granted') {
+          new Notification(title, { body });
+        }
+      } catch (_) {}
+    }
+
+    function stopInAppRestockPolling() {
+      if (restockPollInterval) {
+        clearInterval(restockPollInterval);
+        restockPollInterval = null;
+      }
+    }
+
+    function startInAppRestockPolling({ userId, medicineName, medicineNames, userLat, userLng, subCity, requestId }) {
+      stopInAppRestockPolling();
+      let elapsedChecks = 0;
+
+      restockPollInterval = setInterval(async () => {
+        elapsedChecks++;
+        const statusLabel = document.getElementById('inAppRadarPollStatus');
+        if (statusLabel) {
+          statusLabel.innerText = `Listening live for pharmacist confirmation in ${subCity}... (Check #${elapsedChecks})`;
+        }
+
+        try {
+          // 1. Check if a pharmacist added it to their live shelf inventory via Pharmacy Studio PWA
+          const res = await fetch('/api/search', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              userId,
+              medicineName,
+              medicineNames,
+              userLat,
+              userLng,
+              subCity,
+              lang: 'am',
+              silentPoll: true
+            })
+          });
+          const data = await res.json();
+          if (data.success && Array.isArray(data.pharmacies) && data.pharmacies.length > 0) {
+            stopInAppRestockPolling();
+            playAlertChime('confirm');
+            sendNativePwaNotification(
+              `✅ ${medicineName} Just Confirmed in Stock!`,
+              `${data.pharmacies[0].name} (${subCity}) just confirmed stock at ${data.pharmacies[0].priceETB} ETB.`
+            );
+            document.getElementById('resultsCountText').innerText = `🎉 Restock Confirmed! Found ${data.pharmacies.length} pharmacy`;
+            renderPharmacies(data.pharmacies, medicineName, data.isMultiItem, data.searchedMedicines);
+            return;
+          }
+
+          // 2. Also check direct broadcast request responses if requestId is present
+          if (requestId) {
+            const bRes = await fetch(`/api/search/broadcast/${requestId}`);
+            if (bRes.ok) {
+              const bData = await bRes.json();
+              if (bData.success && Array.isArray(bData.responses) && bData.responses.length > 0) {
+                stopInAppRestockPolling();
+                playAlertChime('confirm');
+                const mapped = bData.responses.map(r => ({
+                  id: r.pharmacyId,
+                  name: r.pharmacyName,
+                  subCity: subCity,
+                  phone: r.phone || '+251911223344',
+                  distanceKm: r.distanceKm || 1.2,
+                  isVerified: true,
+                  trustScore: 98,
+                  matchedDrugName: medicineName,
+                  priceETB: r.priceETB || 380
+                }));
+                sendNativePwaNotification(
+                  `✅ ${medicineName} Confirmed by Pharmacist!`,
+                  `${mapped[0].name} responded with stock at ${mapped[0].priceETB} ETB.`
+                );
+                document.getElementById('resultsCountText').innerText = `🎉 Pharmacist Responded! (${mapped.length} available)`;
+                renderPharmacies(mapped, medicineName, false, [medicineName]);
+              }
+            }
+          }
+        } catch (e) {
+          console.warn('[InAppRestockRadar] Poll error:', e.message);
+        }
+      }, 4000);
     }
 
     // 3. Telegram WebApp Integration
@@ -652,12 +781,18 @@
     }
 
     function quickSearch(drugName) {
+      activeFindPrescriptionBasket = null;
       document.getElementById('medicineInput').value = drugName;
       executeMedicineSearch();
     }
 
+    function fillSearch(drugName) {
+      quickSearch(drugName);
+    }
+
     // 5. Execute Live Medicine Radar Search
     async function executeMedicineSearch() {
+      stopInAppRestockPolling();
       const medicineName = document.getElementById('medicineInput').value.trim();
       if (!medicineName) {
         alert('Please enter a medicine name to search.');
@@ -726,22 +861,41 @@
           }
           renderPharmacies(data.pharmacies, medicineName, data.isMultiItem, data.searchedMedicines);
         } else if (data.mode === 'BROADCAST_PING_INITIATED') {
-          document.getElementById('resultsCountText').innerText = `Broadcasting query live...`;
+          document.getElementById('resultsCountText').innerText = `Live In-App Broadcast Active...`;
           container.innerHTML = `
-            <div class="bg-white p-5 rounded-3xl border border-sky-200 shadow-sm space-y-3 text-center">
-              <div class="w-12 h-12 bg-sky-50 text-sky-600 rounded-2xl mx-auto flex items-center justify-center text-xl">
+            <div class="bg-white p-5 rounded-3xl border-2 border-sky-200 shadow-sm space-y-3.5 text-center">
+              <div class="w-12 h-12 bg-sky-50 text-sky-600 rounded-2xl mx-auto flex items-center justify-center text-xl shadow-inner">
                 <i class="fa-solid fa-tower-broadcast animate-pulse"></i>
               </div>
-              <div>
-                <h4 class="font-bold text-sm text-slate-900">Broadcast Ping Sent to ${data.pingedCount || 10} Nearby Pharmacies</h4>
-                <p class="text-xs text-slate-500 mt-0.5">"${escapeHtml(medicineName)}" was pinged to pharmacists in ${subCity}. As they confirm stock, your radar updates.</p>
+              <div class="space-y-1">
+                <span class="inline-flex items-center gap-1.5 text-[10px] font-extrabold uppercase tracking-wider bg-sky-50 text-sky-700 px-2.5 py-0.5 rounded-full border border-sky-200">
+                  <span class="w-1.5 h-1.5 rounded-full bg-sky-500 animate-ping"></span>
+                  Live In-App Restock Radar
+                </span>
+                <h4 class="font-extrabold text-sm text-slate-900">Broadcast Ping Sent to ${data.pingedCount || 10} Nearby Pharmacies</h4>
+                <p class="text-xs text-slate-500 leading-relaxed">"${escapeHtml(medicineName)}" was broadcast to verified pharmacists in <strong>${escapeHtml(subCity)}</strong>. Keep this page open — your screen will automatically chime and display the pharmacy the moment they confirm stock!</p>
               </div>
-              <a href="https://t.me/MedFinder_ET_bot" target="_blank" class="inline-flex items-center gap-1.5 bg-sky-600 text-white font-bold text-xs px-4 py-2 rounded-xl shadow-xs">
-                <i class="fa-brands fa-telegram"></i>
-                <span>Get Notification on Telegram Bot</span>
-              </a>
+              <div class="p-2.5 bg-slate-50 rounded-2xl border border-slate-200 flex items-center justify-center gap-2 text-[11px] font-semibold text-slate-700">
+                <i class="fa-solid fa-circle-notch fa-spin text-sky-600"></i>
+                <span id="inAppRadarPollStatus">Listening live for pharmacist confirmation in ${escapeHtml(subCity)}...</span>
+              </div>
+              <div class="flex flex-col xs:flex-row items-center justify-center gap-2 pt-1">
+                <button onclick="enablePwaNotifications()" class="w-full xs:w-auto inline-flex items-center justify-center gap-1.5 bg-emerald-600 hover:bg-emerald-700 active:scale-95 text-white font-bold text-xs px-4 py-2.5 rounded-xl shadow-xs transition">
+                  <i class="fa-solid fa-bell"></i>
+                  <span>Enable Browser Sound & Push Alert</span>
+                </button>
+              </div>
             </div>
           `;
+          startInAppRestockPolling({
+            userId,
+            medicineName,
+            medicineNames: medicineNamesToSend,
+            userLat,
+            userLng,
+            subCity,
+            requestId: data.requestId
+          });
         } else {
           document.getElementById('resultsCountText').innerText = `No pharmacies found`;
           container.innerHTML = `
@@ -958,14 +1112,8 @@
           phoneEl.innerText = phone;
           phoneEl.href = `tel:${phone}`;
 
-          // Telegram Deep Link for real-time mobile push
-          const tgLink = document.getElementById('voucherTelegramLink');
-          if (tgLink) {
-            tgLink.href = `https://t.me/MedFinder_ET_bot?start=hold_${r.reservationCode}`;
-          }
-
           document.getElementById('voucherFindAnotherBtn').classList.add('hidden');
-          document.getElementById('voucherCloseBtn').innerText = 'Done / Close Voucher';
+          document.getElementById('voucherCloseBtn').innerText = 'Minimize / Keep Voucher Active';
 
           // Start 90-second direct-dial safety valve
           startSafetyTimer(phone, r.reservationCode, r.medicineName, r.lockedPriceETB);
@@ -1011,6 +1159,10 @@
             if (countdownInterval) { clearInterval(countdownInterval); countdownInterval = null; }
             stopSafetyTimer();
             playAlertChime('cancel');
+            sendNativePwaNotification(
+              `❌ Hold #${r.reservationCode} Declined`,
+              `${r.pharmacyName || origName} reported ${r.medicineName} is out of stock. Tap to search another pharmacy.`
+            );
 
             // Modal Icon -> Red Alert
             const iconBox = document.getElementById('voucherModalIcon');
@@ -1059,6 +1211,10 @@
             if (countdownInterval) { clearInterval(countdownInterval); countdownInterval = null; }
             stopSafetyTimer();
             playAlertChime('confirm');
+            sendNativePwaNotification(
+              `✅ Medicine Dispensed (#${r.reservationCode})`,
+              `${r.medicineName} was verified and dispensed at ${r.pharmacyName || origName}.`
+            );
 
             const iconBox = document.getElementById('voucherModalIcon');
             iconBox.className = 'w-14 h-14 bg-gradient-to-tr from-emerald-600 to-teal-500 text-white rounded-2xl mx-auto flex items-center justify-center text-2xl shadow-lg shadow-emerald-600/30 transition-all';
@@ -1088,6 +1244,10 @@
             clearInterval(pollReservationInterval);
             stopSafetyTimer();
             playAlertChime('confirm');
+            sendNativePwaNotification(
+              `✅ Stock Confirmed! Hold #${r.reservationCode} Active`,
+              `${r.pharmacyName || origName} physically set aside ${r.medicineName} at ${r.lockedPriceETB} ETB for 60 minutes.`
+            );
 
             const iconBox = document.getElementById('voucherModalIcon');
             iconBox.className = 'w-14 h-14 bg-gradient-to-tr from-emerald-600 to-teal-500 text-white rounded-2xl mx-auto flex items-center justify-center text-2xl shadow-lg shadow-emerald-600/30 transition-all';

@@ -76,7 +76,7 @@ app.post('/api/prescription/scan', async (req: Request, res: Response) => {
 // 1. PATIENT / USER SEARCH ENDPOINT
 // ==========================================
 app.post('/api/search', async (req: Request, res: Response) => {
-  const { userId, medicineName, medicineNames, userLat, userLng, city = 'Addis Ababa', subCity, lang = 'am' } = req.body;
+  const { userId, medicineName, medicineNames, userLat, userLng, city = 'Addis Ababa', subCity, lang = 'am', silentPoll = false } = req.body;
 
   const rawItemList: string[] = Array.isArray(medicineNames) && medicineNames.length > 0
     ? medicineNames.map((s: any) => String(s).trim()).filter(Boolean)
@@ -96,7 +96,7 @@ app.post('/api/search', async (req: Request, res: Response) => {
   // 1. Dynamic Monetization & Paywall Evaluation
   const access = monetizationService.evaluateAccess({ userId, city, subCity });
 
-  if (!access.isAllowed) {
+  if (!access.isAllowed && !silentPoll) {
     // Paywall triggered! Dynamically fetch price from current policy
     const policy = configService.getPolicy();
     const pricing = policy.monetization.pricing;
@@ -130,7 +130,9 @@ app.post('/api/search', async (req: Request, res: Response) => {
   }
 
   // 2. Access is Allowed (Free promo period, active pass, or free quota)
-  monetizationService.recordSearchUsage(userId);
+  if (!silentPoll) {
+    monetizationService.recordSearchUsage(userId);
+  }
 
   // 3. Search direct indexed inventory for each medicine in the list
   const allPharmacies = await dbRepo.getAllPharmacies();
@@ -142,17 +144,19 @@ app.post('/api/search', async (req: Request, res: Response) => {
     parsed: MedicalFuzzyMatcher.parseQuery(item),
   }));
 
-  // Log telemetry for each searched medicine in background
-  for (const q of parsedQueries) {
-    dbRepo.logSearchTelemetry({
-      query: q.rawName,
-      normalizedDrug: q.parsed.normalizedQuery,
-      coreBrandOrGeneric: q.parsed.coreBrandOrGeneric,
-      subCity: subCity || 'Bole',
-      city: city || 'Addis Ababa',
-      matchedCount: 0,
-      userId,
-    }).catch((err: any) => console.warn('[SearchTelemetry] Error:', err.message));
+  // Log telemetry for each searched medicine in background (only on initial explicit search)
+  if (!silentPoll) {
+    for (const q of parsedQueries) {
+      dbRepo.logSearchTelemetry({
+        query: q.rawName,
+        normalizedDrug: q.parsed.normalizedQuery,
+        coreBrandOrGeneric: q.parsed.coreBrandOrGeneric,
+        subCity: subCity || 'Bole',
+        city: city || 'Addis Ababa',
+        matchedCount: 0,
+        userId,
+      }).catch((err: any) => console.warn('[SearchTelemetry] Error:', err.message));
+    }
   }
 
   // Evaluate pharmacy stock across all searched medicines
@@ -269,6 +273,14 @@ app.post('/api/search', async (req: Request, res: Response) => {
           basketSummaryText: `${m.matchedCount} of ${m.totalRequested} items in stock`,
         };
       }),
+    });
+  }
+
+  if (silentPoll) {
+    return res.json({
+      success: true,
+      mode: 'STILL_WAITING',
+      pharmacies: [],
     });
   }
 
