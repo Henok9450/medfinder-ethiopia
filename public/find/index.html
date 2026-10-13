@@ -255,7 +255,7 @@
 
   <!-- MOBILE BOTTOM NAVIGATION BAR (< 640px) -->
   <nav class="sm:hidden fixed bottom-0 left-0 right-0 z-40 bg-white/95 backdrop-blur-md border-t border-slate-200 shadow-[0_-4px_20px_rgba(15,23,42,0.06)] safe-area-bottom">
-    <div class="grid grid-cols-4 px-2 pt-1.5">
+    <div class="grid grid-cols-3 px-2 pt-1.5">
       <button onclick="focusSearchInput()" class="flex flex-col items-center justify-center py-1 text-emerald-700 font-bold active:scale-95 transition">
         <i class="fa-solid fa-magnifying-glass text-base"></i>
         <span class="text-[10px] mt-0.5">Search</span>
@@ -267,12 +267,8 @@
       <button onclick="reopenActiveVoucher()" class="relative flex flex-col items-center justify-center py-1 text-slate-500 hover:text-emerald-700 font-medium active:scale-95 transition">
         <i class="fa-solid fa-ticket text-base"></i>
         <span class="text-[10px] mt-0.5">My Voucher</span>
-        <span id="mobActiveVoucherDot" class="hidden absolute top-1 right-6 w-2.5 h-2.5 rounded-full bg-emerald-500 ring-2 ring-white animate-pulse"></span>
+        <span id="mobActiveVoucherDot" class="hidden absolute top-1 right-8 w-2.5 h-2.5 rounded-full bg-emerald-500 ring-2 ring-white animate-pulse"></span>
       </button>
-      <a href="/pharmacy/" class="flex flex-col items-center justify-center py-1 text-slate-500 hover:text-emerald-700 font-medium active:scale-95 transition">
-        <i class="fa-solid fa-mortar-pestle text-base"></i>
-        <span class="text-[10px] mt-0.5">Pharmacist</span>
-      </a>
     </div>
   </nav>
 
