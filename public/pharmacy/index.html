@@ -2,16 +2,20 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
   <title>MedFinder Ethiopia - Pharmacy Studio (PWA)</title>
 
   <!-- PWA & Mobile Meta Tags -->
   <link rel="manifest" href="/pharmacy/manifest.json">
   <meta name="theme-color" content="#059669">
+  <meta name="mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <meta name="apple-mobile-web-app-title" content="MedFinder Studio">
   <link rel="apple-touch-icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 192 192'><rect width='192' height='192' rx='40' fill='%23059669'/><path d='M96 40 v112 M40 96 h112' stroke='white' stroke-width='24' stroke-linecap='round'/></svg>">
+
+  <!-- Telegram WebApp SDK (for seamless 1-Click Magic Key opening inside Telegram) -->
+  <script src="https://telegram.org/js/telegram-web-app.js"></script>
 
   <!-- CDNs: Tailwind, SheetJS, FontAwesome -->
   <script src="https://cdn.tailwindcss.com"></script>
@@ -41,9 +45,27 @@
     body {
       font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
       -webkit-tap-highlight-color: transparent;
+      overscroll-behavior-y: none;
     }
     .hide-scrollbar::-webkit-scrollbar { display: none; }
     .hide-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+    .safe-area-bottom {
+      padding-bottom: calc(0.5rem + env(safe-area-inset-bottom, 0px));
+    }
+    .main-mobile-pad {
+      padding-bottom: calc(5.5rem + env(safe-area-inset-bottom, 0px));
+    }
+    @media (min-width: 768px) {
+      .main-mobile-pad {
+        padding-bottom: 2rem;
+      }
+    }
+    /* Prevent iOS auto-zoom on form inputs while keeping desktop compact */
+    @media (max-width: 640px) {
+      input[type="text"], input[type="number"], input[type="tel"], select, textarea {
+        font-size: 16px !important;
+      }
+    }
   </style>
 </head>
 <body class="bg-slate-50 text-slate-800 antialiased min-h-screen flex flex-col">
@@ -52,66 +74,66 @@
   <!-- TOP NAVIGATION & STATUS BAR                                    -->
   <!-- ============================================================== -->
   <header class="bg-slate-900 text-white sticky top-0 z-40 shadow-md">
-    <div class="max-w-7xl mx-auto px-4 py-3 flex items-center justify-between">
+    <div class="max-w-7xl mx-auto px-3 sm:px-4 py-2.5 sm:py-3 flex items-center justify-between gap-2">
       
       <!-- Logo & PWA Badge -->
-      <div class="flex items-center space-x-3">
-        <a href="/pharmacy" class="flex items-center space-x-2.5">
-          <div class="w-10 h-10 rounded-xl bg-gradient-to-tr from-emerald-600 to-teal-500 flex items-center justify-center text-white shadow-md">
-            <i class="fa-solid fa-mortar-pestle text-lg"></i>
+      <div class="flex items-center space-x-2.5 min-w-0">
+        <a href="/pharmacy" class="flex items-center space-x-2.5 min-w-0">
+          <div class="w-9 h-9 sm:w-10 sm:h-10 rounded-xl bg-gradient-to-tr from-emerald-600 to-teal-500 flex items-center justify-center text-white shadow-md shrink-0">
+            <i class="fa-solid fa-mortar-pestle text-base sm:text-lg"></i>
           </div>
-          <div>
+          <div class="min-w-0">
             <div class="flex items-center gap-1.5">
-              <span class="font-extrabold text-base tracking-tight text-white">MedFinder</span>
-              <span class="text-[10px] font-bold bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 px-2 py-0.5 rounded-full uppercase tracking-wider">Studio PWA</span>
+              <span class="font-extrabold text-sm sm:text-base tracking-tight text-white truncate">MedFinder</span>
+              <span class="text-[9px] sm:text-[10px] font-bold bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 px-1.5 sm:px-2 py-0.5 rounded-full uppercase tracking-wider shrink-0">Studio</span>
             </div>
-            <p class="text-[11px] text-slate-400">Ethiopia Pharmacy Counter Portal</p>
+            <p class="text-[10px] sm:text-[11px] text-slate-400 truncate">Ethiopia Pharmacy Counter</p>
           </div>
         </a>
       </div>
 
       <!-- Right Header Actions (Online Status, Install PWA, Auth Info) -->
-      <div class="flex items-center space-x-2">
+      <div class="flex items-center space-x-1.5 sm:space-x-2 shrink-0">
         <!-- Online/Offline Indicator -->
-        <span id="connectionBadge" class="hidden sm:inline-flex items-center gap-1 text-[11px] font-medium px-2 py-0.5 rounded-full bg-emerald-950 text-emerald-400 border border-emerald-800">
+        <span id="connectionBadge" class="inline-flex items-center gap-1 text-[10px] sm:text-[11px] font-medium px-2 py-0.5 rounded-full bg-emerald-950 text-emerald-400 border border-emerald-800">
           <span class="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span>
-          <span>Online</span>
+          <span class="hidden xs:inline sm:inline">Online</span>
         </span>
 
         <!-- PWA Install Button (Prompted if available) -->
-        <button id="pwaInstallBtn" onclick="installPWA()" class="hidden bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold px-3 py-1.5 rounded-lg shadow transition items-center gap-1.5">
-          <i class="fa-solid fa-download text-[11px]"></i>
-          <span>Install App</span>
+        <button id="pwaInstallBtn" onclick="installPWA()" class="hidden bg-emerald-600 hover:bg-emerald-500 active:scale-95 text-white text-[11px] sm:text-xs font-bold px-2.5 sm:px-3 py-1.5 rounded-lg shadow transition items-center gap-1">
+          <i class="fa-solid fa-download text-[10px]"></i>
+          <span>Install</span>
         </button>
 
         <!-- Authenticated User Profile Dropdown / Logout -->
-        <div id="authHeaderControls" class="hidden items-center space-x-2">
+        <div id="authHeaderControls" class="hidden flex items-center space-x-1.5 sm:space-x-2">
           <div class="text-right hidden md:block">
             <span id="headerPharmName" class="text-xs font-bold text-white block">Pharmacy Partner</span>
             <span id="headerSubCity" class="text-[10px] text-emerald-400">Addis Ababa</span>
           </div>
-          <button onclick="logoutPharmacy()" title="Sign Out" class="text-xs text-slate-300 hover:text-white bg-slate-800 hover:bg-slate-700 p-2 rounded-lg transition">
+          <button onclick="logoutPharmacy()" title="Sign Out" class="text-xs text-slate-300 hover:text-white bg-slate-800 hover:bg-slate-700 active:scale-95 p-2 rounded-lg transition">
             <i class="fa-solid fa-arrow-right-from-bracket"></i>
           </button>
         </div>
 
         <!-- Back to Public Medicine Locator link -->
-        <a href="/" target="_blank" title="Open Patient Search Locator" class="text-xs text-slate-400 hover:text-slate-200 px-2.5 py-1.5 rounded-lg border border-slate-800 hover:bg-slate-800 transition flex items-center gap-1">
-          <i class="fa-solid fa-magnifying-glass text-[10px]"></i>
-          <span class="hidden sm:inline">Patient Search</span>
+        <a href="/find/" title="Open Patient Search Radar" class="text-xs text-slate-300 hover:text-white px-2.5 py-1.5 rounded-lg border border-slate-700 hover:bg-slate-800 transition flex items-center gap-1">
+          <i class="fa-solid fa-magnifying-glass text-[10px] text-emerald-400"></i>
+          <span class="hidden sm:inline">Patient Radar</span>
         </a>
       </div>
     </div>
   </header>
 
   <!-- OFFLINE FLOATING WARNING BANNER (Shows when network drops) -->
-  <div id="offlineNotice" class="hidden bg-amber-500 text-slate-950 text-xs font-bold py-1.5 px-4 text-center sticky top-[57px] z-30 shadow-sm flex items-center justify-center gap-2">
+  <div id="offlineNotice" class="hidden bg-amber-500 text-slate-950 text-xs font-bold py-1.5 px-4 text-center sticky top-[52px] sm:top-[57px] z-30 shadow-sm flex items-center justify-center gap-2">
     <i class="fa-solid fa-wifi"></i>
-    <span>Working Offline: Local shelf cache active. Changes will synchronize when connection restores.</span>
+    <span>Working Offline: Local shelf cache active.</span>
   </div>
 
   <!-- MAIN CONTAINER -->
-  <main class="flex-1 max-w-7xl w-full mx-auto p-4 md:p-6 space-y-6">
+  <main class="flex-1 max-w-7xl w-full mx-auto p-3 sm:p-4 md:p-6 space-y-4 sm:space-y-6 main-mobile-pad">
 
     <!-- ============================================================== -->
     <!-- VIEW 1: AUTHENTICATION CONTAINER (PASSWORDLESS & 1-CLICK KEY) -->
@@ -249,36 +271,36 @@
     <section id="studioDashboard" class="hidden space-y-6">
 
       <!-- TOP PHARMACY HERO CARD -->
-      <div class="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm flex flex-wrap items-center justify-between gap-4">
-        <div class="flex items-center space-x-4">
-          <div class="w-14 h-14 rounded-2xl bg-emerald-100 text-emerald-700 flex items-center justify-center text-2xl shadow-inner">
+      <div class="bg-white p-4 sm:p-6 rounded-2xl border border-slate-200 shadow-sm flex flex-col sm:flex-row sm:flex-wrap items-start sm:items-center justify-between gap-3 sm:gap-4">
+        <div class="flex items-start sm:items-center space-x-3 sm:space-x-4 w-full sm:w-auto">
+          <div class="w-12 h-12 sm:w-14 sm:h-14 rounded-2xl bg-emerald-100 text-emerald-700 flex items-center justify-center text-xl sm:text-2xl shadow-inner shrink-0">
             <i class="fa-solid fa-clinic-medical"></i>
           </div>
-          <div>
-            <div class="flex flex-wrap items-center gap-2">
-              <h1 id="dashPharmName" class="text-lg md:text-xl font-extrabold text-slate-900 tracking-tight">Active Pharmacy</h1>
-              <span id="dashEfdaBadge" class="text-xs bg-emerald-100 text-emerald-800 font-bold px-2.5 py-0.5 rounded-full flex items-center gap-1">
-                <i class="fa-solid fa-shield-halved text-[10px]"></i> EFDA Verified
+          <div class="min-w-0 flex-1">
+            <div class="flex flex-wrap items-center gap-1.5 sm:gap-2">
+              <h1 id="dashPharmName" class="text-base sm:text-lg md:text-xl font-extrabold text-slate-900 tracking-tight truncate">Active Pharmacy</h1>
+              <span id="dashEfdaBadge" class="text-[10px] sm:text-xs bg-emerald-100 text-emerald-800 font-bold px-2 py-0.5 rounded-full flex items-center gap-1 shrink-0">
+                <i class="fa-solid fa-shield-halved text-[9px] sm:text-[10px]"></i> EFDA Verified
               </span>
-              <span id="dashTrustBadge" class="text-xs bg-amber-50 text-amber-800 border border-amber-200 font-bold px-2.5 py-0.5 rounded-full">
-                ★ 98% Trust Score
+              <span id="dashTrustBadge" class="text-[10px] sm:text-xs bg-amber-50 text-amber-800 border border-amber-200 font-bold px-2 py-0.5 rounded-full shrink-0">
+                ★ 98% Trust
               </span>
             </div>
-            <p class="text-xs text-slate-500 mt-1 flex flex-wrap items-center gap-1.5">
+            <p class="text-[11px] sm:text-xs text-slate-500 mt-1 flex flex-wrap items-center gap-x-1.5 gap-y-1">
               <span>📍 <span id="dashSubCity">Addis Ababa</span></span>
               <span>•</span>
-              <span id="pharmGpsCoordBadge" class="font-mono text-emerald-800 bg-emerald-50 px-2 py-0.5 rounded-md border border-emerald-200">GPS: Checking...</span>
-              <span>•</span>
-              <span>License: <strong id="dashLicenseTxt" class="font-mono text-slate-700">EFDA-AA-2025</strong></span>
-              <span>•</span>
-              <span>TIN: <span id="dashTinTxt" class="font-mono text-slate-700">—</span></span>
+              <span id="pharmGpsCoordBadge" class="font-mono text-[10px] sm:text-xs text-emerald-800 bg-emerald-50 px-2 py-0.5 rounded-md border border-emerald-200">GPS: Checking...</span>
+              <span class="hidden sm:inline">•</span>
+              <span class="text-[10px] sm:text-xs">License: <strong id="dashLicenseTxt" class="font-mono text-slate-700">EFDA-AA-2025</strong></span>
+              <span class="hidden sm:inline">•</span>
+              <span class="hidden sm:inline text-[10px] sm:text-xs">TIN: <span id="dashTinTxt" class="font-mono text-slate-700">—</span></span>
             </p>
           </div>
         </div>
 
         <!-- Quick Summary Metrics & GPS Lock Button -->
-        <div class="flex flex-wrap items-center gap-2">
-          <button id="pharmLockGpsBtn" onclick="requestPharmacyCounterGps()" class="px-3.5 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 active:scale-95 text-white text-xs font-bold flex items-center gap-2 shadow-sm transition">
+        <div class="grid grid-cols-3 sm:flex sm:flex-wrap items-center gap-2 w-full sm:w-auto pt-2 sm:pt-0 border-t sm:border-t-0 border-slate-100">
+          <button id="pharmLockGpsBtn" onclick="requestPharmacyCounterGps()" class="col-span-3 sm:col-span-1 px-3.5 py-2.5 sm:py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 active:scale-95 text-white text-xs font-bold flex items-center justify-center gap-2 shadow-sm transition">
             <span class="relative flex h-2 w-2">
               <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-200 opacity-75"></span>
               <span class="relative inline-flex rounded-full h-2 w-2 bg-white"></span>
@@ -287,147 +309,162 @@
             <span id="pharmLockGpsBtnText">Update Counter GPS</span>
           </button>
 
-          <div class="bg-slate-50 px-3.5 py-2 rounded-xl border border-slate-200 text-right">
-            <span class="text-[10px] text-slate-400 uppercase font-semibold block">Total Catalog</span>
-            <strong id="dashShelfCount" class="text-base font-extrabold text-slate-900">0 Items</strong>
+          <div class="col-span-1 bg-slate-50 px-3 py-1.5 sm:px-3.5 sm:py-2 rounded-xl border border-slate-200 text-center sm:text-right">
+            <span class="text-[9px] sm:text-[10px] text-slate-400 uppercase font-semibold block">Shelf Stock</span>
+            <strong id="dashShelfCount" class="text-xs sm:text-base font-extrabold text-slate-900">0 Items</strong>
           </div>
-          <div class="bg-slate-50 px-3.5 py-2 rounded-xl border border-slate-200 text-right">
-            <span class="text-[10px] text-slate-400 uppercase font-semibold block">Compliance</span>
-            <strong id="dashStrikesTxt" class="text-base font-extrabold text-emerald-600">0 / 3 Strikes</strong>
+          <div class="col-span-2 sm:col-span-1 bg-slate-50 px-3 py-1.5 sm:px-3.5 sm:py-2 rounded-xl border border-slate-200 text-center sm:text-right">
+            <span class="text-[9px] sm:text-[10px] text-slate-400 uppercase font-semibold block">EFDA Standing</span>
+            <strong id="dashStrikesTxt" class="text-xs sm:text-base font-extrabold text-emerald-600">0 / 3 Strikes</strong>
           </div>
         </div>
       </div>
 
       <!-- FULL-WIDTH FLASHING HIGH PRIORITY ORDER ALERT BANNER (Retail POS Siren) -->
-      <div id="urgentCounterAlarmBanner" class="hidden bg-rose-600 text-white p-3.5 rounded-2xl shadow-lg border border-rose-500 flex flex-wrap items-center justify-between gap-3 animate-pulse">
-        <div class="flex items-center gap-3">
-          <div class="w-10 h-10 rounded-xl bg-white text-rose-600 flex items-center justify-center text-lg font-black shadow-inner">
+      <div id="urgentCounterAlarmBanner" class="hidden bg-rose-600 text-white p-3.5 rounded-2xl shadow-lg border border-rose-500 flex flex-col sm:flex-row sm:items-center justify-between gap-3 animate-pulse">
+        <div class="flex items-start sm:items-center gap-3">
+          <div class="w-10 h-10 rounded-xl bg-white text-rose-600 flex items-center justify-center text-lg font-black shadow-inner shrink-0">
             <i class="fa-solid fa-bell animate-bounce"></i>
           </div>
           <div>
-            <h4 class="font-black text-sm text-white">🚨 INCOMING 60-MIN MEDICINE HOLD WAITING!</h4>
-            <p id="urgentAlarmDesc" class="text-xs text-rose-100">A customer locked medicine on your shelf. Please confirm stock immediately before they travel.</p>
+            <h4 class="font-black text-xs sm:text-sm text-white">🚨 INCOMING 60-MIN MEDICINE HOLD WAITING!</h4>
+            <p id="urgentAlarmDesc" class="text-[11px] sm:text-xs text-rose-100 leading-snug mt-0.5">A customer locked medicine on your shelf. Please confirm stock immediately before they travel.</p>
           </div>
         </div>
-        <div class="flex items-center gap-2">
-          <button onclick="switchStudioTab('vouchers')" class="bg-white text-rose-700 hover:bg-rose-50 font-black text-xs px-4 py-2 rounded-xl shadow transition">
+        <div class="flex items-center gap-2 w-full sm:w-auto">
+          <button onclick="switchStudioTab('vouchers')" class="flex-1 sm:flex-initial bg-white text-rose-700 hover:bg-rose-50 active:scale-95 font-black text-xs px-4 py-2.5 rounded-xl shadow transition text-center">
             View & Confirm Hold
           </button>
-          <button onclick="toggleAlarmMute()" id="muteAlarmBtn" class="bg-rose-700 hover:bg-rose-800 text-white text-xs px-3 py-2 rounded-xl transition flex items-center gap-1.5" title="Mute/Unmute Chime">
+          <button onclick="toggleAlarmMute()" id="muteAlarmBtn" class="bg-rose-700 hover:bg-rose-800 active:scale-95 text-white text-xs px-3 py-2.5 rounded-xl transition flex items-center justify-center gap-1.5 shrink-0" title="Mute/Unmute Chime">
             <i id="muteAlarmIcon" class="fa-solid fa-volume-high"></i>
             <span id="muteAlarmText">Mute</span>
           </button>
         </div>
       </div>
 
-      <!-- STUDIO TABS NAVIGATION -->
-      <div class="flex space-x-2 border-b border-slate-200 overflow-x-auto hide-scrollbar">
-        <button onclick="switchStudioTab('inventory')" id="tabNavInventory" class="px-4 py-2.5 text-xs font-bold border-b-2 border-emerald-600 text-emerald-700 whitespace-nowrap transition flex items-center gap-1.5">
+      <!-- STUDIO TABS NAVIGATION (Horizontal Pill Bar on Mobile + Tab Bar on Desktop) -->
+      <div class="flex space-x-1.5 sm:space-x-2 border-b border-slate-200 overflow-x-auto hide-scrollbar -mx-3 px-3 sm:mx-0 sm:px-0">
+        <button onclick="switchStudioTab('inventory')" id="tabNavInventory" class="px-3.5 sm:px-4 py-2.5 text-xs font-bold border-b-2 border-emerald-600 text-emerald-700 whitespace-nowrap transition flex items-center gap-1.5">
           <i class="fa-solid fa-boxes-stacked"></i>
-          <span>Shelf Inventory & Pricing</span>
+          <span>Shelf Stock</span>
         </button>
-        <button onclick="switchStudioTab('vouchers')" id="tabNavVouchers" class="relative px-4 py-2.5 text-xs font-semibold border-b-2 border-transparent text-slate-500 hover:text-slate-900 whitespace-nowrap transition flex items-center gap-1.5">
+        <button onclick="switchStudioTab('vouchers')" id="tabNavVouchers" class="relative px-3.5 sm:px-4 py-2.5 text-xs font-semibold border-b-2 border-transparent text-slate-500 hover:text-slate-900 whitespace-nowrap transition flex items-center gap-1.5">
           <i class="fa-solid fa-ticket"></i>
-          <span>Hold Vouchers & Orders</span>
+          <span>Hold Vouchers</span>
           <span id="navPendingHoldsBadge" class="hidden px-2 py-0.5 rounded-full bg-rose-600 text-white font-extrabold text-[10px] animate-pulse">0 Pending</span>
         </button>
-        <button onclick="switchStudioTab('broadcasts')" id="tabNavBroadcasts" class="px-4 py-2.5 text-xs font-semibold border-b-2 border-transparent text-slate-500 hover:text-slate-900 whitespace-nowrap transition flex items-center gap-1.5">
-          <i class="fa-solid fa-tower-broadcast text-amber-500"></i>
-          <span>Patient Broadcast Inquiries</span>
+        <button onclick="switchStudioTab('medsupply')" id="tabNavMedsupply" class="px-3.5 sm:px-4 py-2.5 text-xs font-semibold border-b-2 border-transparent text-slate-500 hover:text-slate-900 whitespace-nowrap transition flex items-center gap-1.5">
+          <i class="fa-solid fa-truck-ramp-box text-indigo-600"></i>
+          <span>MedSupply B2B</span>
+          <span class="text-[9px] bg-indigo-100 text-indigo-800 font-extrabold px-1.5 py-0.5 rounded uppercase">Restock</span>
         </button>
-        <button onclick="switchStudioTab('regulatory')" id="tabNavRegulatory" class="px-4 py-2.5 text-xs font-semibold border-b-2 border-transparent text-slate-500 hover:text-slate-900 whitespace-nowrap transition flex items-center gap-1.5">
-          <i class="fa-solid fa-scale-balanced"></i>
-          <span>EFDA & Telegram Alerts</span>
-        </button>
-        <button onclick="switchStudioTab('analytics')" id="tabNavAnalytics" class="px-4 py-2.5 text-xs font-semibold border-b-2 border-transparent text-slate-500 hover:text-slate-900 whitespace-nowrap transition flex items-center gap-1.5">
+        <button onclick="switchStudioTab('analytics')" id="tabNavAnalytics" class="px-3.5 sm:px-4 py-2.5 text-xs font-semibold border-b-2 border-transparent text-slate-500 hover:text-slate-900 whitespace-nowrap transition flex items-center gap-1.5">
           <i class="fa-solid fa-chart-line text-indigo-500"></i>
-          <span>Demand Radar & Shortages</span>
+          <span>Demand Radar</span>
           <span id="navAnalyticsTierBadge" class="text-[9px] bg-slate-100 text-slate-600 font-bold px-1.5 py-0.2 rounded uppercase">Basic</span>
         </button>
-        <button onclick="switchStudioTab('medsupply')" id="tabNavMedsupply" class="px-4 py-2.5 text-xs font-semibold border-b-2 border-transparent text-slate-500 hover:text-slate-900 whitespace-nowrap transition flex items-center gap-1.5">
-          <i class="fa-solid fa-truck-ramp-box text-indigo-600"></i>
-          <span>MedSupply B2B (Restock)</span>
-          <span class="text-[9px] bg-indigo-100 text-indigo-800 font-extrabold px-1.5 py-0.5 rounded uppercase">2% Fee</span>
+        <button onclick="switchStudioTab('broadcasts')" id="tabNavBroadcasts" class="px-3.5 sm:px-4 py-2.5 text-xs font-semibold border-b-2 border-transparent text-slate-500 hover:text-slate-900 whitespace-nowrap transition flex items-center gap-1.5">
+          <i class="fa-solid fa-tower-broadcast text-amber-500"></i>
+          <span>Patient Pings</span>
+        </button>
+        <button onclick="switchStudioTab('regulatory')" id="tabNavRegulatory" class="px-3.5 sm:px-4 py-2.5 text-xs font-semibold border-b-2 border-transparent text-slate-500 hover:text-slate-900 whitespace-nowrap transition flex items-center gap-1.5">
+          <i class="fa-solid fa-scale-balanced"></i>
+          <span>EFDA & Alerts</span>
         </button>
       </div>
 
       <!-- ============================================================ -->
       <!-- TAB 1: SHELF INVENTORY & PRICING LEDGER                      -->
       <!-- ============================================================ -->
-      <div id="panelInventory" class="space-y-6">
+      <div id="panelInventory" class="space-y-4 sm:space-y-6">
 
-        <!-- 3 REGISTRATION METHODS CARDS -->
-        <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <!-- 3 REGISTRATION METHODS CARDS (Compact horizontal action cards on mobile, 3-col grid on desktop) -->
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-3 sm:gap-4">
           
           <!-- Method 1: 1-Click Master Checklist -->
-          <div class="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm flex flex-col justify-between space-y-4">
-            <div>
-              <div class="w-10 h-10 rounded-xl bg-emerald-50 text-emerald-700 flex items-center justify-center text-lg mb-3">
+          <div class="bg-white p-4 sm:p-5 rounded-2xl border border-slate-200 shadow-sm flex flex-col justify-between space-y-3 sm:space-y-4">
+            <div class="flex md:block items-start gap-3">
+              <div class="w-10 h-10 rounded-xl bg-emerald-50 text-emerald-700 flex items-center justify-center text-lg md:mb-3 shrink-0">
                 <i class="fa-solid fa-list-check"></i>
               </div>
-              <h3 class="font-bold text-sm text-slate-900">1-Click Master Catalog</h3>
-              <p class="text-xs text-slate-500 mt-1">
-                Select from Ethiopia's top 15 essential medicines (Amoxicillin, Insulin, Paracetamol, etc.) and save immediately.
-              </p>
+              <div>
+                <h3 class="font-bold text-sm text-slate-900">1-Click Master Catalog</h3>
+                <p class="text-xs text-slate-500 mt-0.5 sm:mt-1 leading-relaxed">
+                  Select from Ethiopia's top 15 essential medicines (Amoxicillin, Insulin, Ventolin, etc.) and save immediately.
+                </p>
+              </div>
             </div>
-            <button onclick="openMasterChecklistModal()" class="w-full bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold py-2.5 rounded-xl transition shadow-sm flex items-center justify-center space-x-1.5">
+            <button onclick="openMasterChecklistModal()" class="w-full bg-emerald-600 hover:bg-emerald-700 active:scale-98 text-white text-xs font-bold py-2.5 rounded-xl transition shadow-sm flex items-center justify-center space-x-1.5">
               <i class="fa-solid fa-wand-magic-sparkles"></i>
               <span>Select from Catalog</span>
             </button>
           </div>
 
           <!-- Method 2: Single Medicine Direct Add -->
-          <div class="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm flex flex-col justify-between space-y-4">
-            <div>
-              <div class="w-10 h-10 rounded-xl bg-sky-50 text-sky-700 flex items-center justify-center text-lg mb-3">
+          <div class="bg-white p-4 sm:p-5 rounded-2xl border border-slate-200 shadow-sm flex flex-col justify-between space-y-3 sm:space-y-4">
+            <div class="flex md:block items-start gap-3">
+              <div class="w-10 h-10 rounded-xl bg-sky-50 text-sky-700 flex items-center justify-center text-lg md:mb-3 shrink-0">
                 <i class="fa-solid fa-circle-plus"></i>
               </div>
-              <h3 class="font-bold text-sm text-slate-900">Add Single Medicine</h3>
-              <p class="text-xs text-slate-500 mt-1">
-                Manually enter a specialty brand, dosage, generic classification, and your locked retail price in ETB.
-              </p>
+              <div>
+                <h3 class="font-bold text-sm text-slate-900">Add Single Medicine</h3>
+                <p class="text-xs text-slate-500 mt-0.5 sm:mt-1 leading-relaxed">
+                  Manually enter a specialty brand, dosage, generic classification, and your locked retail price in ETB.
+                </p>
+              </div>
             </div>
-            <button onclick="openSingleAddModal()" class="w-full bg-sky-600 hover:bg-sky-700 text-white text-xs font-bold py-2.5 rounded-xl transition shadow-sm flex items-center justify-center space-x-1.5">
+            <button onclick="openSingleAddModal()" class="w-full bg-sky-600 hover:bg-sky-700 active:scale-98 text-white text-xs font-bold py-2.5 rounded-xl transition shadow-sm flex items-center justify-center space-x-1.5">
               <i class="fa-solid fa-plus"></i>
               <span>Add Single Medicine</span>
             </button>
           </div>
 
           <!-- Method 3: Bulk Spreadsheet / CSV Upload -->
-          <div class="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm flex flex-col justify-between space-y-4">
-            <div>
-              <div class="w-10 h-10 rounded-xl bg-amber-50 text-amber-700 flex items-center justify-center text-lg mb-3">
+          <div class="bg-white p-4 sm:p-5 rounded-2xl border border-slate-200 shadow-sm flex flex-col justify-between space-y-3 sm:space-y-4">
+            <div class="flex md:block items-start gap-3">
+              <div class="w-10 h-10 rounded-xl bg-amber-50 text-amber-700 flex items-center justify-center text-lg md:mb-3 shrink-0">
                 <i class="fa-solid fa-file-excel"></i>
               </div>
-              <h3 class="font-bold text-sm text-slate-900">Spreadsheet / CSV Batch</h3>
-              <p class="text-xs text-slate-500 mt-1">
-                Upload your POS export or Excel spreadsheet (.xlsx, .csv) with automatic column auto-mapping.
-              </p>
+              <div>
+                <h3 class="font-bold text-sm text-slate-900">Spreadsheet / CSV Batch</h3>
+                <p class="text-xs text-slate-500 mt-0.5 sm:mt-1 leading-relaxed">
+                  Upload your POS export or Excel spreadsheet (.xlsx, .csv) with automatic column auto-mapping.
+                </p>
+              </div>
             </div>
-            <button onclick="openCsvModal()" class="w-full bg-slate-900 hover:bg-black text-white text-xs font-bold py-2.5 rounded-xl transition shadow-sm flex items-center justify-center space-x-1.5">
+            <button onclick="openCsvModal()" class="w-full bg-slate-900 hover:bg-black active:scale-98 text-white text-xs font-bold py-2.5 rounded-xl transition shadow-sm flex items-center justify-center space-x-1.5">
               <i class="fa-solid fa-upload"></i>
               <span>Import Excel / CSV</span>
             </button>
           </div>
         </div>
 
-        <!-- LIVE SHELF TABLE -->
+        <!-- LIVE SHELF LEDGER (MOBILE CARDS + DESKTOP TABLE) -->
         <div class="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
-          <div class="p-4 bg-slate-50 border-b border-slate-200 flex flex-wrap items-center justify-between gap-3">
+          <div class="p-3.5 sm:p-4 bg-slate-50 border-b border-slate-200 flex flex-col sm:flex-row sm:items-center justify-between gap-2.5">
             <div class="flex items-center space-x-2">
               <i class="fa-solid fa-pills text-emerald-600"></i>
               <h3 class="font-bold text-sm text-slate-900">Live Shelf Inventory Ledger</h3>
               <span id="shelfLedgerBadge" class="text-[10px] font-bold bg-emerald-100 text-emerald-800 px-2 py-0.5 rounded-full">0 Items</span>
             </div>
-            <div class="flex items-center space-x-2">
-              <input type="text" id="filterInventoryInput" onkeyup="filterInventoryTable()" placeholder="Search registered shelf..." class="text-xs px-3 py-1.5 border border-slate-300 rounded-lg outline-none w-48 sm:w-64 bg-white">
-              <button onclick="loadPharmacyInventory()" class="text-xs bg-white hover:bg-slate-100 text-slate-700 font-semibold px-3 py-1.5 border border-slate-300 rounded-lg transition">
+            <div class="flex items-center space-x-2 w-full sm:w-auto">
+              <div class="relative flex-1 sm:w-64">
+                <i class="fa-solid fa-magnifying-glass absolute left-3 top-2.5 text-slate-400 text-xs"></i>
+                <input type="text" id="filterInventoryInput" onkeyup="filterInventoryTable()" placeholder="Filter shelf medicines..." class="text-xs pl-8 pr-3 py-2 border border-slate-300 rounded-xl outline-none w-full bg-white focus:ring-2 focus:ring-emerald-500">
+              </div>
+              <button onclick="loadPharmacyInventory()" class="text-xs bg-white hover:bg-slate-100 active:scale-95 text-slate-700 font-semibold px-3 py-2 border border-slate-300 rounded-xl transition shrink-0" title="Refresh Shelf">
                 <i class="fa-solid fa-rotate-right"></i>
               </button>
             </div>
           </div>
 
-          <div class="overflow-x-auto">
+          <!-- MOBILE SHELF INVENTORY CARDS (< 640px) -->
+          <div id="inventoryMobileList" class="sm:hidden divide-y divide-slate-100 bg-white">
+            <div class="p-8 text-center text-slate-400 text-xs">Loading shelf inventory...</div>
+          </div>
+
+          <!-- DESKTOP SHELF INVENTORY TABLE (>= 640px) -->
+          <div class="hidden sm:block overflow-x-auto">
             <table class="w-full text-left text-xs">
               <thead class="bg-slate-100 text-slate-600 font-semibold border-b border-slate-200">
                 <tr>
@@ -695,8 +732,13 @@
               <span class="text-[10px] text-slate-300">Feature status: Controlled by EFDA Regulatory Administration desk.</span>
             </div>
 
-            <!-- TABLE CONTENT -->
-            <div class="overflow-x-auto">
+            <!-- MOBILE DEMAND RADAR CARDS (< 640px) -->
+            <div id="pwaDemandMobileList" class="sm:hidden divide-y divide-slate-100 bg-white">
+              <div class="p-6 text-center text-slate-400 text-xs">Loading demand telemetry...</div>
+            </div>
+
+            <!-- DESKTOP TABLE CONTENT (>= 640px) -->
+            <div class="hidden sm:block overflow-x-auto">
               <table class="w-full text-left text-xs">
                 <thead class="bg-slate-50 text-slate-600 uppercase font-semibold border-b border-slate-200">
                   <tr>
@@ -724,38 +766,38 @@
       <!-- ============================================================ -->
       <!-- TAB 6: MEDSUPPLY B2B WHOLESALE RESTOCK MARKETPLACE           -->
       <!-- ============================================================ -->
-      <div id="panelMedsupply" class="hidden space-y-6">
+      <div id="panelMedsupply" class="hidden space-y-4 sm:space-y-6">
 
-        <div class="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm space-y-5">
+        <div class="bg-white p-4 sm:p-6 rounded-2xl border border-slate-200 shadow-sm space-y-4 sm:space-y-5">
           <!-- Marketplace Header -->
-          <div class="flex flex-wrap items-center justify-between gap-4 pb-4 border-b border-slate-100">
-            <div class="flex items-center space-x-3">
-              <div class="w-12 h-12 rounded-2xl bg-indigo-600 text-white flex items-center justify-center text-xl shadow-md">
+          <div class="flex flex-col sm:flex-row sm:flex-wrap items-start sm:items-center justify-between gap-3 sm:gap-4 pb-4 border-b border-slate-100">
+            <div class="flex items-start sm:items-center space-x-3">
+              <div class="w-11 h-11 sm:w-12 sm:h-12 rounded-2xl bg-indigo-600 text-white flex items-center justify-center text-lg sm:text-xl shadow-md shrink-0">
                 <i class="fa-solid fa-truck-ramp-box"></i>
               </div>
               <div>
-                <div class="flex items-center gap-2">
-                  <h2 class="text-base font-extrabold text-slate-900">MedSupply B2B Wholesale Exchange</h2>
-                  <span class="text-[10px] font-bold px-2 py-0.5 rounded-full uppercase bg-indigo-100 text-indigo-800 border border-indigo-200">
+                <div class="flex flex-wrap items-center gap-1.5 sm:gap-2">
+                  <h2 class="text-sm sm:text-base font-extrabold text-slate-900">MedSupply B2B Wholesale Exchange</h2>
+                  <span class="text-[9px] sm:text-[10px] font-bold px-2 py-0.5 rounded-full uppercase bg-indigo-100 text-indigo-800 border border-indigo-200">
                     Certified Importers
                   </span>
-                  <span class="text-[10px] font-bold px-2 py-0.5 rounded-full uppercase bg-emerald-100 text-emerald-800 border border-emerald-200">
-                    2% Platform Commission
+                  <span class="text-[9px] sm:text-[10px] font-bold px-2 py-0.5 rounded-full uppercase bg-emerald-100 text-emerald-800 border border-emerald-200">
+                    2% Fee
                   </span>
                 </div>
-                <p class="text-xs text-slate-500 mt-0.5">
+                <p class="text-xs text-slate-500 mt-0.5 leading-relaxed">
                   Restock your shelves directly from EFDA-certified importers & distributors across Addis Ababa with verified batches & fast dispatch.
                 </p>
               </div>
             </div>
 
             <!-- Sub-Navigation Toggle: Catalog vs Orders -->
-            <div class="flex items-center bg-slate-100 p-1 rounded-xl">
-              <button onclick="toggleMedSupplyView('catalog')" id="b2bViewCatalogBtn" class="px-3.5 py-1.5 rounded-lg text-xs font-bold bg-white text-indigo-700 shadow-xs transition">
+            <div class="flex items-center bg-slate-100 p-1 rounded-xl w-full sm:w-auto">
+              <button onclick="toggleMedSupplyView('catalog')" id="b2bViewCatalogBtn" class="flex-1 sm:flex-initial px-3.5 py-2 sm:py-1.5 rounded-lg text-xs font-bold bg-white text-indigo-700 shadow-xs transition text-center">
                 <i class="fa-solid fa-boxes-packing mr-1"></i> Wholesale Catalog
               </button>
-              <button onclick="toggleMedSupplyView('orders')" id="b2bViewOrdersBtn" class="px-3.5 py-1.5 rounded-lg text-xs font-semibold text-slate-600 hover:text-slate-900 transition">
-                <i class="fa-solid fa-file-invoice mr-1"></i> My Purchase Orders (<span id="b2bOrdersCount">0</span>)
+              <button onclick="toggleMedSupplyView('orders')" id="b2bViewOrdersBtn" class="flex-1 sm:flex-initial px-3.5 py-2 sm:py-1.5 rounded-lg text-xs font-semibold text-slate-600 hover:text-slate-900 transition text-center">
+                <i class="fa-solid fa-file-invoice mr-1"></i> Purchase Orders (<span id="b2bOrdersCount">0</span>)
               </button>
             </div>
           </div>
@@ -763,33 +805,32 @@
           <!-- SUB-VIEW 1: WHOLESALE CATALOG -->
           <div id="medSupplyCatalogView" class="space-y-4">
             <!-- Filter Bar -->
-            <div class="flex flex-wrap items-center justify-between gap-3 bg-slate-50 p-3 rounded-2xl border border-slate-200">
-              <div class="flex flex-wrap items-center gap-2 flex-1">
-                <div class="relative flex-1 min-w-[200px]">
-                  <i class="fa-solid fa-magnifying-glass absolute left-3 top-2.5 text-slate-400 text-xs"></i>
-                  <input type="text" id="b2bSearchInput" oninput="debounceB2bSearch()" placeholder="Search wholesale medicines, active ingredients..." class="w-full text-xs pl-8 pr-3 py-2 bg-white border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-indigo-500">
+            <div class="flex flex-col sm:flex-row sm:flex-wrap items-stretch sm:items-center justify-between gap-2.5 sm:gap-3 bg-slate-50 p-3 rounded-2xl border border-slate-200">
+              <div class="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 flex-1">
+                <div class="relative flex-1">
+                  <i class="fa-solid fa-magnifying-glass absolute left-3 top-3 sm:top-2.5 text-slate-400 text-xs"></i>
+                  <input type="text" id="b2bSearchInput" oninput="debounceB2bSearch()" placeholder="Search wholesale medicines, active ingredients..." class="w-full text-xs pl-8 pr-3 py-2.5 sm:py-2 bg-white border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-indigo-500">
                 </div>
-                <select id="b2bCategoryFilter" onchange="loadMedSupplyListings()" class="text-xs bg-white border border-slate-200 rounded-xl px-3 py-2 font-medium text-slate-700 outline-none">
-                  <option value="">All Categories</option>
-                  <option value="Respiratory">Respiratory</option>
-                  <option value="Diabetes">Diabetes</option>
-                  <option value="Antibiotics">Antibiotics</option>
-                  <option value="Cardiovascular">Cardiovascular</option>
-                  <option value="Thyroid">Thyroid</option>
-                  <option value="Pain Management">Pain Management</option>
-                </select>
-              </div>
-
-              <div class="flex items-center gap-2">
-                <button onclick="loadMedSupplyListings()" class="px-3 py-2 text-xs bg-indigo-50 text-indigo-700 hover:bg-indigo-100 rounded-xl font-bold transition flex items-center gap-1">
-                  <i class="fa-solid fa-rotate-right"></i>
-                  <span>Refresh Stock</span>
-                </button>
+                <div class="flex items-center gap-2">
+                  <select id="b2bCategoryFilter" onchange="loadMedSupplyListings()" class="flex-1 sm:flex-initial text-xs bg-white border border-slate-200 rounded-xl px-3 py-2.5 sm:py-2 font-medium text-slate-700 outline-none">
+                    <option value="">All Categories</option>
+                    <option value="Respiratory">Respiratory</option>
+                    <option value="Diabetes">Diabetes</option>
+                    <option value="Antibiotics">Antibiotics</option>
+                    <option value="Cardiovascular">Cardiovascular</option>
+                    <option value="Thyroid">Thyroid</option>
+                    <option value="Pain Management">Pain Management</option>
+                  </select>
+                  <button onclick="loadMedSupplyListings()" class="px-3 py-2.5 sm:py-2 text-xs bg-indigo-50 text-indigo-700 hover:bg-indigo-100 active:scale-95 rounded-xl font-bold transition flex items-center justify-center gap-1 shrink-0">
+                    <i class="fa-solid fa-rotate-right"></i>
+                    <span>Refresh</span>
+                  </button>
+                </div>
               </div>
             </div>
 
             <!-- Wholesale Listings Grid -->
-            <div id="b2bListingsContainer" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            <div id="b2bListingsContainer" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3.5 sm:gap-4">
               <div class="col-span-full py-12 text-center text-slate-400 text-xs">
                 Loading certified wholesale listings...
               </div>
@@ -805,7 +846,13 @@
               </button>
             </div>
 
-            <div class="overflow-x-auto rounded-2xl border border-slate-200">
+            <!-- MOBILE PURCHASE ORDERS CARDS (< 640px) -->
+            <div id="b2bOrdersMobileList" class="sm:hidden divide-y divide-slate-100 rounded-2xl border border-slate-200 bg-white overflow-hidden">
+              <div class="p-6 text-center text-slate-400 text-xs">Loading purchase orders...</div>
+            </div>
+
+            <!-- DESKTOP PURCHASE ORDERS TABLE (>= 640px) -->
+            <div class="hidden sm:block overflow-x-auto rounded-2xl border border-slate-200">
               <table class="w-full text-left text-xs">
                 <thead class="bg-slate-50 text-slate-500 font-semibold border-b border-slate-200">
                   <tr>
@@ -836,38 +883,70 @@
   </main>
 
   <!-- ============================================================== -->
+  <!-- MOBILE BOTTOM NAVIGATION BAR (Thumb-Ergonomic Counter Tabs)    -->
+  <!-- ============================================================== -->
+  <nav id="mobileBottomNav" class="hidden md:hidden fixed bottom-0 left-0 right-0 z-40 bg-white/95 backdrop-blur-md border-t border-slate-200 shadow-[0_-4px_20px_rgba(15,23,42,0.06)] safe-area-bottom">
+    <div class="grid grid-cols-5 px-1 pt-1.5">
+      <button onclick="switchStudioTab('inventory')" id="mobNavInventory" class="flex flex-col items-center justify-center py-1.5 text-emerald-700 font-bold transition active:scale-95">
+        <i class="fa-solid fa-boxes-stacked text-base"></i>
+        <span class="text-[10px] mt-0.5">Shelf</span>
+      </button>
+      <button onclick="switchStudioTab('vouchers')" id="mobNavVouchers" class="relative flex flex-col items-center justify-center py-1.5 text-slate-400 font-medium transition active:scale-95">
+        <i class="fa-solid fa-ticket text-base"></i>
+        <span class="text-[10px] mt-0.5">Holds</span>
+        <span id="mobilePendingHoldsBadge" class="hidden absolute top-0.5 right-3 min-w-[16px] h-4 px-1 rounded-full bg-rose-600 text-white font-black text-[9px] flex items-center justify-center animate-bounce shadow">0</span>
+      </button>
+      <button onclick="openSingleAddModal()" class="flex flex-col items-center justify-center py-1 text-white transition active:scale-95">
+        <div class="w-10 h-10 -mt-3 rounded-2xl bg-gradient-to-tr from-emerald-600 to-teal-500 flex items-center justify-center shadow-lg shadow-emerald-600/30 border-2 border-white">
+          <i class="fa-solid fa-plus text-sm"></i>
+        </div>
+        <span class="text-[9px] font-bold text-emerald-700 mt-0.5">Add Drug</span>
+      </button>
+      <button onclick="switchStudioTab('medsupply')" id="mobNavMedsupply" class="flex flex-col items-center justify-center py-1.5 text-slate-400 font-medium transition active:scale-95">
+        <i class="fa-solid fa-truck-ramp-box text-base"></i>
+        <span class="text-[10px] mt-0.5">Restock</span>
+      </button>
+      <button onclick="switchStudioTab('analytics')" id="mobNavAnalytics" class="flex flex-col items-center justify-center py-1.5 text-slate-400 font-medium transition active:scale-95">
+        <i class="fa-solid fa-chart-line text-base"></i>
+        <span class="text-[10px] mt-0.5">Demand</span>
+      </button>
+    </div>
+  </nav>
+
+  <!-- ============================================================== -->
   <!-- MODAL 1: 1-CLICK MASTER ESSENTIAL DRUG CHECKLIST               -->
   <!-- ============================================================== -->
-  <div id="masterChecklistModal" class="hidden fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4">
-    <div class="bg-white rounded-3xl max-w-2xl w-full max-h-[90vh] flex flex-col shadow-2xl overflow-hidden border border-slate-200">
-      <div class="p-5 border-b border-slate-100 flex items-center justify-between bg-slate-50">
+  <div id="masterChecklistModal" class="hidden fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-end sm:items-center justify-center p-0 sm:p-4">
+    <div class="bg-white rounded-t-3xl sm:rounded-3xl max-w-2xl w-full max-h-[92vh] sm:max-h-[90vh] flex flex-col shadow-2xl overflow-hidden border border-slate-200 safe-area-bottom">
+      <div class="w-10 h-1 bg-slate-300 rounded-full mx-auto mt-2.5 sm:hidden"></div>
+      <div class="p-4 sm:p-5 border-b border-slate-100 flex items-center justify-between bg-slate-50">
         <div>
           <h3 class="font-extrabold text-sm text-slate-900">Select Essential Medicines to Register</h3>
           <p class="text-xs text-slate-500">Ethiopian standard essential medicine catalog</p>
         </div>
-        <button onclick="closeModal('masterChecklistModal')" class="text-slate-400 hover:text-slate-700 text-lg px-2">
+        <button onclick="closeModal('masterChecklistModal')" class="text-slate-400 hover:text-slate-700 text-lg px-2 py-1">
           <i class="fa-solid fa-xmark"></i>
         </button>
       </div>
 
-      <div class="p-3 bg-slate-100 border-b border-slate-200 flex justify-between items-center text-xs px-5">
+      <div class="p-3 bg-slate-100 border-b border-slate-200 flex justify-between items-center text-xs px-4 sm:px-5">
         <span class="text-slate-600 font-medium">Tick medicines available in your shelf today:</span>
-        <div class="space-x-2">
+        <div class="space-x-2 shrink-0">
           <button onclick="toggleSelectAllChecklist(true)" class="text-emerald-700 hover:underline font-semibold">Select All</button>
           <span>•</span>
           <button onclick="toggleSelectAllChecklist(false)" class="text-slate-500 hover:underline">Clear All</button>
         </div>
       </div>
 
-      <div class="p-5 overflow-y-auto space-y-2 flex-1" id="masterChecklistItemsContainer">
+      <div class="p-4 sm:p-5 overflow-y-auto space-y-2 flex-1" id="masterChecklistItemsContainer">
         <!-- Rendered dynamically -->
       </div>
 
-      <div class="p-4 border-t border-slate-100 bg-slate-50 flex items-center justify-between">
-        <span class="text-xs text-slate-500">Prices are pre-filled with standard Addis Ababa ranges</span>
-        <div class="space-x-2">
-          <button onclick="closeModal('masterChecklistModal')" class="px-4 py-2 text-xs font-semibold text-slate-600 hover:bg-slate-200 rounded-lg">Cancel</button>
-          <button onclick="submitChecklistImport()" class="px-5 py-2 text-xs font-bold bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl shadow transition">Save to Shelf</button>
+      <div class="p-4 border-t border-slate-100 bg-slate-50 flex flex-col sm:flex-row sm:items-center justify-between gap-2.5">
+        <span class="text-[11px] sm:text-xs text-slate-500">Prices are pre-filled with standard Addis Ababa ranges</span>
+        <div class="flex items-center gap-2 w-full sm:w-auto">
+          <button onclick="closeModal('masterChecklistModal')" class="flex-1 sm:flex-initial px-4 py-2.5 sm:py-2 text-xs font-semibold text-slate-600 bg-slate-200/70 hover:bg-slate-200 rounded-xl">Cancel</button>
+          <button onclick="submitChecklistImport()" class="flex-1 sm:flex-initial px-5 py-2.5 sm:py-2 text-xs font-bold bg-emerald-600 hover:bg-emerald-700 active:scale-95 text-white rounded-xl shadow transition">Save to Shelf</button>
         </div>
       </div>
     </div>
@@ -876,11 +955,12 @@
   <!-- ============================================================== -->
   <!-- MODAL 2: ADD SINGLE MEDICINE                                   -->
   <!-- ============================================================== -->
-  <div id="singleAddModal" class="hidden fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4">
-    <div class="bg-white rounded-3xl max-w-md w-full p-6 shadow-2xl border border-slate-200 space-y-4">
+  <div id="singleAddModal" class="hidden fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-end sm:items-center justify-center p-0 sm:p-4">
+    <div class="bg-white rounded-t-3xl sm:rounded-3xl max-w-md w-full p-5 sm:p-6 shadow-2xl border border-slate-200 space-y-4 safe-area-bottom">
+      <div class="w-10 h-1 bg-slate-300 rounded-full mx-auto -mt-1 sm:hidden"></div>
       <div class="flex items-center justify-between pb-3 border-b border-slate-100">
         <h3 class="font-extrabold text-sm text-slate-900">Add Medicine to Counter Shelf</h3>
-        <button onclick="closeModal('singleAddModal')" class="text-slate-400 hover:text-slate-700 text-lg">
+        <button onclick="closeModal('singleAddModal')" class="text-slate-400 hover:text-slate-700 text-lg px-2">
           <i class="fa-solid fa-xmark"></i>
         </button>
       </div>
@@ -888,16 +968,16 @@
       <form onsubmit="handleSingleAddSubmit(event)" class="space-y-3 text-xs">
         <div>
           <label class="block font-medium text-slate-600 mb-1">Brand or Trade Name</label>
-          <input type="text" id="singleMedName" required placeholder="e.g. Ventolin Inhaler 100mcg" class="w-full text-xs px-3 py-2 border border-slate-300 rounded-xl outline-none focus:ring-2 focus:ring-emerald-500">
+          <input type="text" id="singleMedName" required placeholder="e.g. Ventolin Inhaler 100mcg" class="w-full text-xs px-3 py-2.5 border border-slate-300 rounded-xl outline-none focus:ring-2 focus:ring-emerald-500">
         </div>
         <div>
           <label class="block font-medium text-slate-600 mb-1">Generic Name (INN)</label>
-          <input type="text" id="singleGenericName" placeholder="e.g. Salbutamol" class="w-full text-xs px-3 py-2 border border-slate-300 rounded-xl outline-none focus:ring-2 focus:ring-emerald-500">
+          <input type="text" id="singleGenericName" placeholder="e.g. Salbutamol" class="w-full text-xs px-3 py-2.5 border border-slate-300 rounded-xl outline-none focus:ring-2 focus:ring-emerald-500">
         </div>
-        <div class="grid grid-cols-2 gap-2">
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
           <div>
             <label class="block font-medium text-slate-600 mb-1">Category</label>
-            <select id="singleCategory" class="w-full text-xs px-3 py-2 border border-slate-300 rounded-xl outline-none">
+            <select id="singleCategory" class="w-full text-xs px-3 py-2.5 border border-slate-300 rounded-xl outline-none bg-white">
               <option value="General">General</option>
               <option value="Antibiotics">Antibiotics</option>
               <option value="Diabetes">Diabetes</option>
@@ -908,13 +988,13 @@
           </div>
           <div>
             <label class="block font-medium text-slate-600 mb-1">Price (ETB)</label>
-            <input type="number" id="singlePriceETB" required min="1" step="0.5" placeholder="e.g. 250" class="w-full text-xs px-3 py-2 border border-slate-300 rounded-xl outline-none focus:ring-2 focus:ring-emerald-500 font-bold">
+            <input type="number" id="singlePriceETB" required min="1" step="0.5" placeholder="e.g. 250" class="w-full text-xs px-3 py-2.5 border border-slate-300 rounded-xl outline-none focus:ring-2 focus:ring-emerald-500 font-bold">
           </div>
         </div>
 
-        <div class="pt-3 flex justify-end space-x-2">
-          <button type="button" onclick="closeModal('singleAddModal')" class="px-4 py-2 text-xs font-semibold text-slate-600 hover:bg-slate-100 rounded-lg">Cancel</button>
-          <button type="submit" class="px-5 py-2 text-xs font-bold bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl shadow transition">Save Item</button>
+        <div class="pt-3 flex items-center gap-2">
+          <button type="button" onclick="closeModal('singleAddModal')" class="flex-1 sm:flex-initial px-4 py-2.5 text-xs font-semibold text-slate-600 bg-slate-100 hover:bg-slate-200 rounded-xl">Cancel</button>
+          <button type="submit" class="flex-1 sm:flex-initial px-5 py-2.5 text-xs font-bold bg-emerald-600 hover:bg-emerald-700 active:scale-95 text-white rounded-xl shadow transition">Save Item to Shelf</button>
         </div>
       </form>
     </div>
@@ -923,11 +1003,12 @@
   <!-- ============================================================== -->
   <!-- MODAL 3: EXCEL / CSV BATCH SPREADSHEET IMPORT                  -->
   <!-- ============================================================== -->
-  <div id="csvModal" class="hidden fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4">
-    <div class="bg-white rounded-3xl max-w-xl w-full p-6 shadow-2xl border border-slate-200 space-y-4">
+  <div id="csvModal" class="hidden fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-end sm:items-center justify-center p-0 sm:p-4">
+    <div class="bg-white rounded-t-3xl sm:rounded-3xl max-w-xl w-full p-5 sm:p-6 shadow-2xl border border-slate-200 space-y-4 safe-area-bottom">
+      <div class="w-10 h-1 bg-slate-300 rounded-full mx-auto -mt-1 sm:hidden"></div>
       <div class="flex items-center justify-between pb-3 border-b border-slate-100">
         <h3 class="font-extrabold text-sm text-slate-900">Upload Inventory Spreadsheet (.xlsx / .csv)</h3>
-        <button onclick="closeModal('csvModal')" class="text-slate-400 hover:text-slate-700 text-lg">
+        <button onclick="closeModal('csvModal')" class="text-slate-400 hover:text-slate-700 text-lg px-2">
           <i class="fa-solid fa-xmark"></i>
         </button>
       </div>
@@ -937,8 +1018,8 @@
         <div class="border-2 border-dashed border-slate-300 hover:border-emerald-500 rounded-2xl p-6 text-center cursor-pointer transition" onclick="document.getElementById('csvFileInput').click()">
           <input type="file" id="csvFileInput" accept=".csv, .xlsx, .xls" class="hidden" onchange="handleSpreadsheetSelected(event)">
           <i class="fa-solid fa-file-excel text-3xl text-emerald-600 mb-2"></i>
-          <p class="font-semibold text-slate-700">Click to choose Excel or CSV spreadsheet</p>
-          <p class="text-[11px] text-slate-400 mt-1">Supports drag & drop from computer or phone</p>
+          <p class="font-semibold text-slate-700">Tap to choose Excel or CSV spreadsheet</p>
+          <p class="text-[11px] text-slate-400 mt-1">Supports files from phone or computer</p>
         </div>
 
         <div id="csvPreviewBox" class="hidden max-h-48 overflow-y-auto border border-slate-200 rounded-xl p-2 bg-slate-50">
@@ -951,9 +1032,9 @@
         </div>
       </div>
 
-      <div class="pt-3 border-t border-slate-100 flex justify-end space-x-2">
-        <button onclick="closeModal('csvModal')" class="px-4 py-2 text-xs font-semibold text-slate-600 hover:bg-slate-100 rounded-lg">Cancel</button>
-        <button id="commitImportBtn" disabled onclick="submitDirectFileImport()" class="px-5 py-2 text-xs font-bold bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 text-white rounded-xl shadow transition">
+      <div class="pt-3 border-t border-slate-100 flex items-center gap-2">
+        <button onclick="closeModal('csvModal')" class="flex-1 sm:flex-initial px-4 py-2.5 text-xs font-semibold text-slate-600 bg-slate-100 hover:bg-slate-200 rounded-xl">Cancel</button>
+        <button id="commitImportBtn" disabled onclick="submitDirectFileImport()" class="flex-1 sm:flex-initial px-5 py-2.5 text-xs font-bold bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 text-white rounded-xl shadow transition">
           Import Medicines
         </button>
       </div>
@@ -964,8 +1045,9 @@
   <!-- ============================================================== -->
   <!-- MODAL 5: PHARMACY COUNTER GPS GUIDE MODAL                      -->
   <!-- ============================================================== -->
-  <div id="pharmGpsModal" class="hidden fixed inset-0 z-50 bg-black/70 backdrop-blur-sm flex items-center justify-center p-4">
-    <div class="bg-white rounded-3xl max-w-sm w-full p-6 shadow-2xl space-y-4 border border-slate-100 text-center animate-in fade-in zoom-in duration-150">
+  <div id="pharmGpsModal" class="hidden fixed inset-0 z-50 bg-black/70 backdrop-blur-sm flex items-end sm:items-center justify-center p-0 sm:p-4">
+    <div class="bg-white rounded-t-3xl sm:rounded-3xl max-w-sm w-full p-6 shadow-2xl space-y-4 border border-slate-100 text-center animate-in fade-in zoom-in duration-150 safe-area-bottom">
+      <div class="w-10 h-1 bg-slate-300 rounded-full mx-auto -mt-2 sm:hidden"></div>
       <div class="w-14 h-14 bg-amber-100 text-amber-700 rounded-2xl mx-auto flex items-center justify-center text-2xl shadow-inner">
         <i class="fa-solid fa-location-crosshairs"></i>
       </div>
@@ -1008,11 +1090,12 @@
   <!-- ============================================================== -->
   <!-- MODAL 6: B2B WHOLESALE RESTOCK & PURCHASE ORDER MODAL          -->
   <!-- ============================================================== -->
-  <div id="medSupplyOrderModal" class="hidden fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4">
-    <div class="bg-white rounded-3xl max-w-lg w-full max-h-[90vh] flex flex-col shadow-2xl overflow-hidden border border-slate-200 animate-in fade-in zoom-in duration-150">
-      <div class="p-5 border-b border-slate-100 flex items-center justify-between bg-indigo-50/70">
+  <div id="medSupplyOrderModal" class="hidden fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-end sm:items-center justify-center p-0 sm:p-4">
+    <div class="bg-white rounded-t-3xl sm:rounded-3xl max-w-lg w-full max-h-[92vh] sm:max-h-[90vh] flex flex-col shadow-2xl overflow-hidden border border-slate-200 animate-in fade-in zoom-in duration-150 safe-area-bottom">
+      <div class="w-10 h-1 bg-indigo-200 rounded-full mx-auto mt-2 sm:hidden"></div>
+      <div class="p-4 sm:p-5 border-b border-slate-100 flex items-center justify-between bg-indigo-50/70">
         <div class="flex items-center space-x-2.5">
-          <div class="w-9 h-9 rounded-xl bg-indigo-600 text-white flex items-center justify-center text-sm shadow-sm">
+          <div class="w-9 h-9 rounded-xl bg-indigo-600 text-white flex items-center justify-center text-sm shadow-sm shrink-0">
             <i class="fa-solid fa-file-invoice"></i>
           </div>
           <div>
@@ -1025,15 +1108,15 @@
         </button>
       </div>
 
-      <div class="p-6 overflow-y-auto space-y-4 flex-1 text-xs">
+      <div class="p-4 sm:p-6 overflow-y-auto space-y-4 flex-1 text-xs">
         <!-- Selected Item & Importer Info Card -->
         <div class="p-3.5 bg-slate-50 rounded-2xl border border-slate-200 space-y-2">
-          <div class="flex justify-between items-start">
+          <div class="flex justify-between items-start gap-2">
             <div>
               <h4 id="poModalDrugName" class="font-black text-sm text-slate-900">Medicine Name</h4>
               <p id="poModalWholesaler" class="text-xs text-indigo-700 font-semibold mt-0.5">Importer Name PLC</p>
             </div>
-            <div class="text-right">
+            <div class="text-right shrink-0">
               <span id="poModalUnitPrice" class="text-sm font-black text-slate-900">0 ETB</span>
               <span class="text-[10px] text-slate-400 block">per unit / box</span>
             </div>
@@ -1054,8 +1137,8 @@
             <span class="text-[11px] text-indigo-700 font-semibold" id="poModalMoqLabel">Min. Order: 10 units</span>
           </div>
           <div class="relative">
-            <input type="number" id="poOrderQtyInput" min="1" oninput="calculatePoPricing()" class="w-full text-base font-extrabold px-3 py-2 border border-slate-300 rounded-xl outline-none focus:ring-2 focus:ring-indigo-500 font-mono">
-            <span class="absolute right-3 top-2.5 text-xs text-slate-400 font-semibold">units</span>
+            <input type="number" id="poOrderQtyInput" min="1" oninput="calculatePoPricing()" class="w-full text-base font-extrabold px-3 py-2.5 border border-slate-300 rounded-xl outline-none focus:ring-2 focus:ring-indigo-500 font-mono">
+            <span class="absolute right-3 top-3 text-xs text-slate-400 font-semibold">units</span>
           </div>
           <p id="poMoqWarning" class="hidden text-[11px] text-rose-600 mt-1 font-semibold">
             Quantity must meet or exceed minimum order quantity.
@@ -1084,13 +1167,13 @@
         <!-- Delivery Address -->
         <div>
           <label class="block font-bold text-slate-700 mb-1">Counter Delivery Address</label>
-          <input type="text" id="poDeliveryAddressInput" placeholder="e.g. Bole Medhanialem, Next to Edna Mall" class="w-full text-xs px-3 py-2 border border-slate-300 rounded-xl outline-none focus:ring-2 focus:ring-indigo-500">
+          <input type="text" id="poDeliveryAddressInput" placeholder="e.g. Bole Medhanialem, Next to Edna Mall" class="w-full text-xs px-3 py-2.5 border border-slate-300 rounded-xl outline-none focus:ring-2 focus:ring-indigo-500">
         </div>
 
         <!-- Payment Method -->
         <div>
           <label class="block font-bold text-slate-700 mb-1">Payment Method</label>
-          <select id="poPaymentMethodSelect" class="w-full text-xs px-3 py-2 border border-slate-300 rounded-xl outline-none focus:ring-2 focus:ring-indigo-500 font-medium">
+          <select id="poPaymentMethodSelect" class="w-full text-xs px-3 py-2.5 border border-slate-300 rounded-xl outline-none focus:ring-2 focus:ring-indigo-500 font-medium bg-white">
             <option value="COD">Cash on Delivery (COD) / ካሽ ሲደርስ</option>
             <option value="TELEBIRR">Telebirr Merchant Transfer / ቴሌብር</option>
             <option value="CBE_BIRR">CBE Birr / Commercial Bank of Ethiopia</option>
@@ -1106,11 +1189,11 @@
         <div id="poOrderAlertBox" class="hidden p-3 rounded-xl text-xs"></div>
       </div>
 
-      <div class="p-4 border-t border-slate-100 bg-slate-50 flex items-center justify-between">
-        <button onclick="closeModal('medSupplyOrderModal')" class="px-4 py-2 text-xs font-semibold text-slate-600 hover:bg-slate-200 rounded-xl transition">
+      <div class="p-4 border-t border-slate-100 bg-slate-50 flex items-center gap-2">
+        <button onclick="closeModal('medSupplyOrderModal')" class="flex-1 sm:flex-initial px-4 py-2.5 text-xs font-semibold text-slate-600 bg-slate-200/70 hover:bg-slate-200 rounded-xl transition">
           Cancel
         </button>
-        <button id="poSubmitBtn" onclick="submitWholesalePurchaseOrder()" class="px-5 py-2.5 text-xs font-bold bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl shadow-md transition flex items-center gap-1.5">
+        <button id="poSubmitBtn" onclick="submitWholesalePurchaseOrder()" class="flex-1 sm:flex-initial px-5 py-2.5 text-xs font-bold bg-indigo-600 hover:bg-indigo-700 active:scale-95 text-white rounded-xl shadow-md transition flex items-center justify-center gap-1.5">
           <i class="fa-solid fa-paper-plane"></i>
           <span>Dispatch Purchase Order</span>
         </button>
@@ -1185,6 +1268,14 @@
     // --- INITIALIZATION ---
     window.addEventListener('DOMContentLoaded', async () => {
       updateNetworkStatus();
+
+      // 0. Expand Telegram WebApp if opened inside Telegram Mini App / WebView
+      if (window.Telegram && window.Telegram.WebApp) {
+        try {
+          window.Telegram.WebApp.ready();
+          window.Telegram.WebApp.expand();
+        } catch (e) {}
+      }
 
       // 1. Check if URL has ?key=... or ?token=... or ?setupToken=...
       const urlParams = new URLSearchParams(window.location.search);
@@ -1409,12 +1500,16 @@
       document.getElementById('authSection').classList.remove('hidden');
       document.getElementById('studioDashboard').classList.add('hidden');
       document.getElementById('authHeaderControls').classList.add('hidden');
+      const mobNav = document.getElementById('mobileBottomNav');
+      if (mobNav) mobNav.classList.add('hidden');
     }
 
     function activateStudioDashboard(session) {
       document.getElementById('authSection').classList.add('hidden');
       document.getElementById('studioDashboard').classList.remove('hidden');
       document.getElementById('authHeaderControls').classList.remove('hidden');
+      const mobNav = document.getElementById('mobileBottomNav');
+      if (mobNav) mobNav.classList.remove('hidden');
 
       const pharm = session.pharmacy || {};
       const acc = session.account || {};
@@ -1567,16 +1662,23 @@
 
     // --- TAB SWITCHING IN STUDIO ---
     function switchStudioTab(tab) {
+      if (window.Telegram?.WebApp?.HapticFeedback) {
+        try { window.Telegram.WebApp.HapticFeedback.impactOccurred('light'); } catch (e) {}
+      }
       const tabs = ['inventory', 'vouchers', 'broadcasts', 'regulatory', 'analytics', 'medsupply'];
       tabs.forEach(t => {
-        const panel = document.getElementById('panel' + t.charAt(0).toUpperCase() + t.slice(1));
-        const nav = document.getElementById('tabNav' + t.charAt(0).toUpperCase() + t.slice(1));
+        const cap = t.charAt(0).toUpperCase() + t.slice(1);
+        const panel = document.getElementById('panel' + cap);
+        const nav = document.getElementById('tabNav' + cap);
+        const mobNav = document.getElementById('mobNav' + cap);
         if (t === tab) {
           if (panel) panel.classList.remove('hidden');
-          if (nav) nav.className = 'px-4 py-2.5 text-xs font-bold border-b-2 border-emerald-600 text-emerald-700 whitespace-nowrap transition flex items-center gap-1.5';
+          if (nav) nav.className = 'px-3.5 sm:px-4 py-2.5 text-xs font-bold border-b-2 border-emerald-600 text-emerald-700 whitespace-nowrap transition flex items-center gap-1.5';
+          if (mobNav) mobNav.className = 'relative flex flex-col items-center justify-center py-1.5 text-emerald-700 font-bold transition active:scale-95';
         } else {
           if (panel) panel.classList.add('hidden');
-          if (nav) nav.className = 'px-4 py-2.5 text-xs font-semibold border-b-2 border-transparent text-slate-500 hover:text-slate-900 whitespace-nowrap transition flex items-center gap-1.5';
+          if (nav) nav.className = 'px-3.5 sm:px-4 py-2.5 text-xs font-semibold border-b-2 border-transparent text-slate-500 hover:text-slate-900 whitespace-nowrap transition flex items-center gap-1.5';
+          if (mobNav) mobNav.className = 'relative flex flex-col items-center justify-center py-1.5 text-slate-400 font-medium transition active:scale-95';
         }
       });
       if (tab === 'broadcasts') loadActiveBroadcasts();
@@ -1593,12 +1695,14 @@
       const subCitySelect = document.getElementById('pwaDemandSubCitySelect');
       const subCity = subCitySelect ? subCitySelect.value : (currentAuthSession?.pharmacy?.subCity || 'Bole');
       const tbody = document.getElementById('pwaDemandTableTbody');
+      const mobList = document.getElementById('pwaDemandMobileList');
       const lockedOverlay = document.getElementById('pwaDemandLockedOverlay');
       const activeBadge = document.getElementById('pwaAnalyticsActiveBadge');
       const navBadge = document.getElementById('navAnalyticsTierBadge');
 
       if (!tbody) return;
       tbody.innerHTML = `<tr><td colspan="8" class="p-6 text-center text-slate-400">Loading real-time demand telemetry...</td></tr>`;
+      if (mobList) mobList.innerHTML = `<div class="p-6 text-center text-slate-400 text-xs">Loading real-time demand telemetry...</div>`;
 
       try {
         const url = `/api/analytics/demand?pharmacyId=${encodeURIComponent(pharmacyId)}&subCity=${encodeURIComponent(subCity)}&days=14`;
@@ -1629,6 +1733,17 @@
               <td class="p-3.5 text-right"><span class="text-xs text-slate-400">Upgrade Required</span></td>
             </tr>
           `).join('');
+          if (mobList) {
+            mobList.innerHTML = teaser.map(item => `
+              <div class="p-4 opacity-40 filter blur-[1px] space-y-1">
+                <div class="flex justify-between font-bold text-xs text-slate-900">
+                  <span>${item.drugName}</span>
+                  <span class="text-emerald-800">~${Math.round(item.estimatedMissedSalesETB || 2500)} ETB</span>
+                </div>
+                <div class="text-[11px] text-slate-500">📍 ${item.subCity} • 🔒 Pro Tier</div>
+              </div>
+            `).join('');
+          }
 
           document.getElementById('pwaKpiCritical').innerText = `${teaser.filter(t => t.shortageLevel === 'CRITICAL').length} Items`;
           document.getElementById('pwaKpiSearches').innerText = '🔒 Locked';
@@ -1649,7 +1764,9 @@
 
         const items = data.items || [];
         if (items.length === 0) {
-          tbody.innerHTML = `<tr><td colspan="8" class="p-8 text-center text-slate-400 text-xs">No shortage spikes recorded for ${subCity} in the last 14 days. Demand telemetry logs automatically as patients search.</td></tr>`;
+          const emptyMsg = `No shortage spikes recorded for ${subCity} in the last 14 days. Demand telemetry logs automatically as patients search.`;
+          tbody.innerHTML = `<tr><td colspan="8" class="p-8 text-center text-slate-400 text-xs">${emptyMsg}</td></tr>`;
+          if (mobList) mobList.innerHTML = `<div class="p-8 text-center text-slate-400 text-xs">${emptyMsg}</div>`;
           document.getElementById('pwaKpiCritical').innerText = '0 Items';
           document.getElementById('pwaKpiSearches').innerText = '0 Inquiries';
           document.getElementById('pwaKpiOpportunity').innerText = '0 ETB';
@@ -1692,6 +1809,42 @@
           `;
         }).join('');
 
+        if (mobList) {
+          mobList.innerHTML = items.map(item => {
+            let badgeColor = 'bg-slate-100 text-slate-700';
+            if (item.shortageLevel === 'CRITICAL') badgeColor = 'bg-rose-100 text-rose-800 font-bold';
+            else if (item.shortageLevel === 'HIGH') badgeColor = 'bg-amber-100 text-amber-800 font-bold';
+            else if (item.shortageLevel === 'MODERATE') badgeColor = 'bg-blue-100 text-blue-800 font-semibold';
+
+            return `
+              <div class="p-4 space-y-2.5">
+                <div class="flex items-start justify-between gap-2">
+                  <div>
+                    <div class="flex items-center gap-1.5 flex-wrap">
+                      <h4 class="font-extrabold text-xs text-slate-900">${item.drugName}</h4>
+                      <span class="${badgeColor} px-2 py-0.5 rounded text-[9px]">${item.shortageLevel}</span>
+                    </div>
+                    <p class="text-[11px] text-slate-500 mt-0.5">📍 ${item.subCity} • <strong>${item.searchCount} searches</strong></p>
+                  </div>
+                  <div class="text-right shrink-0">
+                    <div class="text-xs font-black text-emerald-700">${(item.estimatedMissedSalesETB || 0).toLocaleString()} ETB</div>
+                    <span class="text-[9px] text-slate-400">missed sales</span>
+                  </div>
+                </div>
+                <div class="flex items-center justify-between pt-1">
+                  <span class="text-[11px] ${item.stockingPharmaciesCount === 0 ? 'text-rose-600 font-bold' : 'text-slate-600'}">
+                    ${item.stockingPharmaciesCount === 0 ? '⚠️ 0 Pharmacies Stocking' : `${item.stockingPharmaciesCount} pharmacies stocking`}
+                  </span>
+                  <button onclick="quickAddPwaShortage('${item.drugName}')" class="text-xs bg-emerald-600 hover:bg-emerald-700 active:scale-95 text-white font-bold px-3 py-1.5 rounded-xl transition shadow-xs flex items-center gap-1">
+                    <i class="fa-solid fa-plus text-[10px]"></i>
+                    <span>Add to Shelf</span>
+                  </button>
+                </div>
+              </div>
+            `;
+          }).join('');
+        }
+
         const criticalCount = items.filter(i => i.shortageLevel === 'CRITICAL').length;
         const totalQueries = items.reduce((acc, c) => acc + (c.searchCount || 0), 0);
         const totalOpp = items.reduce((acc, c) => acc + (c.estimatedMissedSalesETB || 0), 0);
@@ -1702,6 +1855,7 @@
 
       } catch (err) {
         tbody.innerHTML = `<tr><td colspan="8" class="p-6 text-center text-rose-500">Failed to load demand radar: ${err.message}</td></tr>`;
+        if (mobList) mobList.innerHTML = `<div class="p-6 text-center text-rose-500 text-xs">Failed to load demand radar: ${err.message}</div>`;
       }
     }
 
@@ -1722,7 +1876,9 @@
       if (!currentAuthSession || !currentAuthSession.account) return;
       const pharmacyId = currentAuthSession.account.pharmacyId;
       const tbody = document.getElementById('inventoryTableBody');
+      const mobList = document.getElementById('inventoryMobileList');
       tbody.innerHTML = `<tr><td colspan="5" class="p-8 text-center text-slate-400">Loading shelf inventory...</td></tr>`;
+      if (mobList) mobList.innerHTML = `<div class="p-8 text-center text-slate-400 text-xs">Loading shelf inventory...</div>`;
 
       try {
         const res = await fetch(`/api/pharmacy/${pharmacyId}/inventory`);
@@ -1734,18 +1890,23 @@
           renderInventoryTable(currentPharmacyInventory);
         } else {
           tbody.innerHTML = `<tr><td colspan="5" class="p-8 text-center text-slate-400">No items on shelf. Use buttons above to add medicines.</td></tr>`;
+          if (mobList) mobList.innerHTML = `<div class="p-8 text-center text-slate-400 text-xs">No items on shelf. Use buttons above to add medicines.</div>`;
         }
       } catch (err) {
         tbody.innerHTML = `<tr><td colspan="5" class="p-8 text-center text-rose-500">Failed to load inventory: ${err.message}</td></tr>`;
+        if (mobList) mobList.innerHTML = `<div class="p-8 text-center text-rose-500 text-xs">Failed to load inventory: ${err.message}</div>`;
       }
     }
 
     function renderInventoryTable(items) {
       const tbody = document.getElementById('inventoryTableBody');
+      const mobList = document.getElementById('inventoryMobileList');
       const pharmacyId = currentAuthSession?.account?.pharmacyId;
 
       if (!items || items.length === 0) {
-        tbody.innerHTML = `<tr><td colspan="5" class="p-8 text-center text-slate-400 text-xs">No items currently on counter shelf. Click "1-Click Master Catalog" or "Add Single Medicine" above!</td></tr>`;
+        const emptyHtml = `No items currently on counter shelf. Tap "1-Click Master Catalog" or "Add Single Medicine" above!`;
+        tbody.innerHTML = `<tr><td colspan="5" class="p-8 text-center text-slate-400 text-xs">${emptyHtml}</td></tr>`;
+        if (mobList) mobList.innerHTML = `<div class="p-8 text-center text-slate-400 text-xs">${emptyHtml}</div>`;
         return;
       }
 
@@ -1778,6 +1939,41 @@
           </td>
         </tr>
       `).join('');
+
+      if (mobList) {
+        mobList.innerHTML = items.map(item => `
+          <div class="p-3.5 space-y-2.5">
+            <div class="flex items-start justify-between gap-2">
+              <div class="min-w-0">
+                <h4 class="font-extrabold text-xs text-slate-900 leading-snug">${item.name}</h4>
+                <p class="text-[11px] text-slate-500 mt-0.5">
+                  ${item.genericName || 'Standard Formulation'} • <span class="text-[10px] bg-slate-100 text-slate-600 px-1.5 py-0.5 rounded font-medium">${item.category || 'General'}</span>
+                </p>
+              </div>
+              <div class="text-right shrink-0">
+                <span class="font-mono font-black text-sm text-emerald-700">${item.priceETB} ETB</span>
+              </div>
+            </div>
+            <div class="flex items-center justify-between gap-2 pt-1">
+              <div class="flex items-center gap-1.5 flex-wrap">
+                <button onclick="toggleStock('${pharmacyId}', '${item.name}', ${!item.inStock})" class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold active:scale-95 transition ${item.inStock ? 'bg-emerald-100 text-emerald-800 border border-emerald-200' : 'bg-rose-100 text-rose-800 border border-rose-200'}">
+                  <span class="w-2 h-2 rounded-full ${item.inStock ? 'bg-emerald-500' : 'bg-rose-500'}"></span>
+                  <span>${item.inStock ? 'In Stock (Tap to Toggle)' : 'Out of Stock'}</span>
+                </button>
+                ${!item.inStock ? `
+                  <button onclick="openRestockModalForDrug('${encodeURIComponent(item.name)}')" class="inline-flex items-center gap-1 px-3 py-1.5 rounded-xl text-xs font-bold bg-indigo-600 text-white active:scale-95 transition shadow-xs">
+                    <i class="fa-solid fa-truck-ramp-box text-[10px]"></i>
+                    <span>Restock B2B</span>
+                  </button>
+                ` : ''}
+              </div>
+              <button onclick="deleteItem('${pharmacyId}', '${item.name}')" title="Delete from shelf" class="text-xs text-rose-500 hover:text-rose-700 p-2 rounded-xl bg-rose-50/70 active:scale-95 transition shrink-0">
+                <i class="fa-solid fa-trash"></i>
+              </button>
+            </div>
+          </div>
+        `).join('');
+      }
     }
 
     function filterInventoryTable() {
@@ -2132,6 +2328,7 @@
       const container = document.getElementById('holdsQueueContainer');
       const countBadge = document.getElementById('holdsQueueCountBadge');
       const navBadge = document.getElementById('navPendingHoldsBadge');
+      const mobBadge = document.getElementById('mobilePendingHoldsBadge');
       const alarmBanner = document.getElementById('urgentCounterAlarmBanner');
 
       try {
@@ -2150,6 +2347,10 @@
             navBadge.classList.remove('hidden');
             navBadge.innerText = `🚨 ${pendingUnacknowledged.length} Pending`;
           }
+          if (mobBadge) {
+            mobBadge.classList.remove('hidden');
+            mobBadge.innerText = `${pendingUnacknowledged.length}`;
+          }
           if (alarmBanner) {
             alarmBanner.classList.remove('hidden');
             const top = pendingUnacknowledged[0];
@@ -2158,6 +2359,7 @@
           startCounterAlarmLoop();
         } else {
           if (navBadge) navBadge.classList.add('hidden');
+          if (mobBadge) mobBadge.classList.add('hidden');
           if (alarmBanner) alarmBanner.classList.add('hidden');
           stopCounterAlarmLoop();
         }
@@ -2180,9 +2382,9 @@
             const expTime = new Date(h.expiresAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
             return `
               <div class="p-4 rounded-2xl border transition-all flex flex-col md:flex-row md:items-center justify-between gap-3 ${!isAck ? 'bg-amber-50/70 border-amber-300 shadow-sm animate-in fade-in' : 'bg-emerald-50/40 border-emerald-200'}">
-                <div class="space-y-1">
-                  <div class="flex items-center gap-2">
-                    <span class="font-mono text-base font-black px-2.5 py-0.5 rounded-lg ${!isAck ? 'bg-amber-200 text-amber-900 border border-amber-300' : 'bg-emerald-100 text-emerald-800 border border-emerald-300'}">
+                <div class="space-y-1.5">
+                  <div class="flex flex-wrap items-center gap-2">
+                    <span class="font-mono text-sm sm:text-base font-black px-2.5 py-0.5 rounded-lg ${!isAck ? 'bg-amber-200 text-amber-900 border border-amber-300' : 'bg-emerald-100 text-emerald-800 border border-emerald-300'}">
                       #${h.reservationCode}
                     </span>
                     <h4 class="font-bold text-sm text-slate-900">${h.medicineName}</h4>
@@ -2190,24 +2392,24 @@
                       ${h.lockedPriceETB} ETB
                     </span>
                   </div>
-                  <div class="flex flex-wrap items-center gap-2 text-xs text-slate-500">
+                  <div class="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-slate-500">
                     <span>⏱️ Valid until: <strong>${expTime}</strong></span>
                     <span>• Contact: <strong>${h.phone || h.patientUserId}</strong></span>
                     <span>• Status: <strong class="${isAck ? 'text-emerald-700' : 'text-amber-700 font-extrabold'}">${isAck ? '🟢 Physically Held at Counter' : '🟡 Waiting Your Shelf Confirmation'}</strong></span>
                   </div>
                 </div>
-                <div class="flex items-center gap-2 shrink-0">
+                <div class="flex items-center gap-2 w-full md:w-auto shrink-0 pt-1 md:pt-0">
                   ${!isAck ? `
-                    <button onclick="confirmHoldAction('${h.reservationCode}')" class="px-4 py-2.5 text-xs font-extrabold rounded-xl bg-emerald-600 hover:bg-emerald-700 active:scale-95 text-white transition flex items-center gap-1.5 shadow-sm">
+                    <button onclick="confirmHoldAction('${h.reservationCode}')" class="flex-1 md:flex-initial justify-center px-4 py-2.5 text-xs font-extrabold rounded-xl bg-emerald-600 hover:bg-emerald-700 active:scale-95 text-white transition flex items-center gap-1.5 shadow-sm">
                       <i class="fa-solid fa-check"></i>
-                      <span>Confirm Stock & Hold (አለ)</span>
+                      <span>Confirm Stock (አለ)</span>
                     </button>
-                    <button onclick="rejectHoldAction('${h.reservationCode}')" class="px-3.5 py-2.5 text-xs font-bold rounded-xl bg-rose-600 hover:bg-rose-700 active:scale-95 text-white transition flex items-center gap-1 shadow-sm">
+                    <button onclick="rejectHoldAction('${h.reservationCode}')" class="flex-1 md:flex-initial justify-center px-3.5 py-2.5 text-xs font-bold rounded-xl bg-rose-600 hover:bg-rose-700 active:scale-95 text-white transition flex items-center gap-1 shadow-sm">
                       <i class="fa-solid fa-xmark"></i>
                       <span>Out of Stock (አልቋል)</span>
                     </button>
                   ` : `
-                    <button onclick="fulfillFromQueue('${h.reservationCode}')" class="px-4 py-2.5 text-xs font-bold rounded-xl bg-slate-900 hover:bg-black active:scale-95 text-white transition flex items-center gap-1.5 shadow-sm">
+                    <button onclick="fulfillFromQueue('${h.reservationCode}')" class="w-full md:w-auto justify-center px-4 py-2.5 text-xs font-bold rounded-xl bg-slate-900 hover:bg-black active:scale-95 text-white transition flex items-center gap-1.5 shadow-sm">
                       <i class="fa-solid fa-circle-check text-emerald-400"></i>
                       <span>Check-In & Fulfill Voucher</span>
                     </button>
@@ -2297,14 +2499,14 @@
       if (view === 'orders') {
         catalogView.classList.add('hidden');
         ordersView.classList.remove('hidden');
-        ordBtn.className = 'px-3.5 py-1.5 rounded-lg text-xs font-bold bg-white text-indigo-700 shadow-xs transition';
-        catBtn.className = 'px-3.5 py-1.5 rounded-lg text-xs font-semibold text-slate-600 hover:text-slate-900 transition';
+        ordBtn.className = 'flex-1 sm:flex-initial px-3.5 py-2 sm:py-1.5 rounded-lg text-xs font-bold bg-white text-indigo-700 shadow-xs transition text-center';
+        catBtn.className = 'flex-1 sm:flex-initial px-3.5 py-2 sm:py-1.5 rounded-lg text-xs font-semibold text-slate-600 hover:text-slate-900 transition text-center';
         loadWholesaleOrders();
       } else {
         catalogView.classList.remove('hidden');
         ordersView.classList.add('hidden');
-        catBtn.className = 'px-3.5 py-1.5 rounded-lg text-xs font-bold bg-white text-indigo-700 shadow-xs transition';
-        ordBtn.className = 'px-3.5 py-1.5 rounded-lg text-xs font-semibold text-slate-600 hover:text-slate-900 transition';
+        catBtn.className = 'flex-1 sm:flex-initial px-3.5 py-2 sm:py-1.5 rounded-lg text-xs font-bold bg-white text-indigo-700 shadow-xs transition text-center';
+        ordBtn.className = 'flex-1 sm:flex-initial px-3.5 py-2 sm:py-1.5 rounded-lg text-xs font-semibold text-slate-600 hover:text-slate-900 transition text-center';
         loadMedSupplyListings();
       }
     }
@@ -2389,7 +2591,7 @@
                 <h4 class="font-extrabold text-sm text-slate-900 mt-1.5 leading-snug">${item.drugName}</h4>
                 <p class="text-[11px] text-slate-500">${item.genericName}</p>
               </div>
-              <div class="text-right">
+              <div class="text-right shrink-0">
                 <div class="text-base font-black text-indigo-700 font-mono">${item.wholesaleUnitPriceETB} ETB</div>
                 <div class="text-[10px] text-slate-400">per unit</div>
               </div>
@@ -2423,7 +2625,7 @@
             <div class="text-[10px] text-emerald-700 font-semibold flex items-center gap-1">
               <i class="fa-solid fa-bolt text-amber-500"></i> ${item.deliveryLeadTimeHours || 4}h same-day dispatch
             </div>
-            <button onclick="openB2bOrderModal('${item.id}')" class="px-3.5 py-1.5 text-xs font-bold bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl transition shadow-xs flex items-center gap-1">
+            <button onclick="openB2bOrderModal('${item.id}')" class="px-3.5 py-2 sm:py-1.5 text-xs font-bold bg-indigo-600 hover:bg-indigo-700 active:scale-95 text-white rounded-xl transition shadow-xs flex items-center gap-1">
               <i class="fa-solid fa-cart-shopping text-[10px]"></i>
               <span>Order Stock</span>
             </button>
@@ -2578,6 +2780,7 @@
       if (!currentAuthSession) return;
       const pharmacyId = currentAuthSession.account?.pharmacyId || currentAuthSession.pharmacy?.id;
       const tbody = document.getElementById('b2bOrdersTableTbody');
+      const mobList = document.getElementById('b2bOrdersMobileList');
       const ordersCount = document.getElementById('b2bOrdersCount');
 
       if (!tbody) return;
@@ -2591,18 +2794,23 @@
           renderWholesaleOrdersTable(data.orders);
         } else {
           tbody.innerHTML = `<tr><td colspan="9" class="p-6 text-center text-slate-400">No purchase orders placed yet.</td></tr>`;
+          if (mobList) mobList.innerHTML = `<div class="p-6 text-center text-slate-400 text-xs">No purchase orders placed yet.</div>`;
         }
       } catch (err) {
         tbody.innerHTML = `<tr><td colspan="9" class="p-6 text-center text-rose-500">Failed to load orders: ${err.message}</td></tr>`;
+        if (mobList) mobList.innerHTML = `<div class="p-6 text-center text-rose-500 text-xs">Failed to load orders: ${err.message}</div>`;
       }
     }
 
     function renderWholesaleOrdersTable(orders) {
       const tbody = document.getElementById('b2bOrdersTableTbody');
+      const mobList = document.getElementById('b2bOrdersMobileList');
       if (!tbody) return;
 
       if (!orders || orders.length === 0) {
-        tbody.innerHTML = `<tr><td colspan="9" class="p-8 text-center text-slate-400 text-xs">No purchase orders placed yet. Browse the catalog to restock your shelf.</td></tr>`;
+        const emptyHtml = `No purchase orders placed yet. Browse the catalog to restock your shelf.`;
+        tbody.innerHTML = `<tr><td colspan="9" class="p-8 text-center text-slate-400 text-xs">${emptyHtml}</td></tr>`;
+        if (mobList) mobList.innerHTML = `<div class="p-8 text-center text-slate-400 text-xs">${emptyHtml}</div>`;
         return;
       }
 
@@ -2632,6 +2840,42 @@
           </tr>
         `;
       }).join('');
+
+      if (mobList) {
+        mobList.innerHTML = orders.map(po => {
+          let statusBadge = 'bg-slate-100 text-slate-700';
+          if (po.status === 'PENDING') statusBadge = 'bg-amber-100 text-amber-800 font-bold';
+          else if (po.status === 'CONFIRMED') statusBadge = 'bg-blue-100 text-blue-800 font-bold';
+          else if (po.status === 'DISPATCHED') statusBadge = 'bg-indigo-100 text-indigo-800 font-bold animate-pulse';
+          else if (po.status === 'DELIVERED') statusBadge = 'bg-emerald-100 text-emerald-800 font-bold';
+          else if (po.status === 'CANCELLED') statusBadge = 'bg-rose-100 text-rose-800 font-semibold';
+
+          const dateStr = new Date(po.createdAt).toLocaleDateString([], { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
+
+          return `
+            <div class="p-3.5 space-y-2">
+              <div class="flex items-start justify-between gap-2">
+                <div>
+                  <div class="flex items-center gap-1.5">
+                    <span class="font-mono font-black text-xs text-slate-900">${po.poNumber}</span>
+                    <span class="${statusBadge} px-2 py-0.5 rounded-full text-[9px]">${po.status}</span>
+                  </div>
+                  <h4 class="font-bold text-xs text-indigo-900 mt-0.5">${po.drugName}</h4>
+                  <p class="text-[11px] text-slate-500">${po.wholesalerName}</p>
+                </div>
+                <div class="text-right shrink-0">
+                  <div class="font-mono font-black text-sm text-slate-900">${po.totalPriceETB.toLocaleString()} ETB</div>
+                  <span class="text-[10px] font-mono text-slate-500">${po.quantity} units</span>
+                </div>
+              </div>
+              <div class="flex items-center justify-between text-[10px] text-slate-400 pt-1 border-t border-slate-100">
+                <span>Payment: <strong class="text-slate-600">${po.paymentMethod}</strong> • Fee: ${po.platformFeeETB.toLocaleString()} ETB</span>
+                <span>${dateStr}</span>
+              </div>
+            </div>
+          `;
+        }).join('');
+      }
     }
   </script>
 </body>

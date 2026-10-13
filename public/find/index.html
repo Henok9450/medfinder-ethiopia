@@ -24,33 +24,52 @@
     body {
       font-family: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
       -webkit-tap-highlight-color: transparent;
+      overscroll-behavior-y: none;
+    }
+    .hide-scrollbar::-webkit-scrollbar { display: none; }
+    .hide-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+    .safe-area-bottom {
+      padding-bottom: calc(0.5rem + env(safe-area-inset-bottom, 0px));
+    }
+    .main-mobile-pad {
+      padding-bottom: calc(5.25rem + env(safe-area-inset-bottom, 0px));
+    }
+    @media (min-width: 640px) {
+      .main-mobile-pad {
+        padding-bottom: 1.5rem;
+      }
+    }
+    @media (max-width: 640px) {
+      input[type="text"], select {
+        font-size: 16px !important;
+      }
     }
   </style>
 </head>
 <body class="bg-slate-50 text-slate-800 min-h-screen flex flex-col">
 
   <!-- TOP APP BAR -->
-  <header class="sticky top-0 z-40 bg-white/95 backdrop-blur-md border-b border-slate-200 px-4 py-3 shadow-xs">
+  <header class="sticky top-0 z-40 bg-white/95 backdrop-blur-md border-b border-slate-200 px-3.5 sm:px-4 py-2.5 sm:py-3 shadow-xs">
     <div class="max-w-xl mx-auto flex items-center justify-between gap-2">
-      <div class="flex items-center space-x-2.5">
-        <div class="w-10 h-10 rounded-2xl bg-gradient-to-tr from-emerald-600 to-teal-500 text-white flex items-center justify-center text-lg shadow-sm shadow-emerald-600/30">
+      <div class="flex items-center space-x-2.5 min-w-0">
+        <div class="w-9 h-9 sm:w-10 sm:h-10 rounded-2xl bg-gradient-to-tr from-emerald-600 to-teal-500 text-white flex items-center justify-center text-base sm:text-lg shadow-sm shadow-emerald-600/30 shrink-0">
           <i class="fa-solid fa-prescription-bottle-medical"></i>
         </div>
-        <div>
+        <div class="min-w-0">
           <div class="flex items-center gap-1.5">
-            <h1 class="font-extrabold text-sm text-slate-900 tracking-tight">MedFinder Ethiopia</h1>
-            <span class="text-[10px] bg-emerald-100 text-emerald-800 font-bold px-1.5 py-0.2 rounded-full">የመድኃኒት አግኚ</span>
+            <h1 class="font-extrabold text-xs sm:text-sm text-slate-900 tracking-tight truncate">MedFinder Ethiopia</h1>
+            <span class="text-[9px] sm:text-[10px] bg-emerald-100 text-emerald-800 font-bold px-1.5 py-0.2 rounded-full shrink-0">የመድኃኒት አግኚ</span>
           </div>
-          <p class="text-[11px] text-slate-500">Addis Ababa Verified Medicine Radar</p>
+          <p class="text-[10px] sm:text-[11px] text-slate-500 truncate">Addis Ababa Verified Medicine Radar</p>
         </div>
       </div>
 
       <!-- Action Chips -->
-      <div class="flex items-center gap-2">
+      <div class="flex items-center gap-1.5 sm:gap-2 shrink-0">
         <!-- Install PWA Button (Hidden until install prompt available) -->
-        <button id="pwaInstallBtn" onclick="installPatientPwa()" class="hidden px-2.5 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-[11px] font-bold shadow-xs flex items-center gap-1 transition animate-bounce">
+        <button id="pwaInstallBtn" onclick="installPatientPwa()" class="hidden px-2.5 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 active:scale-95 text-white text-[11px] font-bold shadow-xs flex items-center gap-1 transition">
           <i class="fa-solid fa-download text-[10px]"></i>
-          <span>Install App</span>
+          <span>Install</span>
         </button>
 
         <!-- Telegram Bot Handoff -->
@@ -79,10 +98,10 @@
   </div>
 
   <!-- MAIN PATIENT RADAR CONTAINER -->
-  <main class="max-w-xl mx-auto w-full px-4 py-4 space-y-4 flex-1">
+  <main class="max-w-xl mx-auto w-full px-3.5 sm:px-4 py-3.5 sm:py-4 space-y-4 flex-1 main-mobile-pad">
 
     <!-- SEARCH HERO CARD -->
-    <section class="bg-gradient-to-br from-slate-900 via-slate-800 to-emerald-950 rounded-3xl p-5 text-white shadow-xl relative overflow-hidden space-y-3.5">
+    <section class="bg-gradient-to-br from-slate-900 via-slate-800 to-emerald-950 rounded-3xl p-4 sm:p-5 text-white shadow-xl relative overflow-hidden space-y-3.5">
       <div class="space-y-1">
         <span class="text-[10px] font-bold uppercase tracking-wider text-emerald-300 bg-emerald-900/60 border border-emerald-700/50 px-2.5 py-0.5 rounded-full inline-block">
           EFDA Verified Pharmacy Radar
@@ -94,31 +113,31 @@
       </div>
 
       <!-- SEARCH INPUT BAR & CAMERA SCANNER -->
-      <div class="space-y-2">
+      <div class="space-y-2.5">
         <div class="flex items-center gap-2">
-          <div class="relative flex-1 flex items-center">
+          <div class="relative flex-1 flex items-center min-w-0">
             <i class="fa-solid fa-magnifying-glass absolute left-3.5 text-slate-400 text-sm"></i>
             <input 
               type="text" 
               id="medicineInput"
-              placeholder="Type medicine (e.g. Augmentin) or snap picture..." 
+              placeholder="Medicine name (e.g. Augmentin)..." 
               onkeydown="if(event.key==='Enter') executeMedicineSearch()"
-              class="w-full bg-white/10 backdrop-blur-md text-white placeholder-slate-400 text-xs font-medium pl-10 pr-24 py-3 rounded-2xl border border-white/20 outline-none focus:ring-2 focus:ring-emerald-400 focus:bg-white/15 transition shadow-inner"
+              class="w-full bg-white/10 backdrop-blur-md text-white placeholder-slate-400 text-xs font-medium pl-9 pr-20 sm:pr-24 py-3 rounded-2xl border border-white/20 outline-none focus:ring-2 focus:ring-emerald-400 focus:bg-white/15 transition shadow-inner"
             >
             <button 
               onclick="executeMedicineSearch()"
               id="searchBtn"
-              class="absolute right-1.5 bg-emerald-500 hover:bg-emerald-400 active:bg-emerald-600 text-slate-950 text-xs font-bold px-4 py-2 rounded-xl transition flex items-center space-x-1 shadow-sm"
+              class="absolute right-1.5 bg-emerald-500 hover:bg-emerald-400 active:bg-emerald-600 text-slate-950 text-xs font-bold px-3 sm:px-4 py-2 rounded-xl transition flex items-center space-x-1 shadow-sm"
             >
               <span>Search</span>
-              <i class="fa-solid fa-arrow-right text-[10px]"></i>
+              <i class="fa-solid fa-arrow-right text-[10px] hidden xs:inline sm:inline"></i>
             </button>
           </div>
           <button 
             type="button"
             onclick="triggerPrescriptionScan()" 
             id="scanPrescriptionBtn"
-            class="bg-gradient-to-tr from-sky-500 to-emerald-500 hover:from-sky-400 hover:to-emerald-400 active:scale-95 text-white p-3 rounded-2xl shadow-md transition flex items-center justify-center shrink-0 border border-white/20 group"
+            class="bg-gradient-to-tr from-sky-500 to-emerald-500 hover:from-sky-400 hover:to-emerald-400 active:scale-95 text-white p-3.5 sm:p-3 rounded-2xl shadow-md transition flex items-center justify-center shrink-0 border border-white/20 group"
             title="Scan doctor's prescription or medicine packaging"
           >
             <i class="fa-solid fa-camera text-base group-hover:scale-110 transition"></i>
@@ -127,14 +146,14 @@
         </div>
 
         <!-- 📸 PRESCRIPTION & MEDICINE SCANNER QUICK BANNER -->
-        <div onclick="triggerPrescriptionScan()" class="cursor-pointer bg-gradient-to-r from-sky-950/70 via-slate-900/80 to-emerald-950/70 hover:border-emerald-400/50 border border-sky-400/30 rounded-2xl p-2.5 flex items-center justify-between gap-2 text-white transition shadow-sm group">
-          <div class="flex items-center gap-2.5">
-            <div class="w-8 h-8 rounded-xl bg-sky-500/20 text-sky-300 flex items-center justify-center text-sm border border-sky-400/30 group-hover:scale-105 transition">
+        <div onclick="triggerPrescriptionScan()" class="cursor-pointer bg-gradient-to-r from-sky-950/70 via-slate-900/80 to-emerald-950/70 hover:border-emerald-400/50 active:scale-98 border border-sky-400/30 rounded-2xl p-2.5 flex items-center justify-between gap-2 text-white transition shadow-sm group">
+          <div class="flex items-center gap-2.5 min-w-0">
+            <div class="w-8 h-8 rounded-xl bg-sky-500/20 text-sky-300 flex items-center justify-center text-sm border border-sky-400/30 shrink-0">
               <i class="fa-solid fa-camera-retro"></i>
             </div>
-            <div class="text-left">
-              <strong class="block text-[11px] text-sky-200">📸 የሐኪም ማዘዣ ወይም ማሸጊያ ፎቶ አንሳ (AI Vision)</strong>
-              <span class="text-[10px] text-slate-300">Scan handwritten doctor prescription or pill box / bottle</span>
+            <div class="text-left min-w-0">
+              <strong class="block text-[11px] text-sky-200 truncate">📸 የሐኪም ማዘዣ ወይም ማሸጊያ ፎቶ አንሳ</strong>
+              <span class="text-[10px] text-slate-300 block truncate">Scan handwritten prescription or medicine box</span>
             </div>
           </div>
           <span class="text-[10px] bg-sky-500/20 text-sky-200 px-2.5 py-1 rounded-xl border border-sky-400/30 font-bold shrink-0 group-hover:bg-emerald-500 group-hover:text-slate-950 transition">
@@ -143,9 +162,9 @@
         </div>
 
         <!-- LOCATION SELECTOR & GPS -->
-        <div class="flex items-center justify-between gap-2 text-xs">
-          <div class="flex-1 relative">
-            <select id="subCitySelect" onchange="handleSubCityChange()" class="w-full bg-slate-800/90 text-white border border-white/10 text-[11px] rounded-xl px-3 py-2 outline-none focus:ring-1 focus:ring-emerald-400">
+        <div class="flex flex-col xs:flex-row sm:flex-row items-stretch sm:items-center justify-between gap-2 text-xs">
+          <div class="flex-1 relative min-w-0">
+            <select id="subCitySelect" onchange="handleSubCityChange()" class="w-full bg-slate-800/90 text-white border border-white/10 text-[11px] rounded-xl px-3 py-2.5 sm:py-2 outline-none focus:ring-1 focus:ring-emerald-400">
               <option value="Bole" data-lat="8.9950" data-lng="38.7880">📍 Bole / ቦሌ (Airport, Edna Mall, CMC)</option>
               <option value="Kirkos" data-lat="9.0110" data-lng="38.7520">📍 Kirkos / ቂርቆስ (Mexico, Kazanchis, Meskel Sq)</option>
               <option value="Yeka" data-lat="9.0300" data-lng="38.8100">📍 Yeka / የካ (Megenagna, Shola, Signal)</option>
@@ -159,7 +178,7 @@
               <option value="Lemi Kura" data-lat="9.0150" data-lng="38.8400">📍 Lemi Kura / ለሚ ኩራ (Ayat, Summit, Koye Feche)</option>
             </select>
           </div>
-          <button type="button" id="findGpsBtn" onclick="detectGpsLocation()" class="group relative bg-emerald-600 hover:bg-emerald-500 active:scale-95 text-white px-3.5 py-2 rounded-xl text-[11px] font-bold flex items-center gap-1.5 transition shadow-sm whitespace-nowrap">
+          <button type="button" id="findGpsBtn" onclick="detectGpsLocation()" class="group relative bg-emerald-600 hover:bg-emerald-500 active:scale-95 text-white px-3.5 py-2.5 sm:py-2 rounded-xl text-[11px] font-bold flex items-center justify-center gap-1.5 transition shadow-sm whitespace-nowrap shrink-0">
             <span class="relative flex h-2 w-2">
               <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-200 opacity-75"></span>
               <span class="relative inline-flex rounded-full h-2 w-2 bg-white"></span>
@@ -170,16 +189,16 @@
         </div>
       </div>
 
-      <!-- POPULAR SEARCH CHIPS -->
+      <!-- POPULAR SEARCH CHIPS (Horizontally scrollable on narrow mobile) -->
       <div class="space-y-1.5 pt-1 border-t border-white/10">
         <span class="text-[10px] text-slate-400 font-medium">Quick Searches:</span>
-        <div class="flex flex-wrap gap-1.5 text-[11px]">
-          <button onclick="quickSearch('Insulin')" class="px-2.5 py-1 rounded-lg bg-white/10 hover:bg-emerald-500 hover:text-slate-950 text-slate-200 transition">Insulin</button>
-          <button onclick="quickSearch('Ventolin')" class="px-2.5 py-1 rounded-lg bg-white/10 hover:bg-emerald-500 hover:text-slate-950 text-slate-200 transition">Ventolin</button>
-          <button onclick="quickSearch('Augmentin')" class="px-2.5 py-1 rounded-lg bg-white/10 hover:bg-emerald-500 hover:text-slate-950 text-slate-200 transition">Augmentin</button>
-          <button onclick="quickSearch('Metformin')" class="px-2.5 py-1 rounded-lg bg-white/10 hover:bg-emerald-500 hover:text-slate-950 text-slate-200 transition">Metformin</button>
-          <button onclick="quickSearch('Amoxicillin')" class="px-2.5 py-1 rounded-lg bg-white/10 hover:bg-emerald-500 hover:text-slate-950 text-slate-200 transition">Amoxicillin</button>
-          <button onclick="quickSearch('Paracetamol')" class="px-2.5 py-1 rounded-lg bg-white/10 hover:bg-emerald-500 hover:text-slate-950 text-slate-200 transition">Paracetamol</button>
+        <div class="flex items-center gap-1.5 text-[11px] overflow-x-auto hide-scrollbar pb-0.5">
+          <button onclick="quickSearch('Insulin')" class="px-2.5 py-1 rounded-lg bg-white/10 hover:bg-emerald-500 active:scale-95 hover:text-slate-950 text-slate-200 whitespace-nowrap transition">Insulin</button>
+          <button onclick="quickSearch('Ventolin')" class="px-2.5 py-1 rounded-lg bg-white/10 hover:bg-emerald-500 active:scale-95 hover:text-slate-950 text-slate-200 whitespace-nowrap transition">Ventolin</button>
+          <button onclick="quickSearch('Augmentin')" class="px-2.5 py-1 rounded-lg bg-white/10 hover:bg-emerald-500 active:scale-95 hover:text-slate-950 text-slate-200 whitespace-nowrap transition">Augmentin</button>
+          <button onclick="quickSearch('Metformin')" class="px-2.5 py-1 rounded-lg bg-white/10 hover:bg-emerald-500 active:scale-95 hover:text-slate-950 text-slate-200 whitespace-nowrap transition">Metformin</button>
+          <button onclick="quickSearch('Amoxicillin')" class="px-2.5 py-1 rounded-lg bg-white/10 hover:bg-emerald-500 active:scale-95 hover:text-slate-950 text-slate-200 whitespace-nowrap transition">Amoxicillin</button>
+          <button onclick="quickSearch('Paracetamol')" class="px-2.5 py-1 rounded-lg bg-white/10 hover:bg-emerald-500 active:scale-95 hover:text-slate-950 text-slate-200 whitespace-nowrap transition">Paracetamol</button>
         </div>
       </div>
     </section>
@@ -196,7 +215,7 @@
     <!-- SEARCH RESULTS LIST -->
     <div id="resultsContainer" class="space-y-3">
       <!-- Default Prompt -->
-      <div id="emptySearchPrompt" class="text-center py-10 px-4 bg-white rounded-3xl border border-slate-200 shadow-xs space-y-3">
+      <div id="emptySearchPrompt" class="text-center py-8 sm:py-10 px-4 bg-white rounded-3xl border border-slate-200 shadow-xs space-y-3">
         <div class="w-14 h-14 rounded-2xl bg-emerald-50 border border-emerald-100 text-emerald-600 mx-auto flex items-center justify-center text-2xl shadow-inner">
           <i class="fa-solid fa-radar text-emerald-600"></i>
         </div>
@@ -214,7 +233,7 @@
     </div>
 
     <!-- BENEFIT CARDS (ANTI-SCAM PRICE LOCK) -->
-    <section class="grid grid-cols-2 gap-3 text-xs">
+    <section class="grid grid-cols-1 xs:grid-cols-2 sm:grid-cols-2 gap-3 text-xs">
       <div class="p-3.5 bg-white rounded-2xl border border-slate-200 shadow-xs space-y-1">
         <div class="w-7 h-7 rounded-lg bg-emerald-100 text-emerald-700 flex items-center justify-center text-xs font-bold mb-1">
           <i class="fa-solid fa-clock"></i>
@@ -234,10 +253,34 @@
 
   </main>
 
-  <!-- 60-MINUTE PRICE LOCK RESERVATION MODAL -->
-  <div id="reservationModal" class="hidden fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4">
-    <div class="bg-white rounded-3xl max-w-sm w-full p-6 shadow-2xl space-y-4 border border-slate-100 text-center animate-in fade-in zoom-in duration-150">
-      <div id="voucherModalIcon" class="w-14 h-14 bg-gradient-to-tr from-emerald-600 to-teal-500 text-white rounded-2xl mx-auto flex items-center justify-center text-2xl shadow-lg shadow-emerald-600/30 transition-all">
+  <!-- MOBILE BOTTOM NAVIGATION BAR (< 640px) -->
+  <nav class="sm:hidden fixed bottom-0 left-0 right-0 z-40 bg-white/95 backdrop-blur-md border-t border-slate-200 shadow-[0_-4px_20px_rgba(15,23,42,0.06)] safe-area-bottom">
+    <div class="grid grid-cols-4 px-2 pt-1.5">
+      <button onclick="focusSearchInput()" class="flex flex-col items-center justify-center py-1 text-emerald-700 font-bold active:scale-95 transition">
+        <i class="fa-solid fa-magnifying-glass text-base"></i>
+        <span class="text-[10px] mt-0.5">Search</span>
+      </button>
+      <button onclick="triggerPrescriptionScan()" class="flex flex-col items-center justify-center py-1 text-slate-500 hover:text-emerald-700 font-medium active:scale-95 transition">
+        <i class="fa-solid fa-camera text-base text-sky-600"></i>
+        <span class="text-[10px] mt-0.5">Scan Rx</span>
+      </button>
+      <button onclick="reopenActiveVoucher()" class="relative flex flex-col items-center justify-center py-1 text-slate-500 hover:text-emerald-700 font-medium active:scale-95 transition">
+        <i class="fa-solid fa-ticket text-base"></i>
+        <span class="text-[10px] mt-0.5">My Voucher</span>
+        <span id="mobActiveVoucherDot" class="hidden absolute top-1 right-6 w-2.5 h-2.5 rounded-full bg-emerald-500 ring-2 ring-white animate-pulse"></span>
+      </button>
+      <a href="/pharmacy/" class="flex flex-col items-center justify-center py-1 text-slate-500 hover:text-emerald-700 font-medium active:scale-95 transition">
+        <i class="fa-solid fa-mortar-pestle text-base"></i>
+        <span class="text-[10px] mt-0.5">Pharmacist</span>
+      </a>
+    </div>
+  </nav>
+
+  <!-- 60-MINUTE PRICE LOCK RESERVATION MODAL (Bottom-Sheet on Mobile) -->
+  <div id="reservationModal" class="hidden fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-end sm:items-center justify-center p-0 sm:p-4">
+    <div class="bg-white rounded-t-3xl sm:rounded-3xl max-w-sm w-full p-5 sm:p-6 shadow-2xl space-y-3.5 border border-slate-100 text-center animate-in fade-in zoom-in duration-150 max-h-[92vh] overflow-y-auto safe-area-bottom">
+      <div class="w-10 h-1 bg-slate-300 rounded-full mx-auto -mt-1 sm:hidden"></div>
+      <div id="voucherModalIcon" class="w-12 h-12 sm:w-14 sm:h-14 bg-gradient-to-tr from-emerald-600 to-teal-500 text-white rounded-2xl mx-auto flex items-center justify-center text-xl sm:text-2xl shadow-lg shadow-emerald-600/30 transition-all">
         <i id="voucherModalIconI" class="fa-solid fa-shield-halved"></i>
       </div>
 
@@ -245,7 +288,7 @@
         <span id="voucherBadge" class="text-[10px] font-bold uppercase tracking-wider text-emerald-700 bg-emerald-50 px-2.5 py-0.5 rounded-full border border-emerald-200">
           Official Price-Lock Voucher
         </span>
-        <h3 id="voucherModalTitle" class="text-lg font-black text-slate-900 mt-1">Medicine Held for 60 Minutes</h3>
+        <h3 id="voucherModalTitle" class="text-base sm:text-lg font-black text-slate-900 mt-1">Medicine Held for 60 Minutes</h3>
         <p id="voucherModalSubtitle" class="text-xs text-slate-500 mt-0.5">Show this code at the pharmacy counter to claim your locked price.</p>
       </div>
 
@@ -288,7 +331,7 @@
       </div>
 
       <!-- VOUCHER CODE BOX -->
-      <div id="voucherCodeBox" class="bg-slate-900 text-white p-4 rounded-2xl space-y-1.5 shadow-inner transition-all">
+      <div id="voucherCodeBox" class="bg-slate-900 text-white p-3.5 sm:p-4 rounded-2xl space-y-1.5 shadow-inner transition-all">
         <span class="text-[10px] text-slate-400 font-medium">RESERVATION HOLD CODE</span>
         <div id="voucherCodeDisplay" class="text-2xl font-mono font-black tracking-widest text-emerald-400">#HLD-0000</div>
         <div class="text-[10px] text-slate-400 flex items-center justify-center gap-1 font-mono">
@@ -335,16 +378,17 @@
           <i class="fa-solid fa-magnifying-glass"></i>
           <span>Search Another Pharmacy Nearby (ሌላ ፈልግ)</span>
         </button>
-        <button id="voucherCloseBtn" onclick="closeReservationModal()" class="w-full bg-slate-900 hover:bg-black text-white text-xs font-bold py-2.5 rounded-xl transition">
-          Done / Close Voucher
+        <button id="voucherCloseBtn" onclick="minimizeReservationModal()" class="w-full bg-slate-900 hover:bg-black active:scale-95 text-white text-xs font-bold py-2.5 rounded-xl transition">
+          Minimize / Keep Voucher Active
         </button>
       </div>
     </div>
   </div>
 
   <!-- INTERACTIVE LOCATION PERMISSION & ENABLE GUIDE MODAL -->
-  <div id="gpsGuideModal" class="hidden fixed inset-0 z-50 bg-black/70 backdrop-blur-sm flex items-center justify-center p-4">
-    <div class="bg-white rounded-3xl max-w-sm w-full p-6 shadow-2xl space-y-4 border border-slate-100 text-center animate-in fade-in zoom-in duration-150">
+  <div id="gpsGuideModal" class="hidden fixed inset-0 z-50 bg-black/70 backdrop-blur-sm flex items-end sm:items-center justify-center p-0 sm:p-4">
+    <div class="bg-white rounded-t-3xl sm:rounded-3xl max-w-sm w-full p-6 shadow-2xl space-y-4 border border-slate-100 text-center animate-in fade-in zoom-in duration-150 safe-area-bottom">
+      <div class="w-10 h-1 bg-slate-300 rounded-full mx-auto -mt-2 sm:hidden"></div>
       <div class="w-14 h-14 bg-amber-100 text-amber-700 rounded-2xl mx-auto flex items-center justify-center text-2xl shadow-inner">
         <i class="fa-solid fa-location-dot"></i>
       </div>
@@ -385,9 +429,9 @@
   </div>
 
   <!-- PRESCRIPTION & MEDICINE PACKAGING SCANNER MODAL -->
-  <div id="prescriptionModal" class="hidden fixed inset-0 z-50 bg-black/75 backdrop-blur-md flex items-center justify-center p-4">
-    <div class="bg-white rounded-3xl max-w-sm w-full p-5 shadow-2xl space-y-3 border border-slate-100 text-center animate-in fade-in zoom-in duration-150 max-h-[90vh] overflow-y-auto">
-      
+  <div id="prescriptionModal" class="hidden fixed inset-0 z-50 bg-black/75 backdrop-blur-md flex items-end sm:items-center justify-center p-0 sm:p-4">
+    <div class="bg-white rounded-t-3xl sm:rounded-3xl max-w-sm w-full p-5 shadow-2xl space-y-3 border border-slate-100 text-center animate-in fade-in zoom-in duration-150 max-h-[92vh] overflow-y-auto safe-area-bottom">
+      <div class="w-10 h-1 bg-slate-300 rounded-full mx-auto -mt-1 sm:hidden"></div>
       <!-- HEADER -->
       <div class="flex items-center justify-between pb-2 border-b border-slate-100">
         <div class="flex items-center gap-2 text-left">
@@ -441,7 +485,7 @@
             <i class="fa-solid fa-magnifying-glass"></i>
             <span id="prescriptionSearchBtnText">Search Selected Medicines (በአቅራቢያ ፈልግ)</span>
           </button>
-          <button onclick="triggerPrescriptionScan()" class="w-full bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-semibold py-2 rounded-xl transition flex items-center justify-center gap-1.5">
+          <button onclick="triggerPrescriptionScan()" class="w-full bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-semibold py-2.5 rounded-xl transition flex items-center justify-center gap-1.5">
             <i class="fa-solid fa-camera"></i>
             <span>Retake Another Photo (እንደገና አንሳ)</span>
           </button>
@@ -455,7 +499,7 @@
           <span>Could Not Read Image</span>
         </div>
         <p id="prescriptionErrorMsg" class="text-[11px] text-rose-700">Please take a clearer picture with better lighting or type the medicine name directly.</p>
-        <button onclick="triggerPrescriptionScan()" class="w-full bg-rose-600 hover:bg-rose-700 text-white text-xs font-bold py-2 rounded-xl transition">
+        <button onclick="triggerPrescriptionScan()" class="w-full bg-rose-600 hover:bg-rose-700 text-white text-xs font-bold py-2.5 rounded-xl transition">
           Retake Photo
         </button>
       </div>
@@ -464,7 +508,7 @@
   </div>
 
   <!-- BOTTOM FOOTER -->
-  <footer class="bg-white border-t border-slate-200 px-4 py-3 text-center text-xs text-slate-500">
+  <footer class="hidden sm:block bg-white border-t border-slate-200 px-4 py-3 text-center text-xs text-slate-500">
     <div class="max-w-xl mx-auto flex items-center justify-between text-[11px]">
       <span>Federal Democratic Republic of Ethiopia (EFDA)</span>
       <a href="https://t.me/MedFinder_ET_bot" target="_blank" class="text-emerald-700 font-bold hover:underline">@MedFinder_ET_bot</a>
@@ -924,6 +968,9 @@
           // Start fast status polling
           startReservationPolling(r.reservationCode, lat, lng, pharmacyName, subCity);
 
+          const mobDot = document.getElementById('mobActiveVoucherDot');
+          if (mobDot) mobDot.classList.remove('hidden');
+
           document.getElementById('reservationModal').classList.remove('hidden');
         } else {
           alert('Could not lock price: ' + (data.error || 'Unknown issue'));
@@ -1172,12 +1219,45 @@
       }, 1000);
     }
 
+    function minimizeReservationModal() {
+      document.getElementById('reservationModal').classList.add('hidden');
+    }
+
+    function reopenActiveVoucher() {
+      try {
+        if (window.Telegram?.WebApp?.HapticFeedback) {
+          window.Telegram.WebApp.HapticFeedback.impactOccurred('light');
+        }
+      } catch (_) {}
+      if (currentReservationCode) {
+        document.getElementById('reservationModal').classList.remove('hidden');
+      } else {
+        alert('No active Price-Lock Voucher right now. Search for a medicine and tap "Lock Price (60m)" on any pharmacy card to reserve!');
+        focusSearchInput();
+      }
+    }
+
+    function focusSearchInput() {
+      try {
+        if (window.Telegram?.WebApp?.HapticFeedback) {
+          window.Telegram.WebApp.HapticFeedback.impactOccurred('light');
+        }
+      } catch (_) {}
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+      const input = document.getElementById('medicineInput');
+      if (input) {
+        setTimeout(() => input.focus(), 200);
+      }
+    }
+
     function closeReservationModal() {
       document.getElementById('reservationModal').classList.add('hidden');
       if (countdownInterval) clearInterval(countdownInterval);
       if (pollReservationInterval) clearInterval(pollReservationInterval);
       stopSafetyTimer();
       currentReservationCode = null;
+      const mobDot = document.getElementById('mobActiveVoucherDot');
+      if (mobDot) mobDot.classList.add('hidden');
     }
 
     // --- AI MEDICAL VISION: PRESCRIPTION & MEDICINE SCANNER ---

@@ -19,6 +19,7 @@
       background-color: var(--tg-theme-bg-color, #f8fafc);
       color: var(--tg-theme-text-color, #0f172a);
       -webkit-tap-highlight-color: transparent;
+      overscroll-behavior-y: none;
     }
     .tg-card {
       background-color: var(--tg-theme-secondary-bg-color, #ffffff);
@@ -34,28 +35,39 @@
       -ms-overflow-style: none;
       scrollbar-width: none;
     }
+    .safe-area-bottom {
+      padding-bottom: calc(0.65rem + env(safe-area-inset-bottom, 0px));
+    }
+    .main-mobile-pad {
+      padding-bottom: calc(5.75rem + env(safe-area-inset-bottom, 0px));
+    }
+    @media (max-width: 640px) {
+      input[type="text"], input[type="search"], select, textarea {
+        font-size: 16px !important;
+      }
+    }
   </style>
 </head>
-<body class="min-h-screen pb-20 select-none">
+<body class="min-h-screen main-mobile-pad select-none">
 
   <!-- TOP APP BAR -->
-  <header class="sticky top-0 z-40 bg-white/90 backdrop-blur-md border-b border-slate-200/80 px-4 py-3 shadow-xs">
-    <div class="flex items-center justify-between">
-      <div class="flex items-center space-x-2.5">
-        <div class="w-9 h-9 rounded-xl bg-gradient-to-tr from-emerald-600 to-teal-500 text-white flex items-center justify-center text-base shadow-sm">
+  <header class="sticky top-0 z-40 bg-white/95 backdrop-blur-md border-b border-slate-200/80 px-3.5 py-2.5 shadow-xs">
+    <div class="max-w-md mx-auto flex items-center justify-between gap-2">
+      <div class="flex items-center space-x-2.5 min-w-0">
+        <div class="w-9 h-9 rounded-xl bg-gradient-to-tr from-emerald-600 to-teal-500 text-white flex items-center justify-center text-base shadow-sm shrink-0">
           <i class="fa-solid fa-prescription-bottle-medical"></i>
         </div>
-        <div>
+        <div class="min-w-0">
           <div class="flex items-center gap-1.5">
-            <h1 class="font-extrabold text-sm text-slate-900 tracking-tight">MedFinder Ethiopia</h1>
-            <span class="text-xs">🇪🇹</span>
+            <h1 class="font-extrabold text-sm text-slate-900 tracking-tight truncate">MedFinder Ethiopia</h1>
+            <span class="text-xs shrink-0">🇪🇹</span>
           </div>
-          <p id="userGreeting" class="text-[11px] text-slate-500 font-medium">ጤና ይስጥልኝ! Find medicines in Addis</p>
+          <p id="userGreeting" class="text-[11px] text-slate-500 font-medium truncate">ጤና ይስጥልኝ! Find medicines in Addis</p>
         </div>
       </div>
 
       <!-- Quick Location Badge -->
-      <button onclick="requestGpsLocation()" class="flex items-center space-x-1.5 px-2.5 py-1 rounded-full bg-emerald-50 border border-emerald-200/80 text-emerald-800 text-[11px] font-semibold active:scale-95 transition">
+      <button onclick="requestGpsLocation()" class="flex items-center space-x-1.5 px-2.5 py-1.5 rounded-full bg-emerald-50 border border-emerald-200/80 text-emerald-800 text-[11px] font-bold active:scale-95 transition shrink-0">
         <i class="fa-solid fa-location-dot text-emerald-600 text-[10px]"></i>
         <span id="activeLocationLabel">Bole</span>
       </button>
@@ -63,48 +75,71 @@
   </header>
 
   <!-- MAIN CONTAINER -->
-  <main class="max-w-md mx-auto px-4 pt-3 space-y-4">
+  <main class="max-w-md mx-auto px-3.5 pt-3 space-y-4">
 
     <!-- SEARCH HERO CARD -->
     <section class="bg-gradient-to-br from-slate-900 via-slate-800 to-emerald-950 rounded-2xl p-4 text-white shadow-lg relative overflow-hidden">
       <div class="relative z-10 space-y-3">
-        <div>
-          <span class="text-[10px] uppercase font-bold tracking-wider text-emerald-400 bg-emerald-950/80 px-2 py-0.5 rounded-full border border-emerald-500/30">
+        <div class="flex items-center justify-between gap-2">
+          <span class="text-[10px] uppercase font-bold tracking-wider text-emerald-400 bg-emerald-950/80 px-2.5 py-0.5 rounded-full border border-emerald-500/30">
             Official Telegram Mini App
           </span>
-          <h2 class="text-base font-extrabold mt-1 leading-snug">
+          <a href="/find/" class="text-[10px] font-bold text-emerald-300 hover:text-white underline flex items-center gap-1">
+            <span>Full Map View</span>
+            <i class="fa-solid fa-up-right-from-square text-[9px]"></i>
+          </a>
+        </div>
+        <div>
+          <h2 class="text-base font-extrabold leading-snug">
             የሚፈልጉትን መድኃኒት ይፈልጉ
-            <span class="text-emerald-300 block text-xs font-medium">Search across EFDA-verified pharmacies</span>
+            <span class="text-emerald-300 block text-xs font-medium mt-0.5">Search or snap a prescription across EFDA pharmacies</span>
           </h2>
         </div>
 
-        <!-- SEARCH INPUT -->
-        <div class="relative flex items-center">
-          <i class="fa-solid fa-magnifying-glass absolute left-3.5 text-slate-400 text-xs"></i>
-          <input 
-            type="text" 
-            id="searchInput"
-            placeholder="e.g. Insulin, Augmentin, Ventolin..." 
-            onkeydown="if(event.key==='Enter') executeSearch()"
-            class="w-full bg-white/10 backdrop-blur-md text-white placeholder-slate-400 text-xs font-medium pl-9 pr-20 py-2.5 rounded-xl border border-white/20 outline-none focus:ring-2 focus:ring-emerald-400 focus:bg-white/15 transition shadow-inner"
-          >
-          <button 
-            onclick="executeSearch()"
-            class="absolute right-1.5 bg-emerald-500 hover:bg-emerald-400 active:bg-emerald-600 text-slate-950 text-xs font-bold px-3 py-1.5 rounded-lg transition flex items-center space-x-1 shadow-sm"
-          >
-            <span>Search</span>
-            <i class="fa-solid fa-arrow-right text-[10px]"></i>
-          </button>
+        <!-- SEARCH INPUT + AI RX CAMERA -->
+        <div class="flex flex-col gap-2">
+          <div class="relative flex items-center">
+            <i class="fa-solid fa-magnifying-glass absolute left-3.5 text-slate-400 text-sm"></i>
+            <input 
+              type="text" 
+              id="searchInput"
+              placeholder="Insulin, Augmentin, Ventolin..." 
+              onkeydown="if(event.key==='Enter') executeSearch()"
+              class="w-full bg-white/10 backdrop-blur-md text-white placeholder-slate-400 text-sm font-medium pl-10 pr-20 py-2.5 rounded-xl border border-white/20 outline-none focus:ring-2 focus:ring-emerald-400 focus:bg-white/15 transition shadow-inner"
+            >
+            <button 
+              onclick="executeSearch()"
+              class="absolute right-1.5 bg-emerald-500 hover:bg-emerald-400 active:bg-emerald-600 text-slate-950 text-xs font-extrabold px-3 py-2 rounded-lg transition flex items-center space-x-1 shadow-sm"
+            >
+              <span>Search</span>
+              <i class="fa-solid fa-arrow-right text-[10px]"></i>
+            </button>
+          </div>
+
+          <!-- Hidden File Input for Prescription / Medicine Box Photo -->
+          <input type="file" id="miniRxCameraInput" accept="image/*" capture="environment" class="hidden" onchange="handleMiniRxScan(event)">
+
+          <!-- Quick Action Row: AI Rx Camera + Voice/Popular -->
+          <div class="flex items-center justify-between gap-2">
+            <button 
+              type="button"
+              onclick="triggerMiniRxScan()"
+              class="flex-1 bg-white/10 hover:bg-white/20 active:scale-95 text-emerald-200 border border-emerald-400/30 text-[11px] font-bold py-2 px-3 rounded-xl transition flex items-center justify-center gap-1.5"
+            >
+              <i class="fa-solid fa-camera text-emerald-400"></i>
+              <span>📸 Scan Prescription / Box (AI)</span>
+            </button>
+          </div>
         </div>
 
         <!-- POPULAR CHIPS -->
-        <div class="flex items-center space-x-1.5 overflow-x-auto hide-scrollbar pt-1">
+        <div class="flex items-center space-x-1.5 overflow-x-auto hide-scrollbar pt-0.5">
           <span class="text-[10px] text-slate-400 whitespace-nowrap">🔥 Popular:</span>
-          <button onclick="quickSearch('Insulin')" class="px-2.5 py-0.5 rounded-full bg-white/10 hover:bg-white/20 text-[10px] text-emerald-200 border border-white/10 whitespace-nowrap active:scale-95 transition">Insulin</button>
-          <button onclick="quickSearch('Augmentin')" class="px-2.5 py-0.5 rounded-full bg-white/10 hover:bg-white/20 text-[10px] text-emerald-200 border border-white/10 whitespace-nowrap active:scale-95 transition">Augmentin</button>
-          <button onclick="quickSearch('Ventolin')" class="px-2.5 py-0.5 rounded-full bg-white/10 hover:bg-white/20 text-[10px] text-emerald-200 border border-white/10 whitespace-nowrap active:scale-95 transition">Ventolin</button>
-          <button onclick="quickSearch('Metformin')" class="px-2.5 py-0.5 rounded-full bg-white/10 hover:bg-white/20 text-[10px] text-emerald-200 border border-white/10 whitespace-nowrap active:scale-95 transition">Metformin</button>
-          <button onclick="quickSearch('Losartan')" class="px-2.5 py-0.5 rounded-full bg-white/10 hover:bg-white/20 text-[10px] text-emerald-200 border border-white/10 whitespace-nowrap active:scale-95 transition">Losartan</button>
+          <button onclick="quickSearch('Insulin')" class="px-2.5 py-1 rounded-full bg-white/10 hover:bg-white/20 text-[11px] text-emerald-200 border border-white/10 whitespace-nowrap active:scale-95 transition">Insulin</button>
+          <button onclick="quickSearch('Augmentin')" class="px-2.5 py-1 rounded-full bg-white/10 hover:bg-white/20 text-[11px] text-emerald-200 border border-white/10 whitespace-nowrap active:scale-95 transition">Augmentin</button>
+          <button onclick="quickSearch('Ventolin')" class="px-2.5 py-1 rounded-full bg-white/10 hover:bg-white/20 text-[11px] text-emerald-200 border border-white/10 whitespace-nowrap active:scale-95 transition">Ventolin</button>
+          <button onclick="quickSearch('Metformin')" class="px-2.5 py-1 rounded-full bg-white/10 hover:bg-white/20 text-[11px] text-emerald-200 border border-white/10 whitespace-nowrap active:scale-95 transition">Metformin</button>
+          <button onclick="quickSearch('Amoxicillin')" class="px-2.5 py-1 rounded-full bg-white/10 hover:bg-white/20 text-[11px] text-emerald-200 border border-white/10 whitespace-nowrap active:scale-95 transition">Amoxicillin</button>
         </div>
       </div>
 
@@ -167,9 +202,37 @@
 
   </main>
 
-  <!-- 60-MINUTE PRICE LOCK RESERVATION MODAL -->
+  <!-- STICKY MOBILE BOTTOM NAVIGATION BAR -->
+  <nav id="miniBottomNav" class="fixed bottom-0 left-0 right-0 z-40 bg-white/95 backdrop-blur-lg border-t border-slate-200/90 shadow-[0_-4px_20px_rgba(15,23,42,0.06)] safe-area-bottom">
+    <div class="max-w-md mx-auto grid grid-cols-4 gap-1 px-2 pt-1.5">
+      <button onclick="focusMiniSearch()" class="flex flex-col items-center justify-center py-1 rounded-xl text-emerald-600 font-extrabold active:scale-95 transition">
+        <i class="fa-solid fa-magnifying-glass text-base mb-0.5"></i>
+        <span class="text-[10px] tracking-tight">Search</span>
+      </button>
+      <button onclick="triggerMiniRxScan()" class="flex flex-col items-center justify-center py-1 rounded-xl text-slate-600 font-bold active:scale-95 transition">
+        <div class="w-7 h-7 -mt-2.5 rounded-full bg-gradient-to-tr from-emerald-600 to-teal-500 text-white flex items-center justify-center shadow-md shadow-emerald-600/30">
+          <i class="fa-solid fa-camera text-xs"></i>
+        </div>
+        <span class="text-[10px] text-emerald-700 font-extrabold tracking-tight mt-0.5">Scan Rx</span>
+      </button>
+      <button onclick="reopenMiniVoucher()" class="relative flex flex-col items-center justify-center py-1 rounded-xl text-slate-500 hover:text-slate-900 font-bold active:scale-95 transition">
+        <div class="relative">
+          <i class="fa-solid fa-ticket text-base mb-0.5"></i>
+          <span id="miniActiveHoldDot" class="hidden absolute -top-1 -right-2 w-2.5 h-2.5 rounded-full bg-emerald-500 ring-2 ring-white animate-ping"></span>
+        </div>
+        <span class="text-[10px] tracking-tight">My Hold</span>
+      </button>
+      <a href="/pharmacy/" class="flex flex-col items-center justify-center py-1 rounded-xl text-slate-500 hover:text-slate-900 font-bold active:scale-95 transition">
+        <i class="fa-solid fa-mortar-pestle text-base mb-0.5"></i>
+        <span class="text-[10px] tracking-tight">Pharmacist</span>
+      </a>
+    </div>
+  </nav>
+
+  <!-- 60-MINUTE PRICE LOCK RESERVATION MODAL (BOTTOM SHEET) -->
   <div id="reservationModal" class="hidden fixed inset-0 z-50 bg-black/75 backdrop-blur-sm flex items-end sm:items-center justify-center p-0 sm:p-4 transition-opacity">
-    <div class="bg-white rounded-t-3xl sm:rounded-2xl max-w-sm w-full p-5 shadow-2xl space-y-4 border border-slate-100 animate-slide-up">
+    <div class="bg-white rounded-t-3xl sm:rounded-2xl max-w-sm w-full p-5 safe-area-bottom shadow-2xl space-y-3.5 border border-slate-100 max-h-[92vh] overflow-y-auto">
+      <div class="w-10 h-1 bg-slate-200 rounded-full mx-auto -mt-1 mb-1 sm:hidden"></div>
       <div class="flex items-center justify-between pb-2 border-b border-slate-100">
         <div class="flex items-center space-x-2">
           <div class="w-8 h-8 rounded-full bg-emerald-100 text-emerald-700 flex items-center justify-center text-sm font-bold">
@@ -177,54 +240,66 @@
           </div>
           <div>
             <h4 class="font-bold text-xs text-slate-900">Price-Lock Hold (60 Mins)</h4>
-            <p class="text-[10px] text-slate-500">Anti-Scam Guaranteed Reservation</p>
+            <p id="resModalStatusText" class="text-[10px] text-emerald-700 font-semibold">Live Pharmacist Notification Sent</p>
           </div>
         </div>
-        <button onclick="closeReservationModal()" class="w-7 h-7 rounded-full bg-slate-100 text-slate-500 hover:text-slate-800 flex items-center justify-center text-xs">
+        <button onclick="minimizeMiniReservationModal()" class="w-7 h-7 rounded-full bg-slate-100 text-slate-500 hover:text-slate-800 flex items-center justify-center text-xs">
           <i class="fa-solid fa-xmark"></i>
         </button>
       </div>
 
-      <div class="bg-gradient-to-br from-emerald-500 to-teal-600 p-4 rounded-xl text-white text-center space-y-1 shadow-sm">
-        <span class="text-[10px] uppercase font-bold tracking-wider text-emerald-100">Official Hold Code</span>
-        <div id="resModalCode" class="text-3xl font-mono font-extrabold tracking-widest">#7482</div>
-        <p class="text-[10px] text-emerald-100">Show this code at the pharmacy counter to collect</p>
+      <div class="bg-gradient-to-br from-slate-900 to-emerald-950 p-4 rounded-2xl text-white text-center space-y-1 shadow-sm">
+        <span class="text-[10px] uppercase font-bold tracking-wider text-emerald-300">Official Hold Voucher Code</span>
+        <div id="resModalCode" class="text-3xl font-mono font-extrabold tracking-widest text-emerald-400">#7482</div>
+        <p class="text-[10px] text-slate-300">Show this code at the pharmacy counter to collect</p>
       </div>
 
-      <div class="space-y-2 text-xs">
-        <div class="flex justify-between py-1 border-b border-slate-100">
+      <div class="space-y-2 text-xs bg-slate-50 p-3.5 rounded-2xl border border-slate-200/80">
+        <div class="flex justify-between py-1 border-b border-slate-200/60">
           <span class="text-slate-500">Medicine:</span>
           <strong id="resModalMedicine" class="text-slate-900">—</strong>
         </div>
-        <div class="flex justify-between py-1 border-b border-slate-100">
+        <div class="flex justify-between py-1 border-b border-slate-200/60">
           <span class="text-slate-500">Pharmacy:</span>
-          <strong id="resModalPharmacy" class="text-slate-900">—</strong>
+          <strong id="resModalPharmacy" class="text-slate-900 text-right">—</strong>
         </div>
-        <div class="flex justify-between py-1 border-b border-slate-100">
+        <div class="flex justify-between py-1 border-b border-slate-200/60">
           <span class="text-slate-500">Locked Price:</span>
           <strong id="resModalPrice" class="text-emerald-700 font-extrabold text-sm">—</strong>
         </div>
-        <div class="flex justify-between py-1 border-b border-slate-100">
-          <span class="text-slate-500">Expires In:</span>
-          <strong id="resModalTimer" class="text-amber-700 font-mono font-bold">59:45</strong>
+        <div class="flex justify-between py-1">
+          <span class="text-slate-500">Hold Countdown:</span>
+          <strong id="resModalTimer" class="text-amber-700 font-mono font-bold">59:59</strong>
         </div>
       </div>
 
+      <div class="grid grid-cols-2 gap-2">
+        <a id="resModalCallBtn" href="tel:0911000000" class="bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border border-emerald-200 font-bold text-xs py-2.5 rounded-xl flex items-center justify-center gap-1.5 transition">
+          <i class="fa-solid fa-phone text-emerald-600"></i>
+          <span>Call Counter</span>
+        </a>
+        <a id="resModalMapBtn" href="#" target="_blank" class="bg-sky-50 hover:bg-sky-100 text-sky-800 border border-sky-200 font-bold text-xs py-2.5 rounded-xl flex items-center justify-center gap-1.5 transition">
+          <i class="fa-solid fa-diamond-turn-right text-sky-600"></i>
+          <span>Directions</span>
+        </a>
+      </div>
+
       <div class="pt-1 space-y-2">
-        <button onclick="confirmReservation()" class="w-full bg-slate-900 hover:bg-black text-white font-bold text-xs py-2.5 rounded-xl transition shadow-sm flex items-center justify-center gap-1.5">
+        <button onclick="minimizeMiniReservationModal()" class="w-full bg-slate-900 hover:bg-black text-white font-bold text-xs py-3 rounded-xl transition shadow-sm flex items-center justify-center gap-1.5">
           <i class="fa-solid fa-circle-check text-emerald-400"></i>
-          <span>Save Voucher in Telegram</span>
+          <span>Keep Hold Active in Background</span>
         </button>
-        <button onclick="closeReservationModal()" class="w-full bg-slate-100 text-slate-600 font-semibold text-xs py-2 rounded-xl">
-          Close
+        <button onclick="closeReservationModal()" class="w-full bg-slate-100 text-slate-500 font-semibold text-[11px] py-2 rounded-xl">
+          Dismiss Voucher
         </button>
       </div>
     </div>
   </div>
 
-  <!-- INTERACTIVE LOCATION PERMISSION & ENABLE GUIDE MODAL -->
-  <div id="gpsGuideModal" class="hidden fixed inset-0 z-50 bg-black/70 backdrop-blur-sm flex items-center justify-center p-4">
-    <div class="bg-white rounded-3xl max-w-sm w-full p-6 shadow-2xl space-y-4 border border-slate-100 text-center animate-in fade-in zoom-in duration-150">
+  <!-- INTERACTIVE LOCATION PERMISSION & ENABLE GUIDE MODAL (BOTTOM SHEET) -->
+  <div id="gpsGuideModal" class="hidden fixed inset-0 z-50 bg-black/70 backdrop-blur-sm flex items-end sm:items-center justify-center p-0 sm:p-4">
+    <div class="bg-white rounded-t-3xl sm:rounded-3xl max-w-sm w-full p-6 safe-area-bottom shadow-2xl space-y-4 border border-slate-100 text-center">
+      <div class="w-10 h-1 bg-slate-200 rounded-full mx-auto -mt-2 mb-1 sm:hidden"></div>
       <div class="w-14 h-14 bg-amber-100 text-amber-700 rounded-2xl mx-auto flex items-center justify-center text-2xl shadow-inner">
         <i class="fa-solid fa-location-dot"></i>
       </div>
@@ -519,20 +594,47 @@
       `).join('');
     }
 
-    // 7. Open 60-Minute Price Lock Reservation Modal
+    // 7. Open 60-Minute Price Lock Reservation Modal (Real Backend Hold)
+    let miniPollInterval = null;
+
     async function openReservationModal(idx) {
       if (tg?.HapticFeedback) tg.HapticFeedback.impactOccurred('medium');
 
       const pharm = currentResults[idx];
       if (!pharm) return;
 
-      const randomCode = Math.floor(1000 + Math.random() * 9000).toString();
+      const patientUserId = tg?.initDataUnsafe?.user?.id
+        ? `tg_${tg.initDataUnsafe.user.id}`
+        : 'patient_' + Math.floor(100000 + Math.random() * 900000);
+
+      let resCode = Math.floor(1000 + Math.random() * 9000).toString();
+      try {
+        const res = await fetch('/api/reservation/create', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            patientUserId,
+            pharmacyId: pharm.pharmacyId || pharm.id,
+            medicineName: pharm.matchedMedicine || currentSearchTerm,
+            lockedPriceETB: pharm.priceETB
+          })
+        });
+        const data = await res.json();
+        if (data.success && data.reservation) {
+          resCode = data.reservation.reservationCode;
+        }
+      } catch (e) {
+        console.warn('[MiniApp Hold] Fallback code used:', e.message);
+      }
+
       activeHold = {
-        code: '#' + randomCode,
+        rawCode: resCode,
+        code: '#' + resCode,
         pharmacy: pharm.name,
         price: pharm.priceETB,
-        medicine: currentSearchTerm,
+        medicine: pharm.matchedMedicine || currentSearchTerm,
         phone: pharm.phone,
+        subCity: pharm.subCity || currentSubCity,
         expiresInSeconds: 3600
       };
 
@@ -540,6 +642,18 @@
       document.getElementById('resModalPharmacy').innerText = activeHold.pharmacy;
       document.getElementById('resModalMedicine').innerText = activeHold.medicine;
       document.getElementById('resModalPrice').innerText = activeHold.price + ' ETB';
+      const statusEl = document.getElementById('resModalStatusText');
+      if (statusEl) statusEl.innerText = '⏳ Waiting for Pharmacist Shelf Confirmation...';
+
+      const callBtn = document.getElementById('resModalCallBtn');
+      if (callBtn) callBtn.href = `tel:${activeHold.phone}`;
+      const mapBtn = document.getElementById('resModalMapBtn');
+      if (mapBtn) {
+        mapBtn.href = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(activeHold.pharmacy + ' ' + activeHold.subCity + ' Addis Ababa')}`;
+      }
+
+      const dot = document.getElementById('miniActiveHoldDot');
+      if (dot) dot.classList.remove('hidden');
 
       // Start countdown
       if (holdTimerInterval) clearInterval(holdTimerInterval);
@@ -553,6 +667,29 @@
         }
       }, 1000);
 
+      // Poll reservation status
+      if (miniPollInterval) clearInterval(miniPollInterval);
+      miniPollInterval = setInterval(async () => {
+        if (!activeHold || !activeHold.rawCode) return;
+        try {
+          const sRes = await fetch(`/api/reservation/status/${activeHold.rawCode}`);
+          if (!sRes.ok) return;
+          const sData = await sRes.json();
+          if (sData.success && sData.reservation) {
+            const r = sData.reservation;
+            if (r.status === 'CANCELLED') {
+              if (statusEl) statusEl.innerText = '❌ Out of Stock — Declined by Pharmacist';
+              clearInterval(miniPollInterval);
+            } else if (r.status === 'FULFILLED') {
+              if (statusEl) statusEl.innerText = '✅ Dispensed & Completed at Counter!';
+              clearInterval(miniPollInterval);
+            } else if (r.pharmacistAcknowledged) {
+              if (statusEl) statusEl.innerText = '✅ Confirmed & Held at Counter (60m Active)';
+            }
+          }
+        } catch (_) {}
+      }, 3000);
+
       document.getElementById('reservationModal').classList.remove('hidden');
     }
 
@@ -564,16 +701,87 @@
         `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
     }
 
+    function minimizeMiniReservationModal() {
+      if (tg?.HapticFeedback) tg.HapticFeedback.impactOccurred('light');
+      document.getElementById('reservationModal').classList.add('hidden');
+    }
+
+    function reopenMiniVoucher() {
+      if (tg?.HapticFeedback) tg.HapticFeedback.impactOccurred('light');
+      if (activeHold) {
+        document.getElementById('reservationModal').classList.remove('hidden');
+      } else {
+        alert('No active Price-Lock Hold yet. Tap "Lock Price (60 Mins)" on any pharmacy result to reserve!');
+        focusMiniSearch();
+      }
+    }
+
+    function focusMiniSearch() {
+      if (tg?.HapticFeedback) tg.HapticFeedback.impactOccurred('light');
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+      const input = document.getElementById('searchInput');
+      if (input) setTimeout(() => input.focus(), 200);
+    }
+
     function closeReservationModal() {
       document.getElementById('reservationModal').classList.add('hidden');
       if (holdTimerInterval) clearInterval(holdTimerInterval);
+      if (miniPollInterval) clearInterval(miniPollInterval);
+      activeHold = null;
+      const dot = document.getElementById('miniActiveHoldDot');
+      if (dot) dot.classList.add('hidden');
     }
 
-    function confirmReservation() {
-      if (tg?.HapticFeedback) tg.HapticFeedback.notificationOccurred('success');
+    // 8. AI Prescription / Medicine Box Scanner in Mini App
+    function triggerMiniRxScan() {
+      if (tg?.HapticFeedback) tg.HapticFeedback.impactOccurred('light');
+      const input = document.getElementById('miniRxCameraInput');
+      if (input) {
+        input.value = '';
+        input.click();
+      }
+    }
 
-      alert(`✅ Reservation voucher ${activeHold.code} saved!\nLocked Price: ${activeHold.price} ETB at ${activeHold.pharmacy}.\nShow this code at the pharmacy counter within 60 minutes.`);
-      closeReservationModal();
+    async function handleMiniRxScan(event) {
+      const file = event.target?.files?.[0];
+      if (!file) return;
+
+      const listContainer = document.getElementById('pharmacyList');
+      listContainer.innerHTML = `
+        <div class="text-center py-8 px-4 bg-white rounded-2xl border border-emerald-200 space-y-2 shadow-xs">
+          <div class="inline-block animate-spin text-emerald-600 text-2xl"><i class="fa-solid fa-wand-magic-sparkles"></i></div>
+          <p class="text-xs text-slate-800 font-extrabold">AI Medical Vision Reading Prescription...</p>
+          <p class="text-[11px] text-slate-500">Extracting generic & brand medicine names...</p>
+        </div>
+      `;
+
+      try {
+        const base64DataUrl = await new Promise((resolve, reject) => {
+          const reader = new FileReader();
+          reader.onload = () => resolve(reader.result);
+          reader.onerror = reject;
+          reader.readAsDataURL(file);
+        });
+
+        const res = await fetch('/api/vision/analyze-prescription', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ imageBase64: base64DataUrl, mimeType: file.type || 'image/jpeg' })
+        });
+        const data = await res.json();
+        if (data.success && data.analysis && data.analysis.detectedName) {
+          const medName = data.analysis.detectedName;
+          document.getElementById('searchInput').value = medName;
+          if (tg?.HapticFeedback) tg.HapticFeedback.notificationOccurred('success');
+          executeSearch(medName);
+        } else {
+          alert('Could not read a clear medicine name from the photo. Please try a clearer angle or type the medicine name.');
+          executeSearch();
+        }
+      } catch (err) {
+        alert('Vision scan error: ' + err.message);
+        executeSearch();
+      }
     }
   </script>
 </body>
