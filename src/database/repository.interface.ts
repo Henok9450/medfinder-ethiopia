@@ -336,6 +336,24 @@ export interface IDatabaseRepository {
   getAllWholesalers(): Promise<Wholesaler[]>;
 
   /**
+   * B2B MedSupply Exchange: Wholesaler Authentication & Session
+   */
+  getWholesalerById(id: string): Promise<Wholesaler | null>;
+  getWholesalerByAccessKey(accessKey: string): Promise<Wholesaler | null>;
+  getWholesalerBySession(token: string): Promise<Wholesaler | null>;
+  loginWholesalerWithKey(
+    accessKey: string
+  ): Promise<{ success: boolean; wholesaler?: Wholesaler; token?: string; sessionExpiresAt?: string; error?: string }>;
+
+  /**
+   * B2B MedSupply Exchange: Batch Catalog Inventory Management
+   */
+  addWholesaleListing(listingData: Omit<WholesaleListing, 'id' | 'updatedAt'>): Promise<WholesaleListing>;
+  bulkImportWholesaleListings(wholesalerId: string, items: Array<Partial<WholesaleListing>>): Promise<number>;
+  toggleWholesaleListing(listingId: string): Promise<WholesaleListing | null>;
+  deleteWholesaleListing(listingId: string): Promise<boolean>;
+
+  /**
    * B2B MedSupply Exchange: Platform fee and gross merchandise volume report (2% fee telemetry)
    */
   getB2BCommissionReport(): Promise<{

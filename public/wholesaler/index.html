@@ -1,0 +1,1427 @@
+<!DOCTYPE html>
+<html lang="en" class="h-full bg-slate-950 text-slate-100">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+  <title>MedSupply Exchange — Wholesaler Supply Studio</title>
+  
+  <!-- PWA & Mobile Meta Tags -->
+  <link rel="manifest" href="/wholesaler/manifest.json">
+  <meta name="theme-color" content="#4f46e5">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="Wholesaler Studio">
+  
+  <!-- Tailwind CSS -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- SheetJS for Batch Excel & CSV importing -->
+  <script src="https://cdn.sheetjs.com/xlsx-0.20.2/package/dist/xlsx.full.min.js"></script>
+  <!-- FontAwesome Icons -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: {
+          colors: {
+            brand: {
+              50: '#eef2ff',
+              100: '#e0e7ff',
+              500: '#6366f1',
+              600: '#4f46e5',
+              700: '#4338ca',
+              900: '#312e81'
+            }
+          }
+        }
+      }
+    }
+  </script>
+
+  <style>
+    /* Custom scrollbars and pulse animations */
+    ::-webkit-scrollbar { width: 6px; height: 6px; }
+    ::-webkit-scrollbar-track { background: #0b0f19; }
+    ::-webkit-scrollbar-thumb { background: #334155; border-radius: 3px; }
+    ::-webkit-scrollbar-thumb:hover { background: #475569; }
+
+    @keyframes pulse-ring {
+      0% { transform: scale(0.95); opacity: 0.8; }
+      50% { transform: scale(1.05); opacity: 0.4; }
+      100% { transform: scale(0.95); opacity: 0.8; }
+    }
+    .urgent-pulse {
+      animation: pulse-ring 2s infinite ease-in-out;
+    }
+  </style>
+</head>
+<body class="h-full flex flex-col font-sans antialiased selection:bg-indigo-500 selection:text-white bg-slate-950">
+
+  <!-- TOP APP BAR -->
+  <header class="sticky top-0 z-40 bg-slate-900/90 backdrop-blur-md border-b border-slate-800 px-4 py-3 flex items-center justify-between shadow-lg">
+    <div class="flex items-center space-x-3">
+      <div class="w-10 h-10 rounded-xl bg-gradient-to-tr from-indigo-600 to-indigo-500 flex items-center justify-center shadow-lg shadow-indigo-500/20">
+        <i class="fa-solid fa-truck-ramp-box text-white text-lg"></i>
+      </div>
+      <div>
+        <div class="flex items-center space-x-2">
+          <h1 class="font-bold text-base tracking-tight text-white">Wholesaler Studio</h1>
+          <span class="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-semibold bg-indigo-500/10 text-indigo-400 border border-indigo-500/20">B2B EXCHANGE</span>
+        </div>
+        <p class="text-[11px] text-slate-400 font-medium" id="headerSubtitle">Dispatch & Batch Catalog Portal</p>
+      </div>
+    </div>
+
+    <!-- Header Actions -->
+    <div class="flex items-center space-x-2">
+      <!-- Live Sync Beacon -->
+      <div id="syncBadge" class="hidden md:flex items-center space-x-1.5 px-2.5 py-1 rounded-full bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 text-xs font-mono">
+        <span class="w-2 h-2 rounded-full bg-emerald-400 animate-ping"></span>
+        <span>LIVE PO SYNC (4s)</span>
+      </div>
+
+      <!-- Siren / Audio Toggle -->
+      <button id="toggleAudioBtn" onclick="toggleAudioMute()" title="Toggle POS Dispatch Siren" class="p-2 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white transition-colors border border-slate-700">
+        <i id="audioIcon" class="fa-solid fa-volume-high text-indigo-400"></i>
+      </button>
+
+      <!-- PWA Install Button -->
+      <button id="installPwaBtn" onclick="promptInstallPWA()" class="hidden md:flex items-center space-x-1 px-2.5 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 text-xs font-semibold">
+        <i class="fa-solid fa-download text-indigo-400"></i>
+        <span>Install App</span>
+      </button>
+
+      <!-- Active Profile Dropdown or Signout -->
+      <div id="userHeaderProfile" class="hidden items-center space-x-2 pl-2 border-l border-slate-800">
+        <div class="text-right hidden sm:block">
+          <div id="wholesalerBadgeName" class="text-xs font-bold text-white truncate max-w-[140px]">Cadila Pharma</div>
+          <div id="wholesalerBadgeCity" class="text-[10px] text-slate-400">Addis Ababa • Vetted</div>
+        </div>
+        <button onclick="logoutWholesaler()" title="Sign Out" class="p-2 rounded-lg bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 border border-rose-500/20 transition-colors">
+          <i class="fa-solid fa-right-from-bracket"></i>
+        </button>
+      </div>
+    </div>
+  </header>
+
+  <!-- SCREEN WAKE LOCK NOTIFICATION (Ambient / Driver Mode) -->
+  <div id="wakeLockNotice" class="hidden bg-indigo-950/80 border-b border-indigo-800/40 px-4 py-1.5 text-center text-xs text-indigo-200 flex items-center justify-center space-x-2">
+    <i class="fa-solid fa-sun text-amber-400 animate-pulse"></i>
+    <span>Kiosk Mode Active: Device screen will stay awake while monitoring orders queue.</span>
+  </div>
+
+  <!-- MAIN APP CONTAINER -->
+  <main class="flex-1 overflow-y-auto max-w-7xl w-full mx-auto p-3 sm:p-6 space-y-6">
+
+    <!-- ============================================================ -->
+    <!-- SECTION 1: AUTHENTICATION / ACCESS KEY LOGIN (If logged out) -->
+    <!-- ============================================================ -->
+    <div id="authSection" class="max-w-md mx-auto my-8 sm:my-16 bg-slate-900 border border-slate-800 rounded-2xl p-6 sm:p-8 shadow-2xl relative overflow-hidden">
+      <!-- Glow background decoration -->
+      <div class="absolute -top-24 -right-24 w-48 h-48 bg-indigo-500/20 rounded-full blur-3xl pointer-events-none"></div>
+
+      <div class="text-center mb-6">
+        <div class="w-16 h-16 rounded-2xl bg-indigo-600/20 border border-indigo-500/30 flex items-center justify-center mx-auto mb-4 text-indigo-400 text-2xl">
+          <i class="fa-solid fa-shield-halved"></i>
+        </div>
+        <h2 class="text-xl font-bold text-white">Wholesaler Access Portal</h2>
+        <p class="text-xs text-slate-400 mt-1">Authorized Ethiopian Importers, Distributors & Wholesalers Only</p>
+      </div>
+
+      <form id="loginForm" onsubmit="handleAccessKeyLogin(event)" class="space-y-4">
+        <div>
+          <label class="block text-xs font-semibold text-slate-300 uppercase tracking-wider mb-2">1-Click Vetted Access Key</label>
+          <div class="relative">
+            <input type="password" id="accessKeyInput" placeholder="mf_ws_cadila_7718" required
+              class="w-full bg-slate-950 border border-slate-700 rounded-xl px-4 py-3 text-sm text-white placeholder-slate-500 focus:outline-none focus:border-indigo-500 font-mono tracking-wide">
+            <button type="button" onclick="toggleKeyVisibility()" class="absolute right-3 top-3 text-slate-400 hover:text-white">
+              <i id="toggleKeyIcon" class="fa-solid fa-eye"></i>
+            </button>
+          </div>
+          <p class="text-[11px] text-slate-500 mt-1.5 flex items-center space-x-1">
+            <i class="fa-solid fa-lock text-[10px]"></i>
+            <span>Keys are issued directly by the MedFinder Admin Inspection Board</span>
+          </p>
+        </div>
+
+        <button type="submit" id="loginBtn" class="w-full py-3 px-4 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-semibold text-sm transition-all shadow-lg shadow-indigo-600/30 flex items-center justify-center space-x-2">
+          <span>Unlock Wholesaler Studio</span>
+          <i class="fa-solid fa-arrow-right text-xs"></i>
+        </button>
+      </form>
+
+      <!-- Quick Switch Testing Keys -->
+      <div class="mt-8 pt-6 border-t border-slate-800">
+        <p class="text-xs font-semibold text-slate-400 mb-2">Demo Vetted Importers (Quick Connect):</p>
+        <div class="grid grid-cols-1 sm:grid-cols-3 gap-2">
+          <button onclick="quickLogin('mf_ws_cadila_7718')" class="p-2.5 rounded-lg bg-slate-800 hover:bg-indigo-900/40 border border-slate-700 hover:border-indigo-500/50 text-left transition-all group">
+            <div class="text-xs font-bold text-white group-hover:text-indigo-400">Cadila Pharma</div>
+            <div class="text-[10px] text-slate-400">Amoxicillin, Azithro</div>
+          </button>
+          <button onclick="quickLogin('mf_ws_medtech_8842')" class="p-2.5 rounded-lg bg-slate-800 hover:bg-indigo-900/40 border border-slate-700 hover:border-indigo-500/50 text-left transition-all group">
+            <div class="text-xs font-bold text-white group-hover:text-indigo-400">Medtech Ethiopia</div>
+            <div class="text-[10px] text-slate-400">Metformin, Insulin</div>
+          </button>
+          <button onclick="quickLogin('mf_ws_epharm_5531')" class="p-2.5 rounded-lg bg-slate-800 hover:bg-indigo-900/40 border border-slate-700 hover:border-indigo-500/50 text-left transition-all group">
+            <div class="text-xs font-bold text-white group-hover:text-indigo-400">EPHARM Official</div>
+            <div class="text-[10px] text-slate-400">Paracetamol, ORS</div>
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- ============================================================ -->
+    <!-- SECTION 2: STUDIO DASHBOARD (Active Wholesaler Session)     -->
+    <!-- ============================================================ -->
+    <div id="studioDashboard" class="hidden space-y-6">
+
+      <!-- TOP METRIC KPI BAR -->
+      <div class="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
+        <!-- Card 1: Urgent Incoming Orders -->
+        <div class="bg-slate-900/80 border border-slate-800 rounded-2xl p-4 shadow-sm relative overflow-hidden">
+          <div class="flex items-center justify-between mb-2">
+            <span class="text-xs font-medium text-slate-400">Pending Orders</span>
+            <span class="p-1.5 rounded-lg bg-amber-500/10 text-amber-400 text-xs">
+              <i class="fa-solid fa-bell"></i>
+            </span>
+          </div>
+          <div class="flex items-baseline space-x-2">
+            <div id="kpiPendingCount" class="text-2xl sm:text-3xl font-extrabold text-amber-400">0</div>
+            <span class="text-xs text-slate-500">PO queue</span>
+          </div>
+          <div id="kpiPendingValue" class="text-[11px] text-slate-400 mt-1 font-mono">0.00 ETB Pending</div>
+        </div>
+
+        <!-- Card 2: Active Batch Listings -->
+        <div class="bg-slate-900/80 border border-slate-800 rounded-2xl p-4 shadow-sm relative overflow-hidden">
+          <div class="flex items-center justify-between mb-2">
+            <span class="text-xs font-medium text-slate-400">Live Batches</span>
+            <span class="p-1.5 rounded-lg bg-indigo-500/10 text-indigo-400 text-xs">
+              <i class="fa-solid fa-boxes-stacked"></i>
+            </span>
+          </div>
+          <div class="flex items-baseline space-x-2">
+            <div id="kpiActiveBatches" class="text-2xl sm:text-3xl font-extrabold text-white">0</div>
+            <span class="text-xs text-slate-500">on exchange</span>
+          </div>
+          <div class="text-[11px] text-emerald-400 mt-1 flex items-center space-x-1">
+            <i class="fa-solid fa-check-double text-[9px]"></i>
+            <span>EFDA Certified</span>
+          </div>
+        </div>
+
+        <!-- Card 3: Total Gross Dispatched (ETB) -->
+        <div class="bg-slate-900/80 border border-slate-800 rounded-2xl p-4 shadow-sm relative overflow-hidden">
+          <div class="flex items-center justify-between mb-2">
+            <span class="text-xs font-medium text-slate-400">Gross Trade Volume</span>
+            <span class="p-1.5 rounded-lg bg-emerald-500/10 text-emerald-400 text-xs">
+              <i class="fa-solid fa-money-bill-wave"></i>
+            </span>
+          </div>
+          <div class="flex items-baseline space-x-2">
+            <div id="kpiGrossVolume" class="text-xl sm:text-2xl font-extrabold text-emerald-400 font-mono">0 ETB</div>
+          </div>
+          <div id="kpiCompletedCount" class="text-[11px] text-slate-400 mt-1">0 Delivered POs</div>
+        </div>
+
+        <!-- Card 4: Platform Fee (2%) Invoicing -->
+        <div class="bg-slate-900/80 border border-slate-800 rounded-2xl p-4 shadow-sm relative overflow-hidden">
+          <div class="flex items-center justify-between mb-2">
+            <span class="text-xs font-medium text-slate-400">Platform Fee (2%)</span>
+            <span class="p-1.5 rounded-lg bg-indigo-500/10 text-indigo-400 text-xs font-mono">2.0%</span>
+          </div>
+          <div class="flex items-baseline space-x-2">
+            <div id="kpiCommissionFee" class="text-xl sm:text-2xl font-extrabold text-indigo-300 font-mono">0 ETB</div>
+          </div>
+          <div class="text-[11px] text-indigo-400/80 mt-1">Automatic B2B Ledger</div>
+        </div>
+      </div>
+
+      <!-- FLASHING AUDIO / LIVE ORDER DISPATCH BANNER (Visible when urgent orders await) -->
+      <div id="urgentAlertBanner" class="hidden p-4 rounded-2xl bg-amber-500/10 border-2 border-amber-500/40 text-amber-300 flex flex-col sm:flex-row sm:items-center justify-between gap-3 urgent-pulse">
+        <div class="flex items-center space-x-3">
+          <div class="w-10 h-10 rounded-xl bg-amber-500/20 flex items-center justify-center text-amber-400 text-lg flex-shrink-0 animate-bounce">
+            <i class="fa-solid fa-truck-fast"></i>
+          </div>
+          <div>
+            <div class="font-bold text-sm text-amber-200" id="urgentBannerTitle">New Retail Pharmacy Purchase Order Received!</div>
+            <p class="text-xs text-amber-300/80" id="urgentBannerDesc">Immediate dispatch acceptance required to reserve stock.</p>
+          </div>
+        </div>
+        <div class="flex items-center space-x-2">
+          <button onclick="playDispatchSiren()" class="px-3 py-1.5 rounded-lg bg-amber-500/20 hover:bg-amber-500/30 text-amber-200 border border-amber-500/30 text-xs font-semibold flex items-center space-x-1.5">
+            <i class="fa-solid fa-volume-high"></i>
+            <span>Test POS Siren</span>
+          </button>
+          <button onclick="switchTab('orders')" class="px-3 py-1.5 rounded-lg bg-amber-500 hover:bg-amber-400 text-slate-950 text-xs font-bold">
+            View Live Queue
+          </button>
+        </div>
+      </div>
+
+      <!-- NAVIGATION TABS -->
+      <div class="flex border-b border-slate-800 space-x-2 overflow-x-auto pb-1">
+        <button id="tabBtnOrders" onclick="switchTab('orders')" class="flex items-center space-x-2 px-4 py-2.5 rounded-t-xl font-semibold text-xs tracking-wide transition-colors border-b-2 border-indigo-500 text-white bg-slate-900/60">
+          <i class="fa-solid fa-clipboard-list text-indigo-400"></i>
+          <span>Live Orders Queue</span>
+          <span id="tabOrderBadge" class="hidden ml-1 px-1.5 py-0.2 rounded-full text-[10px] bg-amber-500 text-slate-950 font-bold">0</span>
+        </button>
+
+        <button id="tabBtnCatalog" onclick="switchTab('catalog')" class="flex items-center space-x-2 px-4 py-2.5 rounded-t-xl font-semibold text-xs tracking-wide transition-colors border-b-2 border-transparent text-slate-400 hover:text-slate-200">
+          <i class="fa-solid fa-warehouse text-slate-400"></i>
+          <span>Batch Catalog & Stock</span>
+        </button>
+
+        <button id="tabBtnInvoicing" onclick="switchTab('invoicing')" class="flex items-center space-x-2 px-4 py-2.5 rounded-t-xl font-semibold text-xs tracking-wide transition-colors border-b-2 border-transparent text-slate-400 hover:text-slate-200">
+          <i class="fa-solid fa-receipt text-slate-400"></i>
+          <span>2% Platform Invoicing</span>
+        </button>
+
+        <button id="tabBtnDispatch" onclick="switchTab('dispatch')" class="flex items-center space-x-2 px-4 py-2.5 rounded-t-xl font-semibold text-xs tracking-wide transition-colors border-b-2 border-transparent text-slate-400 hover:text-slate-200">
+          <i class="fa-brands fa-telegram text-sky-400"></i>
+          <span>Telegram Driver Alert Bot</span>
+        </button>
+      </div>
+
+      <!-- ============================================================ -->
+      <!-- TAB 1: LIVE ORDERS QUEUE                                     -->
+      <!-- ============================================================ -->
+      <div id="panelOrders" class="space-y-4">
+        <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-slate-900/40 p-3 rounded-xl border border-slate-800/80">
+          <div class="flex items-center space-x-2">
+            <span class="text-xs text-slate-400">Filter Queue:</span>
+            <select id="orderStatusFilter" onchange="renderOrdersList()" class="bg-slate-950 border border-slate-700 rounded-lg px-2.5 py-1.5 text-xs text-slate-200 focus:outline-none focus:border-indigo-500">
+              <option value="ALL">All Statuses</option>
+              <option value="PENDING" selected>Pending Action</option>
+              <option value="CONFIRMED">Confirmed / In Preparation</option>
+              <option value="DISPATCHED">Out for Delivery</option>
+              <option value="DELIVERED">Delivered / Settled</option>
+              <option value="CANCELLED">Cancelled</option>
+            </select>
+          </div>
+
+          <div class="flex items-center space-x-2 text-xs text-slate-400">
+            <span>Sound alerts: <b id="soundAlertStatus" class="text-emerald-400">ACTIVE</b></span>
+            <span>•</span>
+            <button onclick="refreshOrders()" class="hover:text-white flex items-center space-x-1">
+              <i class="fa-solid fa-arrows-rotate"></i>
+              <span>Refresh Now</span>
+            </button>
+          </div>
+        </div>
+
+        <!-- Orders Container -->
+        <div id="ordersContainer" class="space-y-3">
+          <!-- Populated by JS -->
+          <div class="text-center py-12 text-slate-500">
+            <i class="fa-solid fa-spinner fa-spin text-2xl mb-3 text-indigo-400"></i>
+            <p class="text-sm">Connecting to live dispatch stream...</p>
+          </div>
+        </div>
+      </div>
+
+      <!-- ============================================================ -->
+      <!-- TAB 2: CERTIFIED BATCH CATALOG & STOCK INVENTORY            -->
+      <!-- ============================================================ -->
+      <div id="panelCatalog" class="hidden space-y-4">
+        <!-- Catalog Header Actions -->
+        <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-slate-900/40 p-4 rounded-xl border border-slate-800">
+          <div>
+            <h3 class="text-sm font-bold text-white flex items-center space-x-2">
+              <span>EFDA Verified Batch Inventory</span>
+              <span class="px-2 py-0.5 rounded text-[10px] bg-indigo-500/20 text-indigo-300 border border-indigo-500/30">Certified</span>
+            </h3>
+            <p class="text-xs text-slate-400 mt-0.5">Retail pharmacies can place POs directly against your in-stock batches.</p>
+          </div>
+          <div class="flex items-center space-x-2">
+            <button onclick="openAddBatchModal()" class="px-3.5 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-semibold flex items-center space-x-1.5 shadow-lg shadow-indigo-600/20">
+              <i class="fa-solid fa-plus"></i>
+              <span>Add Single Batch</span>
+            </button>
+            <button onclick="openBulkImportModal()" class="px-3.5 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 text-xs font-semibold flex items-center space-x-1.5">
+              <i class="fa-solid fa-file-excel text-emerald-400"></i>
+              <span>Import Excel / CSV</span>
+            </button>
+          </div>
+        </div>
+
+        <!-- Search & Category Filters -->
+        <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
+          <div class="relative sm:col-span-2">
+            <i class="fa-solid fa-magnifying-glass absolute left-3 top-3 text-slate-500 text-xs"></i>
+            <input type="text" id="catalogSearchInput" oninput="filterCatalogList()" placeholder="Filter by drug name, batch number, or generic formula..."
+              class="w-full bg-slate-900 border border-slate-800 rounded-xl pl-9 pr-4 py-2.5 text-xs text-slate-200 placeholder-slate-500 focus:outline-none focus:border-indigo-500">
+          </div>
+          <div>
+            <select id="catalogCategoryFilter" onchange="filterCatalogList()" class="w-full bg-slate-900 border border-slate-800 rounded-xl px-3 py-2.5 text-xs text-slate-200 focus:outline-none focus:border-indigo-500">
+              <option value="ALL">All Categories</option>
+              <option value="Antibiotics">Antibiotics</option>
+              <option value="Chronic Care">Chronic Care</option>
+              <option value="Emergency & Pain">Emergency & Pain</option>
+              <option value="Pediatrics">Pediatrics</option>
+            </select>
+          </div>
+        </div>
+
+        <!-- Catalog Table / List -->
+        <div class="bg-slate-900/60 border border-slate-800 rounded-2xl overflow-hidden shadow-sm">
+          <div class="overflow-x-auto">
+            <table class="w-full text-left text-xs">
+              <thead class="bg-slate-900 text-slate-400 uppercase tracking-wider text-[10px] border-b border-slate-800">
+                <tr>
+                  <th class="p-3">Medication & Spec</th>
+                  <th class="p-3">Batch & Expiry</th>
+                  <th class="p-3">Wholesale Price (ETB)</th>
+                  <th class="p-3">MOQ / Packaging</th>
+                  <th class="p-3">Stock Units</th>
+                  <th class="p-3 text-center">Status</th>
+                  <th class="p-3 text-right">Actions</th>
+                </tr>
+              </thead>
+              <tbody id="catalogTableBody" class="divide-y divide-slate-800/60 text-slate-300">
+                <!-- Populated via JS -->
+              </tbody>
+            </table>
+          </div>
+          <div id="catalogEmptyNotice" class="hidden text-center py-10 text-slate-500 text-xs">
+            No matching batches found in your inventory.
+          </div>
+        </div>
+      </div>
+
+      <!-- ============================================================ -->
+      <!-- TAB 3: 2% PLATFORM INVOICING & SETTLEMENT                   -->
+      <!-- ============================================================ -->
+      <div id="panelInvoicing" class="hidden space-y-6">
+        <div class="bg-slate-900 border border-slate-800 rounded-2xl p-6 shadow-sm">
+          <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-slate-800 pb-5">
+            <div>
+              <span class="text-xs uppercase tracking-wider text-indigo-400 font-bold">Transparent B2B Clearing</span>
+              <h3 class="text-lg font-bold text-white mt-1">Platform Commission & Remittance Ledger</h3>
+              <p class="text-xs text-slate-400 mt-1">MedFinder charges a flat 2.0% platform fee on settled retail wholesale transactions.</p>
+            </div>
+            <div class="text-right">
+              <div class="text-xs text-slate-400">Settlement Period</div>
+              <div class="text-sm font-semibold text-white">Current Month (Active)</div>
+            </div>
+          </div>
+
+          <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mt-6">
+            <div class="p-4 rounded-xl bg-slate-950 border border-slate-800">
+              <div class="text-xs text-slate-400">Total Settled Volume</div>
+              <div id="invSettledVolume" class="text-xl font-bold text-emerald-400 font-mono mt-1">0.00 ETB</div>
+              <div class="text-[10px] text-slate-500 mt-1">From fulfilled purchase orders</div>
+            </div>
+            <div class="p-4 rounded-xl bg-slate-950 border border-slate-800">
+              <div class="text-xs text-slate-400">2% Platform Fee Owed</div>
+              <div id="invFeeOwed" class="text-xl font-bold text-indigo-300 font-mono mt-1">0.00 ETB</div>
+              <div class="text-[10px] text-indigo-400 mt-1">Calculated per delivered order</div>
+            </div>
+            <div class="p-4 rounded-xl bg-slate-950 border border-slate-800">
+              <div class="text-xs text-slate-400">Settlement Status</div>
+              <div class="text-sm font-bold text-emerald-400 mt-1 flex items-center space-x-1.5">
+                <i class="fa-solid fa-circle-check"></i>
+                <span>Account in Good Standing</span>
+              </div>
+              <div class="text-[10px] text-slate-500 mt-1">Telebirr / CBE B2B Clearing</div>
+            </div>
+          </div>
+
+          <div class="mt-6 pt-6 border-t border-slate-800 flex flex-col sm:flex-row items-center justify-between gap-3 text-xs text-slate-400">
+            <div class="flex items-center space-x-2">
+              <i class="fa-solid fa-shield-halved text-indigo-400"></i>
+              <span>Monthly e-tax invoices comply with EFDA & Ministry of Revenue standards.</span>
+            </div>
+            <button onclick="downloadLedgerReport()" class="px-3.5 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 font-semibold flex items-center space-x-1.5">
+              <i class="fa-solid fa-file-invoice"></i>
+              <span>Export Monthly Ledger</span>
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <!-- ============================================================ -->
+      <!-- TAB 4: TELEGRAM DRIVER ALERT BOT INTEGRATION                 -->
+      <!-- ============================================================ -->
+      <div id="panelDispatch" class="hidden space-y-6">
+        <div class="bg-slate-900 border border-slate-800 rounded-2xl p-6 shadow-sm space-y-6">
+          <div class="flex items-start space-x-4">
+            <div class="w-12 h-12 rounded-2xl bg-sky-500/20 text-sky-400 flex items-center justify-center text-2xl flex-shrink-0 border border-sky-500/30">
+              <i class="fa-brands fa-telegram"></i>
+            </div>
+            <div>
+              <h3 class="text-base font-bold text-white">Hybrid Dispatch Channel: Telegram Driver Bot</h3>
+              <p class="text-xs text-slate-400 mt-1">
+                While this Wholesaler Studio PWA runs on your office or warehouse PC, your warehouse dispatchers and delivery drivers can receive immediate, loud Telegram dispatch notifications directly on their smartphones without battery drain.
+              </p>
+            </div>
+          </div>
+
+          <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <!-- Left Card: Connect Dispatch Bot -->
+            <div class="p-5 rounded-xl bg-slate-950 border border-slate-800 space-y-3">
+              <div class="flex items-center space-x-2 text-sky-400 text-xs font-bold uppercase tracking-wider">
+                <i class="fa-solid fa-link"></i>
+                <span>Connect Warehouse Team</span>
+              </div>
+              <p class="text-xs text-slate-300">
+                Connect your team to <b class="text-white">@MedFinder_Verifier_bot</b> using your company's dedicated 1-click start parameter:
+              </p>
+              <div class="bg-slate-900 p-3 rounded-lg border border-slate-800 text-xs font-mono text-indigo-300 break-all" id="telegramDeepLinkText">
+                https://t.me/MedFinder_Verifier_bot?start=wholesaler_cadila
+              </div>
+              <div class="pt-1">
+                <a id="telegramDeepLinkBtn" href="https://t.me/MedFinder_Verifier_bot" target="_blank" class="inline-flex items-center space-x-2 px-4 py-2.5 rounded-xl bg-sky-500 hover:bg-sky-400 text-slate-950 text-xs font-bold transition-all shadow-lg shadow-sky-500/20">
+                  <i class="fa-brands fa-telegram text-sm"></i>
+                  <span>Launch Dispatch Bot in Telegram</span>
+                </a>
+              </div>
+            </div>
+
+            <!-- Right Card: Sound Siren Audio Diagnostics -->
+            <div class="p-5 rounded-xl bg-slate-950 border border-slate-800 space-y-3">
+              <div class="flex items-center space-x-2 text-amber-400 text-xs font-bold uppercase tracking-wider">
+                <i class="fa-solid fa-volume-high"></i>
+                <span>POS Dispatch Chime Diagnostics</span>
+              </div>
+              <p class="text-xs text-slate-300">
+                Test the browser audio alarm that chimes when a pharmacy transmits a new high-priority Purchase Order to your warehouse:
+              </p>
+              <div class="flex items-center space-x-2 pt-2">
+                <button onclick="playDispatchSiren()" class="px-4 py-2.5 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 text-xs font-bold flex items-center space-x-2">
+                  <i class="fa-solid fa-bell"></i>
+                  <span>Test High-Pitch POS Chime</span>
+                </button>
+                <button onclick="toggleWakeLock(true)" class="px-3.5 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 text-xs font-medium">
+                  Keep Screen Awake
+                </button>
+              </div>
+              <p class="text-[11px] text-slate-500">
+                Synthesized Web Audio API sound (no external MP3 download required, works offline).
+              </p>
+            </div>
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </main>
+
+  <!-- ============================================================ -->
+  <!-- MODAL: ADD SINGLE BATCH LISTING                             -->
+  <!-- ============================================================ -->
+  <div id="addBatchModal" class="hidden fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
+    <div class="bg-slate-900 border border-slate-800 rounded-2xl max-w-lg w-full p-6 shadow-2xl relative">
+      <button onclick="closeAddBatchModal()" class="absolute top-4 right-4 text-slate-400 hover:text-white">
+        <i class="fa-solid fa-xmark text-lg"></i>
+      </button>
+
+      <h3 class="text-base font-bold text-white mb-1">Add Certified Medicine Batch</h3>
+      <p class="text-xs text-slate-400 mb-5">Publish certified batch directly into MedSupply B2B Exchange.</p>
+
+      <form id="addBatchForm" onsubmit="submitAddBatch(event)" class="space-y-3.5 text-xs">
+        <div>
+          <label class="block font-medium text-slate-300 mb-1">Drug Trade Name</label>
+          <input type="text" id="addDrugName" placeholder="e.g. Amoxicillin 500mg Capsules" required
+            class="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-indigo-500">
+        </div>
+
+        <div class="grid grid-cols-2 gap-3">
+          <div>
+            <label class="block font-medium text-slate-300 mb-1">Generic Name / Molecule</label>
+            <input type="text" id="addGenericName" placeholder="e.g. Amoxicillin Trihydrate" required
+              class="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-indigo-500">
+          </div>
+          <div>
+            <label class="block font-medium text-slate-300 mb-1">Therapeutic Category</label>
+            <select id="addCategory" class="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-indigo-500">
+              <option value="Antibiotics">Antibiotics</option>
+              <option value="Chronic Care">Chronic Care</option>
+              <option value="Emergency & Pain">Emergency & Pain</option>
+              <option value="Pediatrics">Pediatrics</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="grid grid-cols-2 gap-3">
+          <div>
+            <label class="block font-medium text-slate-300 mb-1">Wholesale Price (ETB)</label>
+            <input type="number" id="addPrice" step="0.5" placeholder="185.00" required
+              class="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-white font-mono focus:outline-none focus:border-indigo-500">
+          </div>
+          <div>
+            <label class="block font-medium text-slate-300 mb-1">Retail Max Price (ETB)</label>
+            <input type="number" id="addMsp" step="0.5" placeholder="230.00"
+              class="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-white font-mono focus:outline-none focus:border-indigo-500">
+          </div>
+        </div>
+
+        <div class="grid grid-cols-3 gap-3">
+          <div>
+            <label class="block font-medium text-slate-300 mb-1">Batch Number</label>
+            <input type="text" id="addBatchNo" placeholder="CAD-2026-X01" required
+              class="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-white font-mono focus:outline-none focus:border-indigo-500">
+          </div>
+          <div>
+            <label class="block font-medium text-slate-300 mb-1">Expiry Date</label>
+            <input type="date" id="addExpiry" required
+              class="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-indigo-500">
+          </div>
+          <div>
+            <label class="block font-medium text-slate-300 mb-1">Stock Units</label>
+            <input type="number" id="addStock" placeholder="250" required
+              class="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-white font-mono focus:outline-none focus:border-indigo-500">
+          </div>
+        </div>
+
+        <div class="grid grid-cols-2 gap-3">
+          <div>
+            <label class="block font-medium text-slate-300 mb-1">Min Order Qty (MOQ)</label>
+            <input type="number" id="addMoq" value="10" min="1" required
+              class="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-white font-mono focus:outline-none focus:border-indigo-500">
+          </div>
+          <div>
+            <label class="block font-medium text-slate-300 mb-1">Packaging / Dosage Form</label>
+            <input type="text" id="addPackaging" placeholder="Box of 100 capsules"
+              class="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-indigo-500">
+          </div>
+        </div>
+
+        <div class="pt-3 flex items-center justify-end space-x-2">
+          <button type="button" onclick="closeAddBatchModal()" class="px-4 py-2 rounded-xl bg-slate-800 text-slate-300 hover:bg-slate-700">Cancel</button>
+          <button type="submit" id="saveBatchBtn" class="px-4 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-semibold flex items-center space-x-1.5 shadow-lg shadow-indigo-600/30">
+            <i class="fa-solid fa-floppy-disk"></i>
+            <span>Publish Batch</span>
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- ============================================================ -->
+  <!-- MODAL: BULK EXCEL / CSV BATCH IMPORT                        -->
+  <!-- ============================================================ -->
+  <div id="bulkImportModal" class="hidden fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
+    <div class="bg-slate-900 border border-slate-800 rounded-2xl max-w-xl w-full p-6 shadow-2xl relative">
+      <button onclick="closeBulkImportModal()" class="absolute top-4 right-4 text-slate-400 hover:text-white">
+        <i class="fa-solid fa-xmark text-lg"></i>
+      </button>
+
+      <h3 class="text-base font-bold text-white mb-1">Bulk Excel / CSV Batch Upload</h3>
+      <p class="text-xs text-slate-400 mb-4">Upload your distributor stock spreadsheet directly into the catalog.</p>
+
+      <div class="p-4 rounded-xl border-2 border-dashed border-slate-700 hover:border-indigo-500 bg-slate-950 text-center cursor-pointer transition-colors"
+           onclick="document.getElementById('excelFileInput').click()">
+        <input type="file" id="excelFileInput" accept=".xlsx, .xls, .csv" class="hidden" onchange="handleExcelUpload(event)">
+        <i class="fa-solid fa-file-excel text-3xl text-emerald-400 mb-2"></i>
+        <p class="text-xs font-semibold text-slate-200">Click to select .xlsx, .xls, or .csv</p>
+        <p class="text-[11px] text-slate-500 mt-1">Columns: DrugName, GenericName, Category, WholesalePrice, StockUnits, BatchNumber, ExpiryDate</p>
+      </div>
+
+      <!-- Preview of parsed items -->
+      <div id="bulkPreviewContainer" class="hidden mt-4 space-y-2">
+        <div class="flex items-center justify-between text-xs text-slate-300">
+          <span>Parsed <b id="bulkParsedCount" class="text-emerald-400 font-bold">0</b> items ready:</span>
+          <button onclick="downloadSampleTemplate()" class="text-indigo-400 hover:underline text-[11px]">Download Sample CSV</button>
+        </div>
+        <div class="max-h-48 overflow-y-auto bg-slate-950 rounded-lg p-2 border border-slate-800 text-[11px] font-mono text-slate-300 divide-y divide-slate-800" id="bulkPreviewList"></div>
+      </div>
+
+      <div class="mt-5 flex items-center justify-end space-x-2">
+        <button type="button" onclick="closeBulkImportModal()" class="px-4 py-2 rounded-xl bg-slate-800 text-slate-300 hover:bg-slate-700 text-xs">Close</button>
+        <button type="button" id="confirmBulkUploadBtn" onclick="submitBulkImport()" disabled
+          class="px-4 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 text-white font-semibold text-xs flex items-center space-x-1.5 shadow-lg shadow-indigo-600/30">
+          <i class="fa-solid fa-cloud-arrow-up"></i>
+          <span>Confirm & Import Batches</span>
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- SCRIPT LOGIC -->
+  <script>
+    // State
+    let currentWholesaler = null;
+    let cachedOrders = [];
+    let cachedListings = [];
+    let audioMuted = false;
+    let wakeLock = null;
+    let pollingInterval = null;
+    let bulkParsedItems = [];
+
+    // Web Audio Synthesizer for High-Pitch Loud POS Chime
+    let audioCtx = null;
+    function playDispatchSiren() {
+      if (audioMuted) return;
+      try {
+        if (!audioCtx) {
+          audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+        }
+        if (audioCtx.state === 'suspended') {
+          audioCtx.resume();
+        }
+        const now = audioCtx.currentTime;
+
+        // Dual Tone Chime (880Hz -> 1760Hz POS Alert)
+        const osc1 = audioCtx.createOscillator();
+        const osc2 = audioCtx.createOscillator();
+        const gain = audioCtx.createGain();
+
+        osc1.type = 'triangle';
+        osc2.type = 'sine';
+
+        osc1.frequency.setValueAtTime(880, now);
+        osc1.frequency.exponentialRampToValueAtTime(1760, now + 0.15);
+
+        osc2.frequency.setValueAtTime(440, now);
+        osc2.frequency.exponentialRampToValueAtTime(880, now + 0.2);
+
+        gain.gain.setValueAtTime(0.3, now);
+        gain.gain.exponentialRampToValueAtTime(0.001, now + 0.6);
+
+        osc1.connect(gain);
+        osc2.connect(gain);
+        gain.connect(audioCtx.destination);
+
+        osc1.start(now);
+        osc2.start(now);
+        osc1.stop(now + 0.6);
+        osc2.stop(now + 0.6);
+
+        // Vibrate if supported
+        if (navigator.vibrate) {
+          navigator.vibrate([200, 100, 200]);
+        }
+      } catch (err) {
+        console.warn('Audio chime playback failed:', err);
+      }
+    }
+
+    function toggleAudioMute() {
+      audioMuted = !audioMuted;
+      const icon = document.getElementById('audioIcon');
+      const statusText = document.getElementById('soundAlertStatus');
+      if (audioMuted) {
+        icon.className = 'fa-solid fa-volume-xmark text-slate-500';
+        if (statusText) {
+          statusText.innerText = 'MUTED';
+          statusText.className = 'text-slate-500';
+        }
+      } else {
+        icon.className = 'fa-solid fa-volume-high text-indigo-400';
+        if (statusText) {
+          statusText.innerText = 'ACTIVE';
+          statusText.className = 'text-emerald-400';
+        }
+        playDispatchSiren();
+      }
+    }
+
+    // Wake Lock API (keeps warehouse screen active)
+    async function toggleWakeLock(manual = false) {
+      if ('wakeLock' in navigator) {
+        try {
+          if (!wakeLock) {
+            wakeLock = await navigator.wakeLock.request('screen');
+            document.getElementById('wakeLockNotice').classList.remove('hidden');
+            if (manual) alert('Screen wake lock enabled. Device will not sleep while this tab is open.');
+            wakeLock.addEventListener('release', () => {
+              wakeLock = null;
+              document.getElementById('wakeLockNotice').classList.add('hidden');
+            });
+          }
+        } catch (err) {
+          console.warn('Wake Lock request error:', err);
+        }
+      }
+    }
+
+    // PWA Service Worker Registration
+    if ('serviceWorker' in navigator) {
+      window.addEventListener('load', () => {
+        navigator.serviceWorker.register('/wholesaler/sw.js')
+          .then(reg => console.log('[Wholesaler PWA] Registered:', reg.scope))
+          .catch(err => console.warn('[Wholesaler PWA] SW registration failed:', err));
+      });
+    }
+
+    let deferredPrompt = null;
+    window.addEventListener('beforeinstallprompt', (e) => {
+      e.preventDefault();
+      deferredPrompt = e;
+      const btn = document.getElementById('installPwaBtn');
+      if (btn) btn.classList.remove('hidden');
+    });
+
+    function promptInstallPWA() {
+      if (deferredPrompt) {
+        deferredPrompt.prompt();
+        deferredPrompt.userChoice.then(() => {
+          deferredPrompt = null;
+          document.getElementById('installPwaBtn').classList.add('hidden');
+        });
+      } else {
+        alert('To install: Tap your browser menu (⋮ or Share) and select "Add to Home screen".');
+      }
+    }
+
+    // INIT & AUTHENTICATION
+    document.addEventListener('DOMContentLoaded', async () => {
+      // Check URL query for 1-click access key e.g. /wholesaler/?key=mf_ws_cadila_7718
+      const urlParams = new URLSearchParams(window.location.search);
+      const urlKey = urlParams.get('key') || urlParams.get('accessKey');
+
+      if (urlKey) {
+        document.getElementById('accessKeyInput').value = urlKey;
+        await handleAccessKeyLogin(null, urlKey);
+        return;
+      }
+
+      // Check stored session token
+      const storedToken = localStorage.getItem('medsupply_ws_token');
+      if (storedToken) {
+        await verifySession(storedToken);
+      }
+    });
+
+    function toggleKeyVisibility() {
+      const input = document.getElementById('accessKeyInput');
+      const icon = document.getElementById('toggleKeyIcon');
+      if (input.type === 'password') {
+        input.type = 'text';
+        icon.className = 'fa-solid fa-eye-slash';
+      } else {
+        input.type = 'password';
+        icon.className = 'fa-solid fa-eye';
+      }
+    }
+
+    async function quickLogin(key) {
+      document.getElementById('accessKeyInput').value = key;
+      await handleAccessKeyLogin(null, key);
+    }
+
+    async function handleAccessKeyLogin(event, directKey) {
+      if (event) event.preventDefault();
+      const key = directKey || document.getElementById('accessKeyInput').value.trim();
+      if (!key) return;
+
+      const btn = document.getElementById('loginBtn');
+      if (btn) btn.disabled = true;
+
+      try {
+        const res = await fetch('/api/wholesaler/auth/login', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ accessKey: key })
+        });
+        const data = await res.json();
+
+        if (data.success && data.wholesaler) {
+          localStorage.setItem('medsupply_ws_token', data.sessionToken);
+          localStorage.setItem('medsupply_ws_id', data.wholesaler.id);
+          setupWholesalerSession(data.wholesaler);
+        } else {
+          alert('Authentication failed: ' + (data.error || 'Invalid 1-Click Access Key'));
+        }
+      } catch (err) {
+        alert('Server connection error. Ensure the server is online.');
+      } finally {
+        if (btn) btn.disabled = false;
+      }
+    }
+
+    async function verifySession(token) {
+      try {
+        const res = await fetch('/api/wholesaler/auth/session', {
+          headers: { 'Authorization': `Bearer ${token}` }
+        });
+        const data = await res.json();
+        if (data.success && data.wholesaler) {
+          setupWholesalerSession(data.wholesaler);
+        } else {
+          localStorage.removeItem('medsupply_ws_token');
+        }
+      } catch (err) {
+        console.warn('Session check failed:', err);
+      }
+    }
+
+    function setupWholesalerSession(ws) {
+      currentWholesaler = ws;
+      document.getElementById('authSection').classList.add('hidden');
+      document.getElementById('studioDashboard').classList.remove('hidden');
+      document.getElementById('userHeaderProfile').classList.remove('hidden');
+      document.getElementById('userHeaderProfile').classList.add('flex');
+
+      document.getElementById('wholesalerBadgeName').innerText = ws.name;
+      document.getElementById('wholesalerBadgeCity').innerText = `${ws.city} • ${ws.licenseNumber || 'EFDA Vetted'}`;
+      document.getElementById('headerSubtitle').innerText = `${ws.name} — Dispatch Operations`;
+
+      // Set Telegram deep links
+      const tgSlug = ws.id.replace('ws-', '');
+      const tgLink = `https://t.me/MedFinder_Verifier_bot?start=wholesaler_${tgSlug}`;
+      document.getElementById('telegramDeepLinkText').innerText = tgLink;
+      document.getElementById('telegramDeepLinkBtn').href = tgLink;
+
+      // Start Screen wake lock & Live polling
+      toggleWakeLock();
+      refreshAllData();
+
+      if (pollingInterval) clearInterval(pollingInterval);
+      pollingInterval = setInterval(pollOrdersStream, 4000);
+    }
+
+    async function logoutWholesaler() {
+      const token = localStorage.getItem('medsupply_ws_token');
+      if (token) {
+        fetch('/api/wholesaler/auth/logout', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ token })
+        }).catch(() => {});
+      }
+      localStorage.removeItem('medsupply_ws_token');
+      localStorage.removeItem('medsupply_ws_id');
+      if (pollingInterval) clearInterval(pollingInterval);
+      window.location.reload();
+    }
+
+    // NAVIGATION TABS SWITCHER
+    function switchTab(tab) {
+      const tabs = ['orders', 'catalog', 'invoicing', 'dispatch'];
+      tabs.forEach(t => {
+        const panel = document.getElementById('panel' + t.charAt(0).toUpperCase() + t.slice(1));
+        const btn = document.getElementById('tabBtn' + t.charAt(0).toUpperCase() + t.slice(1));
+        if (t === tab) {
+          panel.classList.remove('hidden');
+          btn.className = 'flex items-center space-x-2 px-4 py-2.5 rounded-t-xl font-semibold text-xs tracking-wide transition-colors border-b-2 border-indigo-500 text-white bg-slate-900/60';
+        } else {
+          panel.classList.add('hidden');
+          btn.className = 'flex items-center space-x-2 px-4 py-2.5 rounded-t-xl font-semibold text-xs tracking-wide transition-colors border-b-2 border-transparent text-slate-400 hover:text-slate-200';
+        }
+      });
+    }
+
+    // DATA LOADING & POLLING
+    async function refreshAllData() {
+      await Promise.all([
+        refreshOrders(),
+        refreshCatalog(),
+        refreshInvoicing()
+      ]);
+    }
+
+    async function refreshOrders() {
+      if (!currentWholesaler) return;
+      try {
+        const res = await fetch(`/api/b2b/orders?wholesalerId=${currentWholesaler.id}`);
+        const data = await res.json();
+        if (data.success) {
+          cachedOrders = data.orders || [];
+          renderOrdersList();
+          updateKPIs();
+        }
+      } catch (err) {
+        console.warn('Orders fetch error:', err);
+      }
+    }
+
+    async function pollOrdersStream() {
+      if (!currentWholesaler) return;
+      try {
+        const res = await fetch(`/api/b2b/orders?wholesalerId=${currentWholesaler.id}`);
+        const data = await res.json();
+        if (data.success && data.orders) {
+          const prevPendingCount = cachedOrders.filter(o => o.status === 'PENDING').length;
+          const newOrders = data.orders;
+          const currentPendingCount = newOrders.filter(o => o.status === 'PENDING').length;
+
+          // If new urgent order arrived!
+          if (currentPendingCount > prevPendingCount) {
+            playDispatchSiren();
+          }
+
+          cachedOrders = newOrders;
+          renderOrdersList();
+          updateKPIs();
+        }
+      } catch (err) {
+        console.warn('PO stream poll silent err:', err);
+      }
+    }
+
+    async function refreshCatalog() {
+      if (!currentWholesaler) return;
+      try {
+        const res = await fetch(`/api/b2b/listings?wholesalerId=${currentWholesaler.id}&inStockOnly=false`);
+        const data = await res.json();
+        if (data.success) {
+          cachedListings = data.listings || [];
+          renderCatalogTable(cachedListings);
+          document.getElementById('kpiActiveBatches').innerText = cachedListings.length;
+        }
+      } catch (err) {
+        console.warn('Catalog fetch error:', err);
+      }
+    }
+
+    async function refreshInvoicing() {
+      try {
+        const res = await fetch('/api/b2b/invoicing');
+        const data = await res.json();
+        if (data.success) {
+          // Calculate volume specific to this wholesaler or overall
+          const deliveredOrders = cachedOrders.filter(o => o.status === 'DELIVERED');
+          const mySettledVolume = deliveredOrders.reduce((sum, o) => sum + (o.totalAmountETB || 0), 0);
+          const myCommissionFee = mySettledVolume * 0.02;
+
+          document.getElementById('invSettledVolume').innerText = mySettledVolume.toLocaleString() + ' ETB';
+          document.getElementById('invFeeOwed').innerText = myCommissionFee.toLocaleString() + ' ETB';
+        }
+      } catch (err) {
+        console.warn('Invoicing fetch error:', err);
+      }
+    }
+
+    function updateKPIs() {
+      const pendingOrders = cachedOrders.filter(o => o.status === 'PENDING');
+      const deliveredOrders = cachedOrders.filter(o => o.status === 'DELIVERED');
+      
+      const pendingCount = pendingOrders.length;
+      const pendingValue = pendingOrders.reduce((acc, o) => acc + (o.totalAmountETB || 0), 0);
+      const grossVolume = deliveredOrders.reduce((acc, o) => acc + (o.totalAmountETB || 0), 0);
+      const fee = grossVolume * 0.02;
+
+      document.getElementById('kpiPendingCount').innerText = pendingCount;
+      document.getElementById('kpiPendingValue').innerText = pendingValue.toLocaleString() + ' ETB Pending';
+      document.getElementById('kpiGrossVolume').innerText = grossVolume.toLocaleString() + ' ETB';
+      document.getElementById('kpiCompletedCount').innerText = deliveredOrders.length + ' Delivered POs';
+      document.getElementById('kpiCommissionFee').innerText = fee.toLocaleString() + ' ETB';
+
+      // Order badge on tab
+      const tabBadge = document.getElementById('tabOrderBadge');
+      if (pendingCount > 0) {
+        tabBadge.innerText = pendingCount;
+        tabBadge.classList.remove('hidden');
+        document.getElementById('urgentAlertBanner').classList.remove('hidden');
+        document.getElementById('urgentBannerTitle').innerText = `${pendingCount} Retail Pharmacy Purchase Order(s) Awaiting Dispatch!`;
+        document.getElementById('urgentBannerDesc').innerText = `Total pending value: ${pendingValue.toLocaleString()} ETB. Accept now to assign field driver.`;
+      } else {
+        tabBadge.classList.add('hidden');
+        document.getElementById('urgentAlertBanner').classList.add('hidden');
+      }
+    }
+
+    // RENDER ORDERS QUEUE
+    function renderOrdersList() {
+      const container = document.getElementById('ordersContainer');
+      const filter = document.getElementById('orderStatusFilter').value;
+
+      const filtered = filter === 'ALL' ? cachedOrders : cachedOrders.filter(o => o.status === filter);
+
+      if (filtered.length === 0) {
+        container.innerHTML = `
+          <div class="p-8 text-center bg-slate-900/40 rounded-2xl border border-slate-800 text-slate-400">
+            <i class="fa-solid fa-box-open text-3xl mb-2 text-slate-600"></i>
+            <p class="text-xs font-semibold">No purchase orders found matching '${filter}'.</p>
+            <p class="text-[11px] text-slate-500 mt-1">When retail pharmacies submit purchase orders, they will appear here live with audio alert.</p>
+          </div>
+        `;
+        return;
+      }
+
+      container.innerHTML = filtered.map(order => {
+        const isPending = order.status === 'PENDING';
+        const isConfirmed = order.status === 'CONFIRMED';
+        const isDispatched = order.status === 'DISPATCHED';
+        const isDelivered = order.status === 'DELIVERED';
+        const isCancelled = order.status === 'CANCELLED';
+
+        let badgeColor = 'bg-slate-800 text-slate-300 border-slate-700';
+        if (isPending) badgeColor = 'bg-amber-500/20 text-amber-300 border-amber-500/30 animate-pulse';
+        if (isConfirmed) badgeColor = 'bg-sky-500/20 text-sky-300 border-sky-500/30';
+        if (isDispatched) badgeColor = 'bg-indigo-500/20 text-indigo-300 border-indigo-500/30';
+        if (isDelivered) badgeColor = 'bg-emerald-500/20 text-emerald-300 border-emerald-500/30';
+        if (isCancelled) badgeColor = 'bg-rose-500/20 text-rose-300 border-rose-500/30';
+
+        const timeStr = new Date(order.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+        const dateStr = new Date(order.createdAt).toLocaleDateString([], { month: 'short', day: 'numeric' });
+
+        return `
+          <div class="p-4 sm:p-5 rounded-2xl bg-slate-900 border ${isPending ? 'border-amber-500/50 shadow-lg shadow-amber-500/5' : 'border-slate-800'} space-y-3">
+            <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-slate-800/80 pb-3">
+              <div class="flex items-center space-x-3">
+                <span class="w-2.5 h-2.5 rounded-full ${isPending ? 'bg-amber-400 animate-ping' : isDelivered ? 'bg-emerald-400' : 'bg-indigo-400'}"></span>
+                <div>
+                  <div class="flex items-center space-x-2">
+                    <span class="font-bold text-sm text-white font-mono">${order.id}</span>
+                    <span class="px-2 py-0.5 rounded text-[10px] font-bold border ${badgeColor}">${order.status}</span>
+                  </div>
+                  <div class="text-[11px] text-slate-400 flex items-center space-x-2 mt-0.5">
+                    <span>Retailer: <b class="text-slate-200">${order.pharmacyName || order.pharmacyId}</b></span>
+                    <span>•</span>
+                    <span>${dateStr} at ${timeStr}</span>
+                  </div>
+                </div>
+              </div>
+              <div class="text-right">
+                <div class="text-base font-extrabold text-white font-mono">${(order.totalAmountETB || 0).toLocaleString()} ETB</div>
+                <div class="text-[10px] text-slate-500">2% Platform Fee: ${(order.platformFeeETB || 0).toFixed(2)} ETB</div>
+              </div>
+            </div>
+
+            <!-- Order Item Details -->
+            <div class="grid grid-cols-1 sm:grid-cols-3 gap-3 text-xs bg-slate-950 p-3 rounded-xl border border-slate-800/80">
+              <div>
+                <span class="text-slate-500 block text-[10px] uppercase">Medicine Item</span>
+                <span class="font-bold text-slate-200">${order.drugName || 'Amoxicillin 500mg'}</span>
+                <span class="text-[10px] text-slate-400 block">${order.dosageForm || 'Certified Batch'}</span>
+              </div>
+              <div>
+                <span class="text-slate-500 block text-[10px] uppercase">Quantity Ordered</span>
+                <span class="font-bold text-indigo-300 font-mono text-sm">${order.quantity} units</span>
+                <span class="text-[10px] text-slate-400 block">@ ${(order.unitPriceETB || 0)} ETB / unit</span>
+              </div>
+              <div>
+                <span class="text-slate-500 block text-[10px] uppercase">Delivery Destination</span>
+                <span class="font-medium text-slate-300 flex items-center space-x-1">
+                  <i class="fa-solid fa-location-dot text-indigo-400 text-[10px]"></i>
+                  <span>${order.deliveryAddress || 'Addis Ababa retail store'}</span>
+                </span>
+                <span class="text-[10px] text-slate-500 block">Payment: ${order.paymentMethod || 'Telebirr'}</span>
+              </div>
+            </div>
+
+            <!-- Action Transition Bar -->
+            <div class="flex flex-wrap items-center justify-between gap-2 pt-1">
+              <div class="text-xs text-slate-400">
+                ${order.statusNotes ? `<span class="italic"><i class="fa-regular fa-comment text-[10px]"></i> "${order.statusNotes}"</span>` : ''}
+              </div>
+              <div class="flex items-center space-x-2">
+                ${isPending ? `
+                  <button onclick="updateOrderStatus('${order.id}', 'CANCELLED', 'Out of stock at warehouse')" class="px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-rose-900/40 text-slate-300 hover:text-rose-300 border border-slate-700 text-xs transition-colors">
+                    Decline / OOS
+                  </button>
+                  <button onclick="updateOrderStatus('${order.id}', 'CONFIRMED', 'Stock reserved. Packaging for driver pickup.')" class="px-4 py-1.5 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-xs flex items-center space-x-1.5 shadow-lg shadow-indigo-600/30">
+                    <i class="fa-solid fa-check"></i>
+                    <span>Accept & Pack Order</span>
+                  </button>
+                ` : ''}
+
+                ${isConfirmed ? `
+                  <button onclick="updateOrderStatus('${order.id}', 'DISPATCHED', 'Dispatched with delivery vehicle.')" class="px-4 py-1.5 rounded-lg bg-sky-600 hover:bg-sky-500 text-white font-bold text-xs flex items-center space-x-1.5 shadow-lg shadow-sky-600/30">
+                    <i class="fa-solid fa-truck"></i>
+                    <span>Mark Handed to Driver</span>
+                  </button>
+                ` : ''}
+
+                ${isDispatched ? `
+                  <button onclick="updateOrderStatus('${order.id}', 'DELIVERED', 'Delivered to retail counter & verified by pharmacist.')" class="px-4 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs flex items-center space-x-1.5 shadow-lg shadow-emerald-600/30">
+                    <i class="fa-solid fa-circle-check"></i>
+                    <span>Confirm Delivered & Settle</span>
+                  </button>
+                ` : ''}
+
+                ${isDelivered ? `
+                  <span class="text-xs text-emerald-400 font-semibold flex items-center space-x-1">
+                    <i class="fa-solid fa-check-double"></i>
+                    <span>Fulfilled & Remitted</span>
+                  </span>
+                ` : ''}
+              </div>
+            </div>
+          </div>
+        `;
+      }).join('');
+    }
+
+    async function updateOrderStatus(orderId, newStatus, defaultNote) {
+      const note = prompt(`Update Order #${orderId} to ${newStatus}:`, defaultNote || '');
+      if (note === null) return; // user cancelled
+
+      try {
+        const res = await fetch(`/api/b2b/orders/${orderId}/status`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            status: newStatus,
+            statusNotes: note
+          })
+        });
+        const data = await res.json();
+        if (data.success) {
+          await refreshOrders();
+          await refreshInvoicing();
+        } else {
+          alert('Failed to update order: ' + (data.error || 'Server error'));
+        }
+      } catch (err) {
+        alert('Network error updating order.');
+      }
+    }
+
+    // BATCH CATALOG MANAGEMENT
+    function renderCatalogTable(listings) {
+      const tbody = document.getElementById('catalogTableBody');
+      const empty = document.getElementById('catalogEmptyNotice');
+
+      if (!listings || listings.length === 0) {
+        tbody.innerHTML = '';
+        empty.classList.remove('hidden');
+        return;
+      }
+      empty.classList.add('hidden');
+
+      tbody.innerHTML = listings.map(l => {
+        const isExpiringSoon = new Date(l.expiryDate) < new Date(Date.now() + 90 * 24 * 60 * 60 * 1000);
+        return `
+          <tr class="hover:bg-slate-800/40 transition-colors">
+            <td class="p-3">
+              <div class="font-bold text-white">${l.drugName}</div>
+              <div class="text-[10px] text-slate-400">${l.genericName} • <span class="text-indigo-400">${l.category}</span></div>
+            </td>
+            <td class="p-3 font-mono">
+              <div class="text-slate-200">${l.batchNumber}</div>
+              <div class="text-[10px] ${isExpiringSoon ? 'text-amber-400 font-bold' : 'text-slate-400'}">Exp: ${l.expiryDate}</div>
+            </td>
+            <td class="p-3 font-mono text-emerald-400 font-bold">
+              ${(l.wholesalePriceETB || 0).toFixed(2)} ETB
+              ${l.retailMspETB ? `<div class="text-[10px] text-slate-500 font-normal">MSP: ${l.retailMspETB} ETB</div>` : ''}
+            </td>
+            <td class="p-3">
+              <div class="font-medium text-slate-300">Min: ${l.minimumOrderQty || 1}</div>
+              <div class="text-[10px] text-slate-500">${l.packaging || 'Standard pack'}</div>
+            </td>
+            <td class="p-3 font-mono">
+              <span class="font-bold ${l.stockUnits > 0 ? 'text-white' : 'text-rose-400'}">${l.stockUnits || 0}</span> units
+            </td>
+            <td class="p-3 text-center">
+              <button onclick="toggleListingStock('${l.id}')" class="px-2 py-1 rounded text-[10px] font-bold border ${l.inStock ? 'bg-emerald-500/20 text-emerald-300 border-emerald-500/30' : 'bg-rose-500/20 text-rose-300 border-rose-500/30'}">
+                ${l.inStock ? 'IN STOCK' : 'OUT OF STOCK'}
+              </button>
+            </td>
+            <td class="p-3 text-right">
+              <button onclick="deleteListing('${l.id}')" title="Delete Batch" class="p-1.5 rounded-lg bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 transition-colors">
+                <i class="fa-solid fa-trash-can text-xs"></i>
+              </button>
+            </td>
+          </tr>
+        `;
+      }).join('');
+    }
+
+    function filterCatalogList() {
+      const q = document.getElementById('catalogSearchInput').value.toLowerCase().trim();
+      const cat = document.getElementById('catalogCategoryFilter').value;
+
+      const filtered = cachedListings.filter(l => {
+        const matchesQ = !q || l.drugName.toLowerCase().includes(q) || l.genericName.toLowerCase().includes(q) || l.batchNumber.toLowerCase().includes(q);
+        const matchesCat = cat === 'ALL' || l.category === cat;
+        return matchesQ && matchesCat;
+      });
+
+      renderCatalogTable(filtered);
+    }
+
+    async function toggleListingStock(listingId) {
+      if (!currentWholesaler) return;
+      try {
+        const res = await fetch(`/api/wholesaler/${currentWholesaler.id}/listings/${listingId}/toggle`, { method: 'POST' });
+        const data = await res.json();
+        if (data.success) {
+          await refreshCatalog();
+        }
+      } catch (err) {
+        alert('Failed to toggle stock status');
+      }
+    }
+
+    async function deleteListing(listingId) {
+      if (!confirm('Remove this batch from the B2B catalog?')) return;
+      if (!currentWholesaler) return;
+      try {
+        const res = await fetch(`/api/wholesaler/${currentWholesaler.id}/listings/${listingId}`, { method: 'DELETE' });
+        const data = await res.json();
+        if (data.success) {
+          await refreshCatalog();
+        }
+      } catch (err) {
+        alert('Failed to delete listing');
+      }
+    }
+
+    // MODAL: ADD SINGLE BATCH
+    function openAddBatchModal() {
+      document.getElementById('addBatchModal').classList.remove('hidden');
+    }
+    function closeAddBatchModal() {
+      document.getElementById('addBatchModal').classList.add('hidden');
+    }
+
+    async function submitAddBatch(event) {
+      event.preventDefault();
+      if (!currentWholesaler) return;
+
+      const btn = document.getElementById('saveBatchBtn');
+      btn.disabled = true;
+
+      const payload = {
+        drugName: document.getElementById('addDrugName').value.trim(),
+        genericName: document.getElementById('addGenericName').value.trim(),
+        category: document.getElementById('addCategory').value,
+        wholesalePriceETB: parseFloat(document.getElementById('addPrice').value),
+        retailMspETB: parseFloat(document.getElementById('addMsp').value) || undefined,
+        batchNumber: document.getElementById('addBatchNo').value.trim(),
+        expiryDate: document.getElementById('addExpiry').value,
+        stockUnits: parseInt(document.getElementById('addStock').value, 10),
+        minimumOrderQty: parseInt(document.getElementById('addMoq').value, 10),
+        packaging: document.getElementById('addPackaging').value.trim()
+      };
+
+      try {
+        const res = await fetch(`/api/wholesaler/${currentWholesaler.id}/listings/add`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload)
+        });
+        const data = await res.json();
+        if (data.success) {
+          closeAddBatchModal();
+          document.getElementById('addBatchForm').reset();
+          await refreshCatalog();
+        } else {
+          alert('Failed to add batch: ' + (data.error || 'Server error'));
+        }
+      } catch (err) {
+        alert('Network error saving batch.');
+      } finally {
+        btn.disabled = false;
+      }
+    }
+
+    // MODAL: BULK EXCEL / CSV IMPORT
+    function openBulkImportModal() {
+      document.getElementById('bulkImportModal').classList.remove('hidden');
+    }
+    function closeBulkImportModal() {
+      document.getElementById('bulkImportModal').classList.add('hidden');
+      bulkParsedItems = [];
+      document.getElementById('bulkPreviewContainer').classList.add('hidden');
+      document.getElementById('confirmBulkUploadBtn').disabled = true;
+    }
+
+    function handleExcelUpload(event) {
+      const file = event.target.files[0];
+      if (!file) return;
+
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        try {
+          const data = new Uint8Array(e.target.result);
+          const workbook = XLSX.read(data, { type: 'array' });
+          const firstSheetName = workbook.SheetNames[0];
+          const sheet = workbook.Sheets[firstSheetName];
+          const json = XLSX.utils.sheet_to_json(sheet);
+
+          if (!json || json.length === 0) {
+            alert('Spreadsheet is empty or has invalid headers.');
+            return;
+          }
+
+          bulkParsedItems = json.map(row => ({
+            drugName: String(row.DrugName || row['Drug Name'] || row.Name || '').trim(),
+            genericName: String(row.GenericName || row['Generic Name'] || row.Generic || '').trim(),
+            category: String(row.Category || 'Antibiotics').trim(),
+            wholesalePriceETB: parseFloat(row.WholesalePrice || row['Wholesale Price'] || row.Price || 0),
+            retailMspETB: parseFloat(row.RetailMsp || row.MSP || 0) || undefined,
+            batchNumber: String(row.BatchNumber || row.Batch || `BATCH-${Date.now().toString().slice(-4)}`).trim(),
+            expiryDate: String(row.ExpiryDate || row.Expiry || '2027-12-31').trim(),
+            stockUnits: parseInt(row.StockUnits || row.Stock || row.Quantity || 100, 10),
+            minimumOrderQty: parseInt(row.MOQ || row.MinimumOrderQty || 10, 10),
+            packaging: String(row.Packaging || 'Box of standard blister packs').trim()
+          })).filter(i => i.drugName);
+
+          document.getElementById('bulkParsedCount').innerText = bulkParsedItems.length;
+          const previewList = document.getElementById('bulkPreviewList');
+          previewList.innerHTML = bulkParsedItems.slice(0, 10).map(i => `
+            <div class="py-1 flex justify-between">
+              <span><b>${i.drugName}</b> (${i.batchNumber})</span>
+              <span class="text-emerald-400 font-bold">${i.wholesalePriceETB} ETB • ${i.stockUnits} units</span>
+            </div>
+          `).join('');
+
+          if (bulkParsedItems.length > 10) {
+            previewList.innerHTML += `<div class="py-1 text-slate-500 italic">+ ${bulkParsedItems.length - 10} more items...</div>`;
+          }
+
+          document.getElementById('bulkPreviewContainer').classList.remove('hidden');
+          document.getElementById('confirmBulkUploadBtn').disabled = false;
+        } catch (err) {
+          alert('Error parsing spreadsheet: ' + err.message);
+        }
+      };
+      reader.readAsArrayBuffer(file);
+    }
+
+    async function submitBulkImport() {
+      if (!currentWholesaler || bulkParsedItems.length === 0) return;
+      const btn = document.getElementById('confirmBulkUploadBtn');
+      btn.disabled = true;
+
+      try {
+        const res = await fetch(`/api/wholesaler/${currentWholesaler.id}/listings/batch-import`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ items: bulkParsedItems })
+        });
+        const data = await res.json();
+        if (data.success) {
+          alert(`Successfully imported ${data.count} batches into your certified inventory!`);
+          closeBulkImportModal();
+          await refreshCatalog();
+        } else {
+          alert('Import failed: ' + (data.error || 'Server error'));
+        }
+      } catch (err) {
+        alert('Network error importing batches.');
+      } finally {
+        btn.disabled = false;
+      }
+    }
+
+    function downloadSampleTemplate() {
+      const csv = `DrugName,GenericName,Category,WholesalePrice,RetailMsp,BatchNumber,ExpiryDate,StockUnits,MOQ,Packaging
+Ciprofloxacin 500mg,Ciprofloxacin HCl,Antibiotics,140.00,180.00,CIP-2026-09A,2027-08-30,400,20,Pack of 10 tablets
+Omeprazole 20mg Capsules,Omeprazole,Chronic Care,95.00,125.00,OME-2026-44B,2027-11-15,600,15,Strip of 14 capsules
+Paracetamol 500mg Tablets,Acetaminophen,Emergency & Pain,45.00,60.00,PAR-2026-11C,2028-03-20,1000,50,Box of 100 tablets`;
+
+      const blob = new Blob([csv], { type: 'text/csv' });
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = 'MedSupply_Batch_Template.csv';
+      a.click();
+    }
+
+    function downloadLedgerReport() {
+      const delivered = cachedOrders.filter(o => o.status === 'DELIVERED');
+      if (delivered.length === 0) {
+        alert('No delivered transactions recorded yet for this month.');
+        return;
+      }
+      let csv = "Order ID,Pharmacy,Drug Name,Quantity,Gross ETB,Platform Fee 2% ETB,Delivered Date\n";
+      delivered.forEach(o => {
+        csv += `"${o.id}","${o.pharmacyName || o.pharmacyId}","${o.drugName}",${o.quantity},${o.totalAmountETB},${o.platformFeeETB},"${new Date(o.createdAt).toLocaleDateString()}"\n`;
+      });
+      const blob = new Blob([csv], { type: 'text/csv' });
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `MedSupply_Ledger_${currentWholesaler ? currentWholesaler.name.replace(/\s+/g, '_') : 'report'}.csv`;
+      a.click();
+    }
+  </script>
+</body>
+</html>

@@ -114,6 +114,9 @@ export interface Wholesaler {
   city: string;
   phone: string;
   telegramChatId?: string;
+  accessKey?: string;           // 1-Click access key (e.g. mf_ws_cadila_7718)
+  sessionToken?: string;        // 180-day persistent session token
+  sessionExpiresAt?: string;    // Session expiry ISO timestamp
   efdaWholesaleLicense: string; // EFDA license e.g. "EFDA/WHOLESALE/AA-9912"
   tinNumber: string;
   isVerified: boolean;
@@ -1326,6 +1329,7 @@ export class InMemoryDatabase {
         city: 'Addis Ababa',
         phone: '0911-203490',
         telegramChatId: 'tg_wholesaler_cadila',
+        accessKey: 'mf_ws_cadila_7718',
         efdaWholesaleLicense: 'EFDA/WHOLESALE/AA-7718',
         tinNumber: 'TIN-0019283741',
         isVerified: true,
@@ -1340,6 +1344,7 @@ export class InMemoryDatabase {
         city: 'Addis Ababa',
         phone: '0911-554433',
         telegramChatId: 'tg_wholesaler_medtech',
+        accessKey: 'mf_ws_medtech_8842',
         efdaWholesaleLicense: 'EFDA/WHOLESALE/AA-8842',
         tinNumber: 'TIN-0028391024',
         isVerified: true,
@@ -1354,6 +1359,7 @@ export class InMemoryDatabase {
         city: 'Addis Ababa',
         phone: '0911-889900',
         telegramChatId: 'tg_wholesaler_epharm',
+        accessKey: 'mf_ws_epharm_5531',
         efdaWholesaleLicense: 'EFDA/WHOLESALE/AA-5531',
         tinNumber: 'TIN-0039281745',
         isVerified: true,
@@ -1744,6 +1750,107 @@ export class InMemoryDatabase {
     }
 
     return { success: true, order };
+  }
+
+  public getWholesalerById(id: string): Wholesaler | undefined {
+    return this.wholesalers.find((w) => w.id === id);
+  }
+
+  public getWholesalerByAccessKey(accessKey: string): Wholesaler | undefined {
+    const cleanKey = String(accessKey).trim();
+    return this.wholesalers.find((w) => w.accessKey === cleanKey || w.id === cleanKey);
+  }
+
+  public getWholesalerBySession(token: string): Wholesaler | undefined {
+    const cleanToken = String(token).trim();
+    const ws = this.wholesalers.find((w) => w.sessionToken === cleanToken);
+    if (!ws) return undefined;
+    if (ws.sessionExpiresAt && new Date(ws.sessionExpiresAt) < new Date()) {
+      ws.sessionToken = undefined;
+      return undefined;
+    }
+    return ws;
+  }
+
+  public loginWholesalerWithKey(accessKey: string): { success: boolean; wholesaler?: Wholesaler; token?: string; sessionExpiresAt?: string; error?: string } {
+    const ws = this.getWholesalerByAccessKey(accessKey);
+    if (!ws) {
+      return { success: false, error: 'Invalid or unrecognized Wholesaler Access Key. Contact EFDA Compliance Desk.' };
+    }
+
+    const token = 'ws_sess_' + crypto.randomBytes(32).toString('hex');
+    const expiresAt = new Date(Date.now() + 180 * 24 * 60 * 60 * 1000).toISOString();
+    ws.sessionToken = token;
+    ws.sessionExpiresAt = expiresAt;
+
+    return {
+      success: true,
+      wholesaler: ws,
+      token,
+      sessionExpiresAt: expiresAt,
+    };
+  }
+
+  public addWholesaleListing(listingData: Omit<WholesaleListing, 'id' | 'updatedAt'>): WholesaleListing {
+    const newId = `b2b_${Date.now()}_${Math.floor(Math.random() * 1000)}`;
+    const now = new Date().toISOString();
+    const listing: WholesaleListing = {
+      ...listingData,
+      id: newId,
+      updatedAt: now,
+    };
+    this.wholesaleListings.unshift(listing);
+    return listing;
+  }
+
+  public bulkImportWholesaleListings(wholesalerId: string, items: Array<Partial<WholesaleListing>>): number {
+    const ws = this.getWholesalerById(wholesalerId);
+    if (!ws) return 0;
+
+    const now = new Date().toISOString();
+    let count = 0;
+    for (const item of items) {
+      if (!item.drugName) continue;
+      const listing: WholesaleListing = {
+        id: `b2b_${Date.now()}_${Math.floor(Math.random() * 10000)}`,
+        wholesalerId: ws.id,
+        wholesalerName: ws.name,
+        wholesalerPhone: ws.phone,
+        wholesalerSubCity: ws.subCity,
+        drugName: String(item.drugName).trim(),
+        genericName: item.genericName ? String(item.genericName).trim() : undefined,
+        category: item.category ? String(item.category).trim() : 'General Prescription',
+        wholesalePriceETB: Number(item.wholesalePriceETB) || 100,
+        retailMspETB: item.retailMspETB ? Number(item.retailMspETB) : undefined,
+        minimumOrderQty: Number(item.minimumOrderQty) || 5,
+        availableStock: Number(item.availableStock) || 50,
+        batchNumber: item.batchNumber ? String(item.batchNumber).trim() : `BATCH-${Math.floor(Math.random() * 8999 + 1000)}`,
+        expiryDate: item.expiryDate ? String(item.expiryDate).trim() : '2027-12-31',
+        efdaRegistrationNo: item.efdaRegistrationNo ? String(item.efdaRegistrationNo).trim() : ws.efdaWholesaleLicense,
+        originCountry: item.originCountry ? String(item.originCountry).trim() : 'Ethiopia',
+        deliveryEstimateHours: item.deliveryEstimateHours ? Number(item.deliveryEstimateHours) : 4,
+        isActive: true,
+        updatedAt: now,
+      };
+      this.wholesaleListings.unshift(listing);
+      count++;
+    }
+    return count;
+  }
+
+  public toggleWholesaleListing(listingId: string): WholesaleListing | null {
+    const listing = this.wholesaleListings.find((l) => l.id === listingId);
+    if (!listing) return null;
+    listing.isActive = !listing.isActive;
+    listing.updatedAt = new Date().toISOString();
+    return listing;
+  }
+
+  public deleteWholesaleListing(listingId: string): boolean {
+    const idx = this.wholesaleListings.findIndex((l) => l.id === listingId);
+    if (idx === -1) return false;
+    this.wholesaleListings.splice(idx, 1);
+    return true;
   }
 
   public getAllWholesalers(): Wholesaler[] {

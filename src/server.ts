@@ -1555,6 +1555,148 @@ app.get('/api/b2b/invoicing', async (_req: Request, res: Response) => {
 });
 
 // ==========================================
+// WHOLESALER / IMPORTER SUPPLY STUDIO APIS
+// ==========================================
+app.post('/api/wholesaler/auth/login', async (req: Request, res: Response) => {
+  const { accessKey, key, username } = req.body;
+  const keyToUse = String(accessKey || key || username || '').trim();
+  if (!keyToUse) {
+    return res.status(400).json({ success: false, error: '1-Click Wholesaler Access Key is required' });
+  }
+
+  const result = await dbRepo.loginWholesalerWithKey(keyToUse);
+  if (!result.success || !result.wholesaler) {
+    return res.status(401).json({ success: false, error: result.error || 'Invalid Wholesaler Access Key' });
+  }
+
+  res.json({
+    success: true,
+    token: result.token,
+    sessionExpiresAt: result.sessionExpiresAt,
+    wholesaler: result.wholesaler,
+  });
+});
+
+app.get('/api/wholesaler/auth/session', async (req: Request, res: Response) => {
+  const authHeader = req.headers.authorization || '';
+  const token = authHeader.replace(/^Bearer\s+/i, '') || String(req.query.token || '');
+  if (!token) return res.status(401).json({ success: false, error: 'Not authenticated' });
+
+  const ws = await dbRepo.getWholesalerBySession(token);
+  if (!ws) return res.status(401).json({ success: false, error: 'Wholesaler session expired or invalid' });
+
+  res.json({
+    success: true,
+    wholesaler: ws,
+  });
+});
+
+app.post('/api/wholesaler/auth/logout', async (req: Request, res: Response) => {
+  const authHeader = req.headers.authorization || '';
+  const token = authHeader.replace(/^Bearer\s+/i, '') || String(req.body.token || '');
+  if (token) {
+    const ws = await dbRepo.getWholesalerBySession(token);
+    if (ws) {
+      ws.sessionToken = undefined;
+      ws.sessionExpiresAt = undefined;
+    }
+  }
+  res.json({ success: true, message: 'Logged out successfully' });
+});
+
+app.post('/api/wholesaler/:wholesalerId/listings/add', async (req: Request, res: Response) => {
+  try {
+    const wholesalerId = String(req.params.wholesalerId);
+    const ws = await dbRepo.getWholesalerById(wholesalerId);
+    if (!ws) return res.status(404).json({ success: false, error: 'Wholesaler not found' });
+
+    const {
+      drugName,
+      genericName,
+      category,
+      wholesalePriceETB,
+      retailMspETB,
+      minimumOrderQty,
+      availableStock,
+      batchNumber,
+      expiryDate,
+      efdaRegistrationNo,
+      originCountry,
+      deliveryEstimateHours,
+    } = req.body;
+
+    if (!drugName || !wholesalePriceETB) {
+      return res.status(400).json({ success: false, error: 'Drug name and wholesale price are required' });
+    }
+
+    const listing = await dbRepo.addWholesaleListing({
+      wholesalerId: ws.id,
+      wholesalerName: ws.name,
+      wholesalerPhone: ws.phone,
+      wholesalerSubCity: ws.subCity,
+      drugName: String(drugName).trim(),
+      genericName: genericName ? String(genericName).trim() : undefined,
+      category: category ? String(category).trim() : 'General Prescription',
+      wholesalePriceETB: Number(wholesalePriceETB),
+      retailMspETB: retailMspETB ? Number(retailMspETB) : undefined,
+      minimumOrderQty: Number(minimumOrderQty) || 5,
+      availableStock: Number(availableStock) || 50,
+      batchNumber: batchNumber ? String(batchNumber).trim() : `BATCH-${Math.floor(Math.random() * 8999 + 1000)}`,
+      expiryDate: expiryDate ? String(expiryDate).trim() : '2027-12-31',
+      efdaRegistrationNo: efdaRegistrationNo ? String(efdaRegistrationNo).trim() : ws.efdaWholesaleLicense,
+      originCountry: originCountry ? String(originCountry).trim() : 'Ethiopia',
+      deliveryEstimateHours: deliveryEstimateHours ? Number(deliveryEstimateHours) : 4,
+      isActive: true,
+    });
+
+    res.json({ success: true, listing });
+  } catch (err: any) {
+    res.status(500).json({ success: false, error: err.message || 'Failed to add listing' });
+  }
+});
+
+app.post('/api/wholesaler/:wholesalerId/listings/batch-import', async (req: Request, res: Response) => {
+  try {
+    const wholesalerId = String(req.params.wholesalerId);
+    const { items } = req.body;
+    if (!Array.isArray(items) || items.length === 0) {
+      return res.status(400).json({ success: false, error: 'items array is required' });
+    }
+
+    const count = await dbRepo.bulkImportWholesaleListings(wholesalerId, items);
+    res.json({ success: true, count });
+  } catch (err: any) {
+    res.status(500).json({ success: false, error: err.message || 'Failed to import batch listings' });
+  }
+});
+
+app.post('/api/wholesaler/:wholesalerId/listings/:listingId/toggle', async (req: Request, res: Response) => {
+  try {
+    const listingId = String(req.params.listingId);
+    const listing = await dbRepo.toggleWholesaleListing(listingId);
+    if (!listing) return res.status(404).json({ success: false, error: 'Listing not found' });
+    res.json({ success: true, listing });
+  } catch (err: any) {
+    res.status(500).json({ success: false, error: err.message || 'Failed to toggle listing' });
+  }
+});
+
+app.delete('/api/wholesaler/:wholesalerId/listings/:listingId', async (req: Request, res: Response) => {
+  try {
+    const listingId = String(req.params.listingId);
+    const deleted = await dbRepo.deleteWholesaleListing(listingId);
+    res.json({ success: deleted });
+  } catch (err: any) {
+    res.status(500).json({ success: false, error: err.message || 'Failed to delete listing' });
+  }
+});
+
+// Dedicated Wholesaler Supply Studio PWA direct route
+app.get(['/wholesaler', '/wholesaler/setup', '/wholesaler/index.html'], (_req: Request, res: Response) => {
+  res.sendFile(path.join(__dirname, '../public/wholesaler/index.html'));
+});
+
+// ==========================================
 // 7. TELEGRAM VERIFICATION BOT APIS (CHANNEL B)
 // ==========================================
 // Webhook & Chat Interaction

@@ -456,4 +456,38 @@ export class InMemoryRepository implements IDatabaseRepository {
   }> {
     return this.db.getB2BCommissionReport();
   }
+
+  public async getWholesalerById(id: string): Promise<Wholesaler | null> {
+    return this.db.getWholesalerById(id) || null;
+  }
+
+  public async getWholesalerByAccessKey(accessKey: string): Promise<Wholesaler | null> {
+    return this.db.getWholesalerByAccessKey(accessKey) || null;
+  }
+
+  public async getWholesalerBySession(token: string): Promise<Wholesaler | null> {
+    return this.db.getWholesalerBySession(token) || null;
+  }
+
+  public async loginWholesalerWithKey(
+    accessKey: string
+  ): Promise<{ success: boolean; wholesaler?: Wholesaler; token?: string; sessionExpiresAt?: string; error?: string }> {
+    return this.db.loginWholesalerWithKey(accessKey);
+  }
+
+  public async addWholesaleListing(listingData: Omit<WholesaleListing, 'id' | 'updatedAt'>): Promise<WholesaleListing> {
+    return this.db.addWholesaleListing(listingData);
+  }
+
+  public async bulkImportWholesaleListings(wholesalerId: string, items: Array<Partial<WholesaleListing>>): Promise<number> {
+    return this.db.bulkImportWholesaleListings(wholesalerId, items);
+  }
+
+  public async toggleWholesaleListing(listingId: string): Promise<WholesaleListing | null> {
+    return this.db.toggleWholesaleListing(listingId);
+  }
+
+  public async deleteWholesaleListing(listingId: string): Promise<boolean> {
+    return this.db.deleteWholesaleListing(listingId);
+  }
 }

@@ -1,0 +1,25 @@
+{
+  "name": "MedSupply Exchange - Wholesaler Studio",
+  "short_name": "Wholesaler Studio",
+  "description": "Professional B2B Wholesaler Dispatch, Purchase Orders & EFDA Batch Catalog Management PWA for Ethiopian Distributors",
+  "start_url": "/wholesaler/",
+  "scope": "/wholesaler/",
+  "display": "standalone",
+  "background_color": "#0b0f19",
+  "theme_color": "#4f46e5",
+  "orientation": "any",
+  "icons": [
+    {
+      "src": "data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 192 192'><rect width='192' height='192' rx='40' fill='%234f46e5'/><path d='M46 64 L96 36 L146 64 L146 128 L96 156 L46 128 Z' fill='none' stroke='white' stroke-width='14' stroke-linejoin='round'/><path d='M96 36 L96 156 M46 64 L96 96 L146 64' fill='none' stroke='white' stroke-width='10' stroke-linejoin='round'/></svg>",
+      "sizes": "192x192",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 512 512'><rect width='512' height='512' rx='100' fill='%234f46e5'/><path d='M120 170 L256 90 L392 170 L392 342 L256 422 L120 342 Z' fill='none' stroke='white' stroke-width='36' stroke-linejoin='round'/><path d='M256 90 L256 422 M120 170 L256 256 L392 170' fill='none' stroke='white' stroke-width='28' stroke-linejoin='round'/></svg>",
+      "sizes": "512x512",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}

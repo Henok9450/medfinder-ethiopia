@@ -1788,5 +1788,39 @@ export class PostgresRepository implements IDatabaseRepository {
   }> {
     return InMemoryDatabase.getInstance().getB2BCommissionReport();
   }
+
+  public async getWholesalerById(id: string): Promise<Wholesaler | null> {
+    return InMemoryDatabase.getInstance().getWholesalerById(id) || null;
+  }
+
+  public async getWholesalerByAccessKey(accessKey: string): Promise<Wholesaler | null> {
+    return InMemoryDatabase.getInstance().getWholesalerByAccessKey(accessKey) || null;
+  }
+
+  public async getWholesalerBySession(token: string): Promise<Wholesaler | null> {
+    return InMemoryDatabase.getInstance().getWholesalerBySession(token) || null;
+  }
+
+  public async loginWholesalerWithKey(
+    accessKey: string
+  ): Promise<{ success: boolean; wholesaler?: Wholesaler; token?: string; sessionExpiresAt?: string; error?: string }> {
+    return InMemoryDatabase.getInstance().loginWholesalerWithKey(accessKey);
+  }
+
+  public async addWholesaleListing(listingData: Omit<WholesaleListing, 'id' | 'updatedAt'>): Promise<WholesaleListing> {
+    return InMemoryDatabase.getInstance().addWholesaleListing(listingData);
+  }
+
+  public async bulkImportWholesaleListings(wholesalerId: string, items: Array<Partial<WholesaleListing>>): Promise<number> {
+    return InMemoryDatabase.getInstance().bulkImportWholesaleListings(wholesalerId, items);
+  }
+
+  public async toggleWholesaleListing(listingId: string): Promise<WholesaleListing | null> {
+    return InMemoryDatabase.getInstance().toggleWholesaleListing(listingId);
+  }
+
+  public async deleteWholesaleListing(listingId: string): Promise<boolean> {
+    return InMemoryDatabase.getInstance().deleteWholesaleListing(listingId);
+  }
 }
 
