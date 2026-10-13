@@ -147,57 +147,65 @@ export async function runMigrations(): Promise<{ success: boolean; message: stri
       CREATE INDEX IF NOT EXISTS idx_search_analytics_drug_subcity ON search_analytics_events (normalized_drug, sub_city);
     `);
 
-    // Backfill any approved applications missing portal credentials
+    // Backfill any approved applications missing passwordless portal access keys
     try {
+      await p.query(`
+        UPDATE pharmacy_portal_accounts
+        SET access_key = COALESCE(setup_token, 'mf_key_' || md5(random()::text || id))
+        WHERE access_key IS NULL OR access_key = ''
+      `);
+
       const uncredentialed = await p.query(`
-        SELECT id, pharmacy_name, sub_city, phone, efda_license_number, approved_pharmacy_id, portal_username, portal_temp_password, portal_setup_token
+        SELECT id, telegram_chat_id, pharmacy_name, sub_city, phone, efda_license_number, approved_pharmacy_id, portal_access_key, portal_username, portal_setup_token
         FROM pharmacy_verification_applications
-        WHERE status = 'APPROVED' AND (portal_username IS NULL OR portal_setup_token IS NULL)
+        WHERE status = 'APPROVED' AND (portal_access_key IS NULL OR portal_setup_token IS NULL)
       `);
 
       for (const row of uncredentialed.rows) {
-        const cleanName = (row.pharmacy_name || 'pharm')
-          .toLowerCase()
-          .replace(/[^a-z0-9]/g, '_')
-          .replace(/_+/g, '_')
-          .replace(/^_|_$/g, '');
-        const randNum = Math.floor(100 + Math.random() * 900);
-        const baseUsername = cleanName ? `${cleanName.substring(0, 15)}_${randNum}` : `pharm_${randNum}`;
-        const tempCode = Math.floor(1000 + Math.random() * 9000);
-        const tempPassword = `Med#${tempCode}!ET`;
-        const passHash = crypto.createHash('sha256').update(tempPassword + '_medfinder_ethiopia_salt').digest('hex');
-        const setupTok = crypto.randomBytes(16).toString('hex');
-        const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000); // 7-day validity for backfilled setup link
-        const accId = `acc-${crypto.randomBytes(4).toString('hex')}`;
+        const accessKey = row.portal_access_key || row.portal_setup_token || ('mf_key_' + crypto.randomBytes(24).toString('hex'));
+        const sessionToken = 'sess_' + crypto.randomBytes(32).toString('hex');
+        const expiresAt = new Date(Date.now() + 180 * 24 * 60 * 60 * 1000);
+        const accId = `acc-${crypto.randomBytes(6).toString('hex')}`;
         const pId = row.approved_pharmacy_id || `pharm-${(row.sub_city || 'bole').toLowerCase().replace(/[^a-z]/g, '')}-${Math.floor(1000 + Math.random() * 9000)}`;
 
         // Ensure parent pharmacy record exists in pharmacies table to satisfy foreign key constraint
         await p.query(
-          `INSERT INTO pharmacies (id, name, sub_city, phone, efda_license_number, tin_number, is_verified, location)
-           VALUES ($1, $2, $3, $4, $5, $6, TRUE, ST_SetSRID(ST_MakePoint(38.7880, 8.9950), 4326))
-           ON CONFLICT (id) DO UPDATE SET name = EXCLUDED.name, is_verified = TRUE`,
-          [pId, row.pharmacy_name, row.sub_city || 'Bole', row.phone, row.efda_license_number || 'EFDA/PH/2026', 'TIN-00000000']
+          `INSERT INTO pharmacies (id, name, sub_city, phone, telegram_chat_id, efda_license_number, tin_number, is_verified, location)
+           VALUES ($1, $2, $3, $4, $5, $6, $7, TRUE, ST_SetSRID(ST_MakePoint(38.7880, 8.9950), 4326))
+           ON CONFLICT (id) DO UPDATE SET name = EXCLUDED.name, is_verified = TRUE, telegram_chat_id = COALESCE(pharmacies.telegram_chat_id, EXCLUDED.telegram_chat_id)`,
+          [pId, row.pharmacy_name, row.sub_city || 'Bole', row.phone, row.telegram_chat_id, row.efda_license_number || 'EFDA/PH/2026', 'TIN-00000000']
         );
 
-        await p.query(
-          `INSERT INTO pharmacy_portal_accounts (
-             id, pharmacy_id, pharmacy_name, sub_city, phone, username,
-             password_hash, temp_password, setup_token, setup_token_expires_at,
-             must_change_password, created_at
-           )
-           VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, TRUE, NOW())
-           ON CONFLICT (username) DO UPDATE
-           SET temp_password = EXCLUDED.temp_password, setup_token = EXCLUDED.setup_token`,
-          [accId, pId, row.pharmacy_name, row.sub_city, row.phone, baseUsername, passHash, tempPassword, setupTok, expiresAt]
+        const existingAcc = await p.query(
+          `SELECT id, access_key FROM pharmacy_portal_accounts WHERE pharmacy_id = $1 OR telegram_chat_id = $2 LIMIT 1`,
+          [pId, row.telegram_chat_id]
         );
+
+        let finalKey = accessKey;
+        if (existingAcc.rows.length > 0) {
+          finalKey = existingAcc.rows[0].access_key || accessKey;
+          await p.query(
+            `UPDATE pharmacy_portal_accounts SET access_key = $1, telegram_chat_id = COALESCE(telegram_chat_id, $2) WHERE id = $3`,
+            [finalKey, row.telegram_chat_id, existingAcc.rows[0].id]
+          );
+        } else {
+          await p.query(
+            `INSERT INTO pharmacy_portal_accounts (
+               id, pharmacy_id, pharmacy_name, sub_city, phone,
+               access_key, telegram_chat_id, session_token, session_expires_at, created_at
+             )
+             VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, NOW())`,
+            [accId, pId, row.pharmacy_name, row.sub_city || 'Bole', row.phone, finalKey, row.telegram_chat_id, sessionToken, expiresAt]
+          );
+        }
 
         await p.query(
           `UPDATE pharmacy_verification_applications
-           SET approved_pharmacy_id = $1, portal_username = $2, portal_temp_password = $3, portal_setup_token = $4
-           WHERE id = $5`,
-          [pId, baseUsername, tempPassword, setupTok, row.id]
+           SET approved_pharmacy_id = $1, portal_access_key = $2, portal_username = $2, portal_setup_token = $2
+           WHERE id = $3`,
+          [pId, finalKey, row.id]
         );
-        console.log(`[PostgreSQL] ✅ Backfilled portal credentials for approved pharmacy: ${row.pharmacy_name} (${baseUsername})`);
+        console.log(`[PostgreSQL] ✅ Backfilled 1-Click Magic Key for approved pharmacy: ${row.pharmacy_name}`);
       }
     } catch (backfillErr: any) {
       console.warn('[PostgreSQL] Portal credentials backfill notice:', backfillErr.message);

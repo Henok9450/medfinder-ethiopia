@@ -4170,11 +4170,10 @@
                     <i class="fa-solid fa-file-lines"></i> View Certificate
                   </button>
                   <span class="text-xs text-emerald-600 font-semibold inline-flex items-center gap-1 ml-1"><i class="fa-solid fa-shield-halved"></i> Verified</span>
-                  ${a.portalUsername ? `
+                  ${(a.portalAccessKey || a.portalSetupToken || a.portalUsername) ? `
                     <div class="mt-1 text-[11px] font-mono text-slate-700 bg-emerald-50 border border-emerald-200 rounded px-2 py-1 text-left block">
-                      <span>👤 User: <strong>${a.portalUsername}</strong></span>
-                      ${a.portalTempPassword ? `<span class="ml-1.5 text-slate-600">| 🔑 Pass: <code class="font-bold">${a.portalTempPassword}</code></span>` : ''}
-                      ${a.portalSetupToken ? `<a href="/pharmacy?setupToken=${encodeURIComponent(a.portalSetupToken)}" target="_blank" class="text-sky-600 font-sans hover:underline ml-2 font-semibold inline-flex items-center gap-0.5"><i class="fa-solid fa-arrow-up-right-from-square text-[9px]"></i> Setup Link</a>` : ''}
+                      <span>🔑 Magic Key: <strong>${a.portalAccessKey || a.portalSetupToken || a.portalUsername}</strong></span>
+                      <a href="/pharmacy?key=${encodeURIComponent(a.portalAccessKey || a.portalSetupToken || a.portalUsername)}" target="_blank" class="text-sky-600 font-sans hover:underline ml-2 font-semibold inline-flex items-center gap-0.5"><i class="fa-solid fa-arrow-up-right-from-square text-[9px]"></i> 1-Click Counter Login</a>
                     </div>
                   ` : ''}
                 `}
@@ -4511,8 +4510,9 @@
           const pharmName = (data.pharmacy && data.pharmacy.name) ? ` "${data.pharmacy.name}"` : '';
           const app = data.application || {};
           let credsNotice = '';
-          if (status === 'APPROVED' && app.portalUsername) {
-            credsNotice = `\n\n🔑 Generated Pharmacy Portal Credentials:\n• Username: ${app.portalUsername}\n• Temporary Password: ${app.portalTempPassword}\n• 1-Click Setup Link: /pharmacy?setupToken=${app.portalSetupToken}\n\n(These credentials have been automatically dispatched to the pharmacist's Telegram chat!)`;
+          const magicKey = app.portalAccessKey || app.portalSetupToken || app.portalUsername;
+          if (status === 'APPROVED' && magicKey) {
+            credsNotice = `\n\n🔑 Generated Passwordless 1-Click Magic Key:\n• Magic Key: ${magicKey}\n• 1-Click Counter Link: /pharmacy?key=${encodeURIComponent(magicKey)}\n\n(This 1-click access link has been automatically dispatched to the pharmacist's Telegram chat!)`;
           }
           alert(`Application ${id} status updated to: ${status}!\nLive notification sent to pharmacist Telegram chat.${status === 'APPROVED' ? `\n\n✅ Pharmacy${pharmName} is now EFDA Verified and listed in the Compliance Desk.` : ''}${credsNotice}`);
           closeDocInspectModal();

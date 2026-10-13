@@ -673,6 +673,82 @@ export class TelegramVerificationBotService {
   }
 
   /**
+   * Resolve or provision a guaranteed persistent 1-Click Magic Key for an approved pharmacy
+   */
+  public async resolveOrProvisionAccessKey(
+    chatId: string,
+    passedApp?: PharmacyVerificationApplication
+  ): Promise<{ accessKey?: string; pharmacyName?: string }> {
+    let account = (await this.repo.getAccountByTelegramChatId(chatId)) ||
+      this.db.getAccountByTelegramChatId(chatId);
+
+    let app = passedApp || this.db.verificationApplications.find(
+      (a) => a.telegramChatId === chatId && a.status === 'APPROVED'
+    );
+    if (!app) {
+      try {
+        const allApps = await this.repo.getVerificationApplications();
+        app = allApps.find((a) => a.telegramChatId === chatId && a.status === 'APPROVED');
+      } catch (e) {
+        // ignore
+      }
+    }
+
+    const pharmacy = (await this.repo.getPharmacyByTelegramChatId(chatId)) ||
+      this.getPharmacyForChatId(chatId) ||
+      (app?.approvedPharmacyId ? await this.repo.getPharmacyById(app.approvedPharmacyId) : undefined);
+
+    let accessKey = app?.portalAccessKey || app?.portalSetupToken || app?.portalUsername || account?.accessKey;
+    const pharmacyName = app?.pharmacyName || account?.pharmacyName || pharmacy?.name;
+
+    if (account || pharmacy || (app && (app.status === 'APPROVED' || passedApp))) {
+      const targetPharm: Pharmacy = pharmacy || {
+        id: app?.approvedPharmacyId || account?.pharmacyId || `pharm-bole-${Math.floor(1000 + Math.random() * 9000)}`,
+        name: pharmacyName || 'Registered Pharmacy',
+        subCity: app?.subCity || account?.subCity || 'Bole',
+        city: 'Addis Ababa',
+        latitude: app?.latitude ?? 9.0015,
+        longitude: app?.longitude ?? 38.7845,
+        phone: app?.phone || account?.phone || '+251911000000',
+        telegramChatId: chatId,
+        isVerified: true,
+        efdaLicenseNumber: app?.efdaLicenseNumber || 'EFDA-AA-2025',
+        tinNumber: app?.tinNumber || 'TIN-0000',
+        tier: 'PREMIUM',
+        trustScore: 98,
+        strikeCount: 0,
+        isShadowBanned: false,
+        isPermanentlyBanned: false,
+        inStockItems: ['insulin', 'augmentin', 'amoxicillin', 'metformin', 'ventolin'],
+        inventory: [],
+      };
+
+      try {
+        const dbAcc = await this.repo.createOrGetPharmacyAccount(targetPharm, chatId);
+        accessKey = dbAcc.accessKey;
+      } catch (err) {
+        // Fallback to in-memory if Postgres is offline
+      }
+
+      const memAcc = this.db.createOrGetPharmacyAccount(targetPharm, chatId);
+      if (accessKey && memAcc.accessKey !== accessKey) {
+        memAcc.accessKey = accessKey;
+        this.db.pharmacyAccounts.set(accessKey, memAcc);
+      } else if (!accessKey) {
+        accessKey = memAcc.accessKey;
+      }
+
+      if (app && accessKey) {
+        app.portalAccessKey = accessKey;
+        app.portalUsername = accessKey;
+        app.portalSetupToken = accessKey;
+      }
+    }
+
+    return { accessKey, pharmacyName };
+  }
+
+  /**
    * Prompt user to select/link their pharmacy for inventory management
    */
   public promptLinkPharmacy(chatId: string): TelegramBotResponse {
@@ -1854,18 +1930,12 @@ Type **/status** at any time to monitor progress.
 
       // 5B. Counter 1-Click Key (/key or /counter or /login)
       if (cleanText === '/key' || cleanText === '/counter' || cleanText === '/login' || cleanText === '/magic') {
-        const account = (await this.repo.getAccountByTelegramChatId(chatId)) ||
-          this.db.getAccountByTelegramChatId(chatId);
-        const app = this.db.verificationApplications.find((a) => a.telegramChatId === chatId && a.status === 'APPROVED');
-        const pharmacy = this.getPharmacyForChatId(chatId);
+        const { accessKey, pharmacyName } = await this.resolveOrProvisionAccessKey(chatId);
 
-        const accessKey = account?.accessKey || app?.portalAccessKey;
-
-        if (account || (app && accessKey)) {
+        if (accessKey) {
           const portalUrl = this.getWebStudioUrl();
-          const key = accessKey || `mf_key_${crypto.randomBytes(24).toString('hex')}`;
-          const magicUrl = `${portalUrl}?key=${encodeURIComponent(key)}`;
-          const pharmName = account?.pharmacyName || app?.pharmacyName || pharmacy?.name || 'Your Pharmacy';
+          const magicUrl = `${portalUrl}?key=${encodeURIComponent(accessKey)}`;
+          const pharmName = pharmacyName || 'Your Pharmacy';
 
           return {
             chatId,
@@ -2645,18 +2715,12 @@ ${itemsDisplay}
     }
 
     if (cleanText === '/key' || cleanText === '/counter' || cleanText === '/login' || cleanText === '/magic') {
-      const account = (await this.repo.getAccountByTelegramChatId(chatId)) ||
-        this.db.getAccountByTelegramChatId(chatId);
-      const app = this.db.verificationApplications?.find((a) => a.telegramChatId === chatId && a.status === 'APPROVED');
-      const pharmacy = this.getPharmacyForChatId(chatId);
+      const { accessKey, pharmacyName } = await this.resolveOrProvisionAccessKey(chatId);
 
-      const accessKey = account?.accessKey || app?.portalAccessKey;
-
-      if (account || (app && accessKey)) {
+      if (accessKey) {
         const portalUrl = this.getWebStudioUrl();
-        const key = accessKey || `mf_key_${crypto.randomBytes(24).toString('hex')}`;
-        const magicUrl = `${portalUrl}?key=${encodeURIComponent(key)}`;
-        const pharmName = account?.pharmacyName || app?.pharmacyName || pharmacy?.name || 'Your Pharmacy';
+        const magicUrl = `${portalUrl}?key=${encodeURIComponent(accessKey)}`;
+        const pharmName = pharmacyName || 'Your Pharmacy';
 
         return {
           chatId,
@@ -3322,11 +3386,10 @@ Send **"Confirm"** to submit to the EFDA Compliance Desk.`;
     }
 
     const portalUrl = this.getWebStudioUrl();
-    let accessKey = app?.portalAccessKey;
-    if (!accessKey) {
-      const acc = (await this.repo.getAccountByTelegramChatId(chatId)) ||
-        this.db.getAccountByTelegramChatId(chatId);
-      accessKey = acc?.accessKey || `mf_key_${crypto.randomBytes(24).toString('hex')}`;
+    let accessKey = app?.portalAccessKey || app?.portalSetupToken || app?.portalUsername;
+    if (status === 'APPROVED') {
+      const resolved = await this.resolveOrProvisionAccessKey(chatId, app);
+      accessKey = resolved.accessKey || accessKey;
     }
     const magicUrl = `${portalUrl}?key=${encodeURIComponent(accessKey || '')}`;
 

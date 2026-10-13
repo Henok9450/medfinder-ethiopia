@@ -930,12 +930,17 @@ export class InMemoryDatabase {
    * Creates or returns the pharmacy's cryptographic accessKey and 180-day persistent session token.
    */
   public createOrGetPharmacyAccount(pharmacy: Pharmacy, telegramChatId?: string): PharmacyPortalAccount {
-    // Check if account already exists for this pharmacy
+    // Check if account already exists for this pharmacy or telegramChatId
     for (const acc of this.pharmacyAccounts.values()) {
-      if (acc.pharmacyId === pharmacy.id) {
+      if (acc.pharmacyId === pharmacy.id || (telegramChatId && acc.telegramChatId === telegramChatId)) {
         if (telegramChatId && !acc.telegramChatId) {
           acc.telegramChatId = telegramChatId;
         }
+        if (!acc.accessKey) {
+          acc.accessKey = 'mf_key_' + crypto.randomBytes(24).toString('hex');
+        }
+        this.pharmacyAccounts.set(pharmacy.id, acc);
+        this.pharmacyAccounts.set(acc.accessKey, acc);
         return acc;
       }
     }
@@ -975,9 +980,27 @@ export class InMemoryDatabase {
 
     let targetAcc: PharmacyPortalAccount | undefined;
     for (const acc of this.pharmacyAccounts.values()) {
-      if (acc.accessKey === cleanKey || acc.setupToken === cleanKey) {
+      if (acc.accessKey === cleanKey || acc.setupToken === cleanKey || acc.username === cleanKey) {
         targetAcc = acc;
         break;
+      }
+    }
+
+    // Self-healing fallback: Check verificationApplications
+    if (!targetAcc) {
+      const matchedApp = this.verificationApplications.find(
+        (a) => a.portalAccessKey === cleanKey || a.portalSetupToken === cleanKey || a.portalUsername === cleanKey
+      );
+      if (matchedApp) {
+        let pharm = this.pharmacies.find((p) => p.id === matchedApp.approvedPharmacyId);
+        if (!pharm) {
+          pharm = this.pharmacies.find((p) => p.efdaLicenseNumber === matchedApp.efdaLicenseNumber);
+        }
+        if (pharm) {
+          targetAcc = this.createOrGetPharmacyAccount(pharm, matchedApp.telegramChatId);
+          targetAcc.accessKey = cleanKey;
+          this.pharmacyAccounts.set(cleanKey, targetAcc);
+        }
       }
     }
 
@@ -1100,7 +1123,13 @@ export class InMemoryDatabase {
   public getAccountByPharmacyId(pharmacyId: string): PharmacyPortalAccount | undefined {
     if (!pharmacyId) return undefined;
     for (const acc of this.pharmacyAccounts.values()) {
-      if (acc.pharmacyId === pharmacyId) return acc;
+      if (acc.pharmacyId === pharmacyId) {
+        if (!acc.accessKey) {
+          acc.accessKey = 'mf_key_' + crypto.randomBytes(24).toString('hex');
+          this.pharmacyAccounts.set(acc.accessKey, acc);
+        }
+        return acc;
+      }
     }
     return undefined;
   }
@@ -1108,7 +1137,13 @@ export class InMemoryDatabase {
   public getAccountByTelegramChatId(chatId: string): PharmacyPortalAccount | undefined {
     if (!chatId) return undefined;
     for (const acc of this.pharmacyAccounts.values()) {
-      if (acc.telegramChatId === chatId) return acc;
+      if (acc.telegramChatId === chatId) {
+        if (!acc.accessKey) {
+          acc.accessKey = 'mf_key_' + crypto.randomBytes(24).toString('hex');
+          this.pharmacyAccounts.set(acc.accessKey, acc);
+        }
+        return acc;
+      }
     }
     return undefined;
   }

@@ -154,10 +154,17 @@ export interface IDatabaseRepository {
    */
   getAccountByPharmacyId(pharmacyId: string): Promise<PharmacyPortalAccount | null>;
 
-  /**
-   * Get pharmacy portal account by Telegram chat ID
-   */
   getAccountByTelegramChatId(chatId: string): Promise<PharmacyPortalAccount | null>;
+
+  /**
+   * Passwordless account provisioner: Create or retrieve 1-Click access key account
+   */
+  createOrGetPharmacyAccount(pharmacy: Pharmacy, telegramChatId?: string): Promise<PharmacyPortalAccount>;
+
+  /**
+   * Find verified pharmacy by linked Telegram chat ID
+   */
+  getPharmacyByTelegramChatId(chatId: string): Promise<Pharmacy | null>;
 
   /**
    * Authenticate an administrative account

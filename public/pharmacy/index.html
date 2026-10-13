@@ -1228,7 +1228,23 @@
       }
     }
 
-    async function performMagicLogin(accessKey) {
+    function extractCleanKey(raw) {
+      if (!raw) return '';
+      let s = String(raw).trim();
+      const match = s.match(/mf_key_[a-fA-F0-9]+/);
+      if (match) return match[0];
+      if (s.includes('?')) {
+        try {
+          const q = new URLSearchParams(s.split('?')[1]);
+          const k = q.get('key') || q.get('token') || q.get('setupToken');
+          if (k) return decodeURIComponent(k).trim();
+        } catch (e) {}
+      }
+      return s;
+    }
+
+    async function performMagicLogin(rawAccessKey) {
+      const accessKey = extractCleanKey(rawAccessKey);
       const btn = document.getElementById('keySubmitBtn');
       const alertBox = document.getElementById('keyAlertBox');
 

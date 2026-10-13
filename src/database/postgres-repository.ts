@@ -545,6 +545,7 @@ export class PostgresRepository implements IDatabaseRepository {
     );
 
     let createdPharm: Pharmacy | undefined;
+    let portalAccessKey: string | undefined = appRow.portal_access_key || undefined;
     let portalUsername: string | undefined = appRow.portal_username || undefined;
     let portalTempPassword: string | undefined = appRow.portal_temp_password || undefined;
     let portalSetupToken: string | undefined = appRow.portal_setup_token || undefined;
@@ -601,21 +602,22 @@ export class PostgresRepository implements IDatabaseRepository {
         });
       }
 
-      // Check if account already exists for this pharmacy
+      // Check if account already exists for this pharmacy OR telegram_chat_id
       const existingAccRes = await pool.query(
-        'SELECT * FROM pharmacy_portal_accounts WHERE pharmacy_id = $1',
-        [pharmId]
+        `SELECT * FROM pharmacy_portal_accounts 
+         WHERE pharmacy_id = $1 OR (telegram_chat_id IS NOT NULL AND telegram_chat_id = $2)
+         ORDER BY created_at DESC LIMIT 1`,
+        [pharmId, appRow.telegram_chat_id]
       );
 
-      let portalAccessKey: string;
       if (existingAccRes.rows.length > 0) {
         const existingAcc = existingAccRes.rows[0];
         portalAccessKey = existingAcc.access_key || ('mf_key_' + crypto.randomBytes(24).toString('hex'));
         await pool.query(
           `UPDATE pharmacy_portal_accounts 
-           SET access_key = $1, telegram_chat_id = COALESCE(telegram_chat_id, $2)
-           WHERE id = $3`,
-          [portalAccessKey, appRow.telegram_chat_id, existingAcc.id]
+           SET access_key = $1, telegram_chat_id = COALESCE(telegram_chat_id, $2), pharmacy_id = $3
+           WHERE id = $4`,
+          [portalAccessKey, appRow.telegram_chat_id, pharmId, existingAcc.id]
         );
       } else {
         portalAccessKey = 'mf_key_' + crypto.randomBytes(24).toString('hex');
@@ -681,6 +683,7 @@ export class PostgresRepository implements IDatabaseRepository {
         submittedAt: new Date(appRow.submitted_at).toISOString(),
         reviewedAt: new Date().toISOString(),
         approvedPharmacyId: createdPharm?.id || appRow.approved_pharmacy_id,
+        portalAccessKey,
         portalUsername,
         portalTempPassword,
         portalSetupToken,
@@ -695,10 +698,71 @@ export class PostgresRepository implements IDatabaseRepository {
     if (!pool) return { success: false, error: 'Database offline' };
     if (!accessKey) return { success: false, error: 'Access key is required' };
 
-    const res = await pool.query(
-      `SELECT * FROM pharmacy_portal_accounts WHERE access_key = $1 OR setup_token = $1`,
-      [accessKey.trim()]
+    const cleanKey = accessKey.trim();
+
+    // 1. Try finding in pharmacy_portal_accounts
+    let res = await pool.query(
+      `SELECT * FROM pharmacy_portal_accounts 
+       WHERE access_key = $1 OR setup_token = $1 OR username = $1
+       ORDER BY created_at DESC LIMIT 1`,
+      [cleanKey]
     );
+
+    // 2. Self-healing fallback: Check pharmacy_verification_applications
+    if (res.rows.length === 0) {
+      const appRes = await pool.query(
+        `SELECT * FROM pharmacy_verification_applications 
+         WHERE portal_access_key = $1 OR portal_setup_token = $1 OR portal_username = $1
+         LIMIT 1`,
+        [cleanKey]
+      );
+
+      if (appRes.rows.length > 0) {
+        const appRow = appRes.rows[0];
+        const cleanSubCity = (appRow.sub_city || 'Bole').toLowerCase().replace(/[^a-z]/g, '') || 'bole';
+        const pharmId = appRow.approved_pharmacy_id || `pharm-${cleanSubCity}-${Math.floor(1000 + Math.random() * 9000)}`;
+        const accountId = `acc-${crypto.randomBytes(6).toString('hex')}`;
+        const newSessionToken = 'sess_' + crypto.randomBytes(32).toString('hex');
+        const newSessionExpiresAt = new Date(Date.now() + 180 * 24 * 60 * 60 * 1000);
+
+        const existingAcc = await pool.query(
+          `SELECT * FROM pharmacy_portal_accounts 
+           WHERE pharmacy_id = $1 OR (telegram_chat_id IS NOT NULL AND telegram_chat_id = $2)
+           ORDER BY created_at DESC LIMIT 1`,
+          [pharmId, appRow.telegram_chat_id]
+        );
+
+        if (existingAcc.rows.length > 0) {
+          await pool.query(
+            `UPDATE pharmacy_portal_accounts 
+             SET access_key = $1, session_token = $2, session_expires_at = $3, last_login_at = NOW() 
+             WHERE id = $4`,
+            [cleanKey, newSessionToken, newSessionExpiresAt, existingAcc.rows[0].id]
+          );
+          res = await pool.query('SELECT * FROM pharmacy_portal_accounts WHERE id = $1', [existingAcc.rows[0].id]);
+        } else {
+          await pool.query(
+            `INSERT INTO pharmacy_portal_accounts (
+               id, pharmacy_id, pharmacy_name, sub_city, phone,
+               access_key, telegram_chat_id, session_token, session_expires_at, created_at, last_login_at
+             )
+             VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, NOW(), NOW())`,
+            [
+              accountId,
+              pharmId,
+              appRow.pharmacy_name,
+              appRow.sub_city,
+              appRow.phone,
+              cleanKey,
+              appRow.telegram_chat_id,
+              newSessionToken,
+              newSessionExpiresAt,
+            ]
+          );
+          res = await pool.query('SELECT * FROM pharmacy_portal_accounts WHERE id = $1', [accountId]);
+        }
+      }
+    }
 
     if (res.rows.length === 0) {
       return { success: false, error: 'Invalid or unrecognized 1-Click access key. Open @MedFinder_Verifier_bot and type /key to get a new link.' };
@@ -910,24 +974,154 @@ export class PostgresRepository implements IDatabaseRepository {
     if (!pool || !chatId) return null;
 
     const res = await pool.query(
-      `SELECT * FROM pharmacy_portal_accounts WHERE telegram_chat_id = $1 LIMIT 1`,
+      `SELECT * FROM pharmacy_portal_accounts 
+       WHERE telegram_chat_id = $1 
+       ORDER BY created_at DESC LIMIT 1`,
       [chatId.trim()]
     );
     if (res.rows.length === 0) return null;
     const acc = res.rows[0];
+    let accessKey = acc.access_key;
+    if (!accessKey) {
+      accessKey = 'mf_key_' + crypto.randomBytes(24).toString('hex');
+      await pool.query(
+        `UPDATE pharmacy_portal_accounts SET access_key = $1 WHERE id = $2`,
+        [accessKey, acc.id]
+      );
+      acc.access_key = accessKey;
+    }
     return {
       id: acc.id,
       pharmacyId: acc.pharmacy_id,
       pharmacyName: acc.pharmacy_name,
       subCity: acc.sub_city,
       phone: acc.phone,
-      accessKey: acc.access_key || '',
+      accessKey,
       telegramChatId: acc.telegram_chat_id || undefined,
       sessionToken: acc.session_token || undefined,
       sessionExpiresAt: acc.session_expires_at ? new Date(acc.session_expires_at).toISOString() : undefined,
       createdAt: new Date(acc.created_at).toISOString(),
       lastLoginAt: acc.last_login_at ? new Date(acc.last_login_at).toISOString() : undefined,
     };
+  }
+
+  public async createOrGetPharmacyAccount(pharmacy: Pharmacy, telegramChatId?: string): Promise<PharmacyPortalAccount> {
+    const pool = getDbPool();
+    if (!pool) throw new Error('Database offline');
+
+    const cleanChatId = telegramChatId ? telegramChatId.trim() : null;
+
+    // 1. Try finding existing account
+    const existing = await pool.query(
+      `SELECT * FROM pharmacy_portal_accounts 
+       WHERE pharmacy_id = $1 OR (telegram_chat_id IS NOT NULL AND telegram_chat_id = $2)
+       ORDER BY created_at DESC LIMIT 1`,
+      [pharmacy.id, cleanChatId]
+    );
+
+    if (existing.rows.length > 0) {
+      const acc = existing.rows[0];
+      let accessKey = acc.access_key;
+      let updateNeeded = false;
+      if (!accessKey) {
+        accessKey = 'mf_key_' + crypto.randomBytes(24).toString('hex');
+        updateNeeded = true;
+      }
+      if (cleanChatId && !acc.telegram_chat_id) {
+        updateNeeded = true;
+      }
+      if (updateNeeded) {
+        await pool.query(
+          `UPDATE pharmacy_portal_accounts 
+           SET access_key = $1, telegram_chat_id = COALESCE(telegram_chat_id, $2), pharmacy_id = $3
+           WHERE id = $4`,
+          [accessKey, cleanChatId, pharmacy.id, acc.id]
+        );
+      }
+      return {
+        id: acc.id,
+        pharmacyId: acc.pharmacy_id,
+        pharmacyName: acc.pharmacy_name,
+        subCity: acc.sub_city,
+        phone: acc.phone,
+        accessKey,
+        telegramChatId: acc.telegram_chat_id || cleanChatId || undefined,
+        sessionToken: acc.session_token || undefined,
+        sessionExpiresAt: acc.session_expires_at ? new Date(acc.session_expires_at).toISOString() : undefined,
+        createdAt: new Date(acc.created_at).toISOString(),
+        lastLoginAt: acc.last_login_at ? new Date(acc.last_login_at).toISOString() : undefined,
+      };
+    }
+
+    // 2. Create new account
+    const accessKey = 'mf_key_' + crypto.randomBytes(24).toString('hex');
+    const sessionToken = 'sess_' + crypto.randomBytes(32).toString('hex');
+    const sessionExpiresAt = new Date(Date.now() + 180 * 24 * 60 * 60 * 1000);
+    const accountId = `acc-${crypto.randomBytes(6).toString('hex')}`;
+
+    await pool.query(
+      `INSERT INTO pharmacy_portal_accounts (
+         id, pharmacy_id, pharmacy_name, sub_city, phone,
+         access_key, telegram_chat_id, session_token, session_expires_at, created_at
+       )
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, NOW())`,
+      [
+        accountId,
+        pharmacy.id,
+        pharmacy.name,
+        pharmacy.subCity,
+        pharmacy.phone,
+        accessKey,
+        cleanChatId,
+        sessionToken,
+        sessionExpiresAt,
+      ]
+    );
+
+    return {
+      id: accountId,
+      pharmacyId: pharmacy.id,
+      pharmacyName: pharmacy.name,
+      subCity: pharmacy.subCity,
+      phone: pharmacy.phone,
+      accessKey,
+      telegramChatId: cleanChatId || undefined,
+      sessionToken,
+      sessionExpiresAt: sessionExpiresAt.toISOString(),
+      createdAt: new Date().toISOString(),
+    };
+  }
+
+  public async getPharmacyByTelegramChatId(chatId: string): Promise<Pharmacy | null> {
+    const pool = getDbPool();
+    if (!pool || !chatId) return null;
+
+    const res = await pool.query(
+      `SELECT *, ST_Y(location::geometry) as lat, ST_X(location::geometry) as lng 
+       FROM pharmacies 
+       WHERE telegram_chat_id = $1 
+       ORDER BY created_at DESC LIMIT 1`,
+      [chatId.trim()]
+    );
+
+    if (res.rows.length === 0) {
+      const appRes = await pool.query(
+        `SELECT approved_pharmacy_id FROM pharmacy_verification_applications 
+         WHERE telegram_chat_id = $1 AND approved_pharmacy_id IS NOT NULL 
+         ORDER BY reviewed_at DESC NULLS LAST LIMIT 1`,
+        [chatId.trim()]
+      );
+      if (appRes.rows.length > 0 && appRes.rows[0].approved_pharmacy_id) {
+        return this.getPharmacyById(appRes.rows[0].approved_pharmacy_id);
+      }
+      return null;
+    }
+
+    return this.mapPharmacyRow({
+      ...res.rows[0],
+      latitude: res.rows[0].lat !== null ? parseFloat(res.rows[0].lat) : undefined,
+      longitude: res.rows[0].lng !== null ? parseFloat(res.rows[0].lng) : undefined,
+    });
   }
 
   // Deprecated backward compatibility methods
@@ -1296,6 +1490,7 @@ export class PostgresRepository implements IDatabaseRepository {
       resubmittedAt: r.resubmitted_at ? new Date(r.resubmitted_at).toISOString() : undefined,
       pharmacistUpdateNote: r.pharmacist_update_note || undefined,
       approvedPharmacyId: r.approved_pharmacy_id,
+      portalAccessKey: r.portal_access_key || r.portal_username || r.portal_setup_token,
       portalUsername: r.portal_username,
       portalTempPassword: r.portal_temp_password,
       portalSetupToken: r.portal_setup_token,

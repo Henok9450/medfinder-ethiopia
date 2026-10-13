@@ -207,6 +207,22 @@ export class InMemoryRepository implements IDatabaseRepository {
     return acc || null;
   }
 
+  public async createOrGetPharmacyAccount(pharmacy: Pharmacy, telegramChatId?: string): Promise<PharmacyPortalAccount> {
+    return this.db.createOrGetPharmacyAccount(pharmacy, telegramChatId);
+  }
+
+  public async getPharmacyByTelegramChatId(chatId: string): Promise<Pharmacy | null> {
+    const p = this.db.pharmacies.find((ph) => ph.telegramChatId === chatId);
+    if (p) return p;
+    const app = this.db.verificationApplications.find(
+      (a) => a.telegramChatId === chatId && (a.status === 'APPROVED' || a.approvedPharmacyId)
+    );
+    if (app && app.approvedPharmacyId) {
+      return this.db.pharmacies.find((ph) => ph.id === app.approvedPharmacyId) || null;
+    }
+    return null;
+  }
+
   // Deprecated backward compatibility
   public async authenticatePharmacy(username: string, password: string): Promise<{ success: boolean; account?: PharmacyPortalAccount; token?: string; error?: string }> {
     return this.db.authenticatePharmacy(username, password);

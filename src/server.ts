@@ -338,20 +338,28 @@ app.post('/api/pharmacy/respond', (req: Request, res: Response) => {
 // ==========================================
 // 3A. PHARMACY PORTAL PASSWORDLESS AUTHENTICATION
 // ==========================================
-app.post('/api/pharmacy/auth/magic-login', async (req: Request, res: Response) => {
-  const accessKey = String(req.body.accessKey || req.body.key || req.query.key || '').trim();
+const handleMagicLogin = async (req: Request, res: Response) => {
+  let accessKey = String(req.body.accessKey || req.body.key || req.query.key || req.query.setupToken || '').trim();
+  const keyMatch = accessKey.match(/mf_key_[a-fA-F0-9]+/);
+  if (keyMatch) {
+    accessKey = keyMatch[0];
+  }
   if (!accessKey) {
     return res.status(400).json({ success: false, error: 'Access key is required' });
   }
 
-  const result = await dbRepo.magicLoginWithKey(accessKey);
+  let result = await dbRepo.magicLoginWithKey(accessKey);
+  if (!result.success || !result.account) {
+    result = db.magicLoginWithKey(accessKey);
+  }
   if (!result.success || !result.account) {
     return res.status(401).json({ success: false, error: result.error || 'Invalid or expired counter access key' });
   }
 
-  const pharmacy = await dbRepo.getPharmacyById(result.account.pharmacyId);
+  const pharmacy = (await dbRepo.getPharmacyById(result.account.pharmacyId)) ||
+    db.pharmacies.find((p) => p.id === result.account!.pharmacyId);
 
-  res.json({
+  return res.json({
     success: true,
     token: result.token,
     sessionExpiresAt: result.account.sessionExpiresAt,
@@ -375,7 +383,10 @@ app.post('/api/pharmacy/auth/magic-login', async (req: Request, res: Response) =
       strikeCount: pharmacy.strikeCount,
     } : null,
   });
-});
+};
+
+app.post('/api/pharmacy/auth/magic-login', handleMagicLogin);
+app.post('/api/pharmacy/magic-login', handleMagicLogin);
 
 app.post('/api/pharmacy/auth/send-otp', async (req: Request, res: Response) => {
   const phone = String(req.body.phone || '').trim();
@@ -502,10 +513,11 @@ app.get('/api/pharmacy/auth/session', async (req: Request, res: Response) => {
   const token = authHeader.replace(/^Bearer\s+/i, '') || String(req.query.token || '');
   if (!token) return res.status(401).json({ success: false, error: 'Not authenticated' });
 
-  const account = await dbRepo.getAccountBySession(token);
+  const account = (await dbRepo.getAccountBySession(token)) || db.getAccountBySession(token);
   if (!account) return res.status(401).json({ success: false, error: 'Session expired (6-month limit reached) or invalid. Use your Telegram 1-click key to reconnect.' });
 
-  const pharmacy = await dbRepo.getPharmacyById(account.pharmacyId);
+  const pharmacy = (await dbRepo.getPharmacyById(account.pharmacyId)) ||
+    db.pharmacies.find((p) => p.id === account.pharmacyId);
 
   res.json({
     success: true,
@@ -1599,8 +1611,22 @@ app.post('/api/telegram/applications/:id/review', requireAdminAuth, requirePrivi
     return res.status(404).json({ success: false, error: reviewResult.error || 'Application not found' });
   }
 
-  // Synchronize in-memory DB instance
+  // Synchronize in-memory DB instance with identical access key
   db.reviewVerificationApplication(id, status, adminNotes, efdaLicenseNumber);
+  if (status === 'APPROVED' && reviewResult.application.portalAccessKey) {
+    const exactKey = reviewResult.application.portalAccessKey;
+    const memApp = db.verificationApplications.find((a) => a.id === id || a.telegramChatId === reviewResult.application!.telegramChatId);
+    if (memApp) {
+      memApp.portalAccessKey = exactKey;
+      memApp.portalUsername = exactKey;
+      memApp.portalSetupToken = exactKey;
+    }
+    if (reviewResult.pharmacy) {
+      const memAcc = db.createOrGetPharmacyAccount(reviewResult.pharmacy, reviewResult.application.telegramChatId);
+      memAcc.accessKey = exactKey;
+      db.pharmacyAccounts.set(exactKey, memAcc);
+    }
+  }
 
   // Dispatch live notification back to the pharmacy's Telegram chat in background
   telegramBotService.notifyReviewDecision(
