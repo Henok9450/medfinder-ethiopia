@@ -665,7 +665,7 @@
                   name: r.pharmacyName,
                   subCity: subCity,
                   phone: r.phone || '+251911223344',
-                  distanceKm: r.distanceKm || 1.2,
+                  distanceKm: (typeof r.distanceKm === 'number' && !isNaN(r.distanceKm)) ? r.distanceKm : 0,
                   isVerified: true,
                   trustScore: 98,
                   matchedDrugName: medicineName,
@@ -937,7 +937,7 @@
                 `) : ''}
               </div>
               <p class="text-xs text-slate-500 mt-0.5">
-                📍 ${p.subCity}, Addis Ababa • <strong class="text-emerald-700">${p.distanceKm || 1.2} km away</strong>
+                📍 ${p.subCity}, Addis Ababa • <strong class="text-emerald-700">${(typeof p.distanceKm === 'number' && !isNaN(p.distanceKm)) ? (p.distanceKm < 0.1 ? '< 0.1' : p.distanceKm.toFixed(1)) : '0.0'} km away</strong>
               </p>
               ${!isMultiItem && p.matchedDrugName && p.matchedDrugName.toLowerCase() !== drugName.toLowerCase() ? `
               <div class="mt-1">
