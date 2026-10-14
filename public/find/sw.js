@@ -1,5 +1,5 @@
 // MedFinder Ethiopia - Patient Medicine Finder PWA Service Worker
-const CACHE_NAME = 'medfinder-patient-radar-v4';
+const CACHE_NAME = 'medfinder-patient-radar-v5';
 const STATIC_ASSETS = [
   '/find/',
   '/find/index.html',
@@ -44,7 +44,29 @@ self.addEventListener('activate', (event) => {
 self.addEventListener('fetch', (event) => {
   const url = new URL(event.request.url);
 
-  // Network-first for API search queries
+  // 1. Real-time reservation & verification APIs must NEVER be cached
+  if (url.pathname.startsWith('/api/reservation/')) {
+    event.respondWith(fetch(event.request));
+    return;
+  }
+
+  // 2. HTML Navigation requests: Network-first to always serve the freshest app updates
+  if (event.request.mode === 'navigate' || event.request.headers.get('accept')?.includes('text/html')) {
+    event.respondWith(
+      fetch(event.request)
+        .then((response) => {
+          if (response.status === 200) {
+            const copy = response.clone();
+            caches.open(CACHE_NAME).then((cache) => cache.put(event.request, copy));
+          }
+          return response;
+        })
+        .catch(() => caches.match(event.request).then((cached) => cached || caches.match('/find/index.html')))
+    );
+    return;
+  }
+
+  // 3. Search & other APIs: Network-first with offline fallback
   if (url.pathname.startsWith('/api/')) {
     event.respondWith(
       fetch(event.request)
@@ -70,11 +92,17 @@ self.addEventListener('fetch', (event) => {
     return;
   }
 
-  // Static assets: Cache-first, fallback to network
+  // 4. Static assets (images, icons, fonts): Cache-first with network fallback
   event.respondWith(
     caches.match(event.request).then((cached) => {
       if (cached) return cached;
-      return fetch(event.request).catch(() => {
+      return fetch(event.request).then((networkResponse) => {
+        if (networkResponse.status === 200) {
+          const copy = networkResponse.clone();
+          caches.open(CACHE_NAME).then((cache) => cache.put(event.request, copy));
+        }
+        return networkResponse;
+      }).catch(() => {
         if (event.request.headers.get('accept')?.includes('text/html')) {
           return caches.match('/find/index.html');
         }

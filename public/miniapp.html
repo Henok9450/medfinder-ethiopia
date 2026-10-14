@@ -675,10 +675,20 @@
             const r = sData.reservation;
             if (r.status === 'CANCELLED') {
               if (statusEl) statusEl.innerText = '❌ Out of Stock — Declined by Pharmacist';
-              clearInterval(miniPollInterval);
+              if (miniPollInterval) { clearInterval(miniPollInterval); miniPollInterval = null; }
+              if (holdTimerInterval) { clearInterval(holdTimerInterval); holdTimerInterval = null; }
+              const dot = document.getElementById('miniActiveHoldDot');
+              if (dot) dot.classList.add('hidden');
+              activeHold = null;
             } else if (r.status === 'FULFILLED') {
               if (statusEl) statusEl.innerText = '✅ Dispensed & Completed at Counter!';
-              clearInterval(miniPollInterval);
+              if (miniPollInterval) { clearInterval(miniPollInterval); miniPollInterval = null; }
+              if (holdTimerInterval) { clearInterval(holdTimerInterval); holdTimerInterval = null; }
+              const timerEl = document.getElementById('resModalTimer');
+              if (timerEl) timerEl.innerText = 'CLAIMED';
+              const dot = document.getElementById('miniActiveHoldDot');
+              if (dot) dot.classList.add('hidden');
+              activeHold = null;
             } else if (r.pharmacistAcknowledged) {
               if (statusEl) statusEl.innerText = '✅ Confirmed & Held at Counter (60m Active)';
             }
@@ -702,11 +712,37 @@
       document.getElementById('reservationModal').classList.add('hidden');
     }
 
-    function reopenMiniVoucher() {
+    async function reopenMiniVoucher() {
       if (tg?.HapticFeedback) tg.HapticFeedback.impactOccurred('light');
-      if (activeHold) {
+      if (activeHold && activeHold.rawCode) {
+        try {
+          const res = await fetch(`/api/reservation/status/${activeHold.rawCode}`);
+          if (res.ok) {
+            const data = await res.json();
+            if (data.success && data.reservation) {
+              const r = data.reservation;
+              if (r.status === 'FULFILLED') {
+                const dot = document.getElementById('miniActiveHoldDot');
+                if (dot) dot.classList.add('hidden');
+                activeHold = null;
+                alert('Your voucher has already been verified and dispensed at the counter ✅.');
+                focusMiniSearch();
+                return;
+              } else if (r.status === 'CANCELLED' || r.status === 'EXPIRED') {
+                const dot = document.getElementById('miniActiveHoldDot');
+                if (dot) dot.classList.add('hidden');
+                activeHold = null;
+                alert(`Your voucher is no longer active (${r.status.toLowerCase()}).`);
+                focusMiniSearch();
+                return;
+              }
+            }
+          }
+        } catch (_) {}
         document.getElementById('reservationModal').classList.remove('hidden');
       } else {
+        const dot = document.getElementById('miniActiveHoldDot');
+        if (dot) dot.classList.add('hidden');
         alert('No active Price-Lock Hold yet. Tap "Lock Price (60 Mins)" on any pharmacy result to reserve!');
         focusMiniSearch();
       }
