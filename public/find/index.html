@@ -436,7 +436,7 @@
       </a>
 
       <!-- IN-APP REAL-TIME SYNC INDICATOR -->
-      <div class="flex items-center justify-center gap-2 w-full py-2 px-3 bg-emerald-50 border border-emerald-200 text-emerald-800 rounded-xl text-[11px] font-bold">
+      <div id="voucherLiveSyncBox" class="flex items-center justify-center gap-2 w-full py-2 px-3 bg-emerald-50 border border-emerald-200 text-emerald-800 rounded-xl text-[11px] font-bold">
         <span class="w-2 h-2 rounded-full bg-emerald-500 animate-ping shrink-0"></span>
         <span>Live In-App Sync Active — Chimes automatically on confirmation</span>
       </div>
@@ -1240,7 +1240,33 @@
           phoneEl.href = `tel:${phone}`;
 
           document.getElementById('voucherFindAnotherBtn').classList.add('hidden');
-          document.getElementById('voucherCloseBtn').innerText = 'Minimize / Keep Voucher Active';
+          const closeBtn = document.getElementById('voucherCloseBtn');
+          if (closeBtn) {
+            closeBtn.innerText = 'Minimize / Keep Voucher Active';
+            closeBtn.className = 'w-full bg-slate-900 hover:bg-black active:scale-95 text-white text-xs font-bold py-2.5 rounded-xl transition';
+            closeBtn.onclick = minimizeReservationModal;
+          }
+
+          const syncBox = document.getElementById('voucherLiveSyncBox');
+          if (syncBox) {
+            syncBox.className = 'flex items-center justify-center gap-2 w-full py-2 px-3 bg-emerald-50 border border-emerald-200 text-emerald-800 rounded-xl text-[11px] font-bold';
+            syncBox.innerHTML = '<span class="w-2 h-2 rounded-full bg-emerald-500 animate-ping shrink-0"></span><span>Live In-App Sync Active — Chimes automatically on confirmation</span>';
+          }
+
+          // Persist active hold in localStorage so patient doesn't lose it on refresh
+          try {
+            localStorage.setItem('medfinder_active_reservation', JSON.stringify({
+              code: r.reservationCode,
+              medicineName: r.medicineName,
+              pharmacyName: r.pharmacyName || pharmacyName,
+              lockedPriceETB: r.lockedPriceETB,
+              phone: phone,
+              lat: lat,
+              lng: lng,
+              subCity: subCity,
+              createdAt: Date.now()
+            }));
+          } catch (_) {}
 
           // Start 90-second direct-dial safety valve
           startSafetyTimer(phone, r.reservationCode, r.medicineName, r.lockedPriceETB);
@@ -1325,13 +1351,31 @@
             const dirBtn = document.getElementById('voucherDirectionsBtn');
             if (dirBtn) dirBtn.classList.add('hidden');
 
+            const mobDot = document.getElementById('mobActiveVoucherDot');
+            if (mobDot) mobDot.classList.add('hidden');
+
+            const syncBox = document.getElementById('voucherLiveSyncBox');
+            if (syncBox) {
+              syncBox.className = 'flex items-center justify-center gap-2 w-full py-2 px-3 bg-rose-50 border border-rose-200 text-rose-800 rounded-xl text-[11px] font-medium';
+              syncBox.innerHTML = '<i class="fa-solid fa-circle-xmark text-rose-600"></i><span>Hold cancelled by pharmacy</span>';
+            }
+
             // Prominent "Find Another" button
             const findAnotherBtn = document.getElementById('voucherFindAnotherBtn');
             if (findAnotherBtn) {
               findAnotherBtn.classList.remove('hidden');
               findAnotherBtn.className = 'w-full bg-emerald-600 hover:bg-emerald-700 active:scale-98 text-white text-xs font-black py-3.5 px-4 rounded-xl transition shadow-lg ring-4 ring-emerald-400/30 flex items-center justify-center gap-2 animate-bounce';
             }
-            document.getElementById('voucherCloseBtn').innerText = 'Dismiss';
+            const closeBtn = document.getElementById('voucherCloseBtn');
+            if (closeBtn) {
+              closeBtn.innerText = 'Dismiss (ዝጋ)';
+              closeBtn.className = 'w-full bg-slate-900 hover:bg-black active:scale-95 text-white text-xs font-bold py-2.5 rounded-xl transition';
+              closeBtn.onclick = closeReservationModal;
+            }
+            try {
+              localStorage.removeItem('medfinder_active_reservation');
+            } catch (_) {}
+            currentReservationCode = null;
           } else if (r.status === 'FULFILLED') {
             // Fulfilled & Dispensed at Counter!
             clearInterval(pollReservationInterval);
@@ -1342,6 +1386,14 @@
               `✅ Medicine Dispensed (#${r.reservationCode})`,
               `${r.medicineName} was verified and dispensed at ${r.pharmacyName || origName}.`
             );
+
+            // Hide the active dot immediately on mobile bottom navigation
+            const mobDot = document.getElementById('mobActiveVoucherDot');
+            if (mobDot) mobDot.classList.add('hidden');
+
+            // Hide turn-by-turn navigation since customer already reached pharmacy & collected medicine
+            const dirBtn = document.getElementById('voucherDirectionsBtn');
+            if (dirBtn) dirBtn.classList.add('hidden');
 
             const iconBox = document.getElementById('voucherModalIcon');
             iconBox.className = 'w-14 h-14 bg-gradient-to-tr from-emerald-600 to-teal-500 text-white rounded-2xl mx-auto flex items-center justify-center text-2xl shadow-lg shadow-emerald-600/30 transition-all';
@@ -1366,6 +1418,32 @@
             if (timerIcon) timerIcon.className = 'fa-solid fa-circle-check text-emerald-400';
             const countdownWrapper = document.getElementById('voucherCountdownWrapper');
             if (countdownWrapper) countdownWrapper.innerHTML = 'Status: <strong class="text-emerald-300 font-bold">CLAIMED & COMPLETED (ተረክበዋል)</strong>';
+
+            const syncBox = document.getElementById('voucherLiveSyncBox');
+            if (syncBox) {
+              syncBox.className = 'flex items-center justify-center gap-2 w-full py-2 px-3 bg-slate-100 border border-slate-200 text-slate-700 rounded-xl text-[11px] font-medium';
+              syncBox.innerHTML = '<i class="fa-solid fa-circle-check text-emerald-600"></i><span>Transaction closed & verified at counter</span>';
+            }
+
+            const closeBtn = document.getElementById('voucherCloseBtn');
+            if (closeBtn) {
+              closeBtn.innerText = '✅ Done — Order Fulfilled (ተጠናቋል)';
+              closeBtn.className = 'w-full bg-emerald-600 hover:bg-emerald-700 active:scale-95 text-white text-xs font-black py-3 rounded-xl transition shadow flex items-center justify-center gap-1.5';
+              closeBtn.onclick = dismissFulfilledVoucher;
+            }
+
+            try {
+              localStorage.removeItem('medfinder_active_reservation');
+              localStorage.setItem('medfinder_last_fulfilled', JSON.stringify({
+                code: r.reservationCode,
+                medicineName: r.medicineName,
+                pharmacyName: r.pharmacyName || origName,
+                price: r.lockedPriceETB,
+                dispensedAt: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+              }));
+            } catch (_) {}
+
+            currentReservationCode = null;
           } else if (r.pharmacistAcknowledged && r.status === 'ACTIVE') {
             // STAGE 2: Stock Confirmed & Held! Start the full 60-minute travel countdown!
             clearInterval(pollReservationInterval);
@@ -1515,18 +1593,155 @@
       document.getElementById('reservationModal').classList.add('hidden');
     }
 
+    function dismissFulfilledVoucher() {
+      document.getElementById('reservationModal').classList.add('hidden');
+      currentReservationCode = null;
+      try {
+        localStorage.removeItem('medfinder_active_reservation');
+      } catch (_) {}
+      const mobDot = document.getElementById('mobActiveVoucherDot');
+      if (mobDot) mobDot.classList.add('hidden');
+    }
+
     function reopenActiveVoucher() {
       try {
         if (window.Telegram?.WebApp?.HapticFeedback) {
           window.Telegram.WebApp.HapticFeedback.impactOccurred('light');
         }
       } catch (_) {}
+
+      // If active in memory
       if (currentReservationCode) {
         document.getElementById('reservationModal').classList.remove('hidden');
-      } else {
-        alert('No active Price-Lock Voucher right now. Search for a medicine and tap "Lock Price (60m)" on any pharmacy card to reserve!');
-        focusSearchInput();
+        return;
       }
+
+      // Check if there was an active reservation stored in localStorage
+      try {
+        const savedActive = localStorage.getItem('medfinder_active_reservation');
+        if (savedActive) {
+          const resObj = JSON.parse(savedActive);
+          if (resObj && resObj.code) {
+            currentReservationCode = resObj.code;
+            document.getElementById('reservationModal').classList.remove('hidden');
+            startReservationPolling(resObj.code, resObj.lat, resObj.lng, resObj.pharmacyName, resObj.subCity);
+            return;
+          }
+        }
+      } catch (_) {}
+
+      // Check if there was a recently fulfilled order
+      try {
+        const lastFulfilledRaw = localStorage.getItem('medfinder_last_fulfilled');
+        if (lastFulfilledRaw) {
+          const lastOrder = JSON.parse(lastFulfilledRaw);
+          if (lastOrder && lastOrder.code) {
+            showCompletedVoucherSummary(lastOrder);
+            return;
+          }
+        }
+      } catch (_) {}
+
+      alert('No active Price-Lock Voucher right now. Search for a medicine and tap "Lock Price (60m)" on any pharmacy card to reserve!');
+      focusSearchInput();
+    }
+
+    function showCompletedVoucherSummary(order) {
+      if (!order) return;
+      const modal = document.getElementById('reservationModal');
+      if (!modal) return;
+
+      const iconBox = document.getElementById('voucherModalIcon');
+      if (iconBox) iconBox.className = 'w-14 h-14 bg-gradient-to-tr from-emerald-600 to-teal-500 text-white rounded-2xl mx-auto flex items-center justify-center text-2xl shadow-lg shadow-emerald-600/30 transition-all';
+      const iconI = document.getElementById('voucherModalIconI');
+      if (iconI) iconI.className = 'fa-solid fa-circle-check';
+
+      const badge = document.getElementById('voucherBadge');
+      if (badge) {
+        badge.className = 'text-[10px] font-bold uppercase tracking-wider text-emerald-800 bg-emerald-100 px-2.5 py-0.5 rounded-full border border-emerald-300';
+        badge.innerText = '✅ Dispensed & Completed (ተረክበዋል)';
+      }
+
+      const title = document.getElementById('voucherModalTitle');
+      if (title) title.innerText = 'Order Completed & Fulfilled';
+
+      const subtitle = document.getElementById('voucherModalSubtitle');
+      if (subtitle) subtitle.innerText = 'This voucher was previously verified and dispensed at the pharmacy counter.';
+
+      const banner = document.getElementById('voucherStatusBanner');
+      if (banner) {
+        banner.className = 'p-3 rounded-2xl text-xs font-semibold flex items-center gap-2.5 bg-emerald-50 text-emerald-950 border border-emerald-300 text-left transition-all';
+        const statusIcon = document.getElementById('voucherStatusIcon');
+        if (statusIcon) statusIcon.className = 'fa-solid fa-circle-check text-emerald-700 text-base shrink-0';
+        const desc = document.getElementById('voucherStatusDesc');
+        if (desc) {
+          desc.innerHTML = `
+            <strong class="block text-emerald-900">Fulfilled & Closed (ተረክበዋል)</strong>
+            <span class="text-[11px] text-emerald-800 font-normal">Medicine received (${order.dispensedAt || 'Completed'}). No pending payment or hold.</span>
+          `;
+        }
+      }
+
+      const codeBox = document.getElementById('voucherCodeBox');
+      if (codeBox) codeBox.className = 'bg-slate-900 text-white p-3.5 sm:p-4 rounded-2xl space-y-1.5 shadow-inner transition-all opacity-90';
+      const codeDisplay = document.getElementById('voucherCodeDisplay');
+      if (codeDisplay) {
+        codeDisplay.className = 'text-2xl font-mono font-black tracking-widest text-emerald-400';
+        codeDisplay.innerText = `#${order.code}`;
+      }
+
+      const timerIcon = document.getElementById('voucherTimerIcon');
+      if (timerIcon) timerIcon.className = 'fa-solid fa-circle-check text-emerald-400';
+      const countdownWrapper = document.getElementById('voucherCountdownWrapper');
+      if (countdownWrapper) countdownWrapper.innerHTML = 'Status: <strong class="text-emerald-300 font-bold">COMPLETED (ተጠናቋል)</strong>';
+
+      const medEl = document.getElementById('voucherMedicineName');
+      if (medEl) medEl.innerText = order.medicineName || '—';
+      const priceEl = document.getElementById('voucherPrice');
+      if (priceEl) priceEl.innerText = `${order.price || '—'} ETB`;
+      const phEl = document.getElementById('voucherPharmacyName');
+      if (phEl) phEl.innerText = order.pharmacyName || '—';
+      const phoneEl = document.getElementById('voucherPhoneLink');
+      if (phoneEl) {
+        phoneEl.innerText = 'Completed';
+        phoneEl.removeAttribute('href');
+      }
+
+      // Hide directions
+      const dirBtn = document.getElementById('voucherDirectionsBtn');
+      if (dirBtn) dirBtn.classList.add('hidden');
+
+      // Hide safety valve timer
+      const timerBox = document.getElementById('safetyTimerBox');
+      if (timerBox) timerBox.classList.add('hidden');
+      const dialCard = document.getElementById('safetyDirectDialCard');
+      if (dialCard) dialCard.classList.add('hidden');
+
+      // Update sync box
+      const syncBox = document.getElementById('voucherLiveSyncBox');
+      if (syncBox) {
+        syncBox.className = 'flex items-center justify-center gap-2 w-full py-2 px-3 bg-slate-100 border border-slate-200 text-slate-700 rounded-xl text-[11px] font-medium';
+        syncBox.innerHTML = '<i class="fa-solid fa-circle-check text-emerald-600"></i><span>Transaction closed & verified at counter</span>';
+      }
+
+      // Close / Search new button
+      const closeBtn = document.getElementById('voucherCloseBtn');
+      if (closeBtn) {
+        closeBtn.innerText = '🔍 Start New Search (አዲስ ፈልግ)';
+        closeBtn.className = 'w-full bg-emerald-600 hover:bg-emerald-700 active:scale-95 text-white text-xs font-black py-3 rounded-xl transition shadow flex items-center justify-center gap-1.5';
+        closeBtn.onclick = () => {
+          modal.classList.add('hidden');
+          focusSearchInput();
+        };
+      }
+
+      const findAnotherBtn = document.getElementById('voucherFindAnotherBtn');
+      if (findAnotherBtn) findAnotherBtn.classList.add('hidden');
+
+      const mobDot = document.getElementById('mobActiveVoucherDot');
+      if (mobDot) mobDot.classList.add('hidden');
+
+      modal.classList.remove('hidden');
     }
 
     function focusSearchInput() {
@@ -1548,6 +1763,9 @@
       if (pollReservationInterval) clearInterval(pollReservationInterval);
       stopSafetyTimer();
       currentReservationCode = null;
+      try {
+        localStorage.removeItem('medfinder_active_reservation');
+      } catch (_) {}
       const mobDot = document.getElementById('mobActiveVoucherDot');
       if (mobDot) mobDot.classList.add('hidden');
     }
@@ -1707,9 +1925,63 @@
       document.getElementById('prescriptionModal').classList.add('hidden');
     }
 
+    async function checkSavedReservationState() {
+      try {
+        const savedRaw = localStorage.getItem('medfinder_active_reservation');
+        if (!savedRaw) {
+          const mobDot = document.getElementById('mobActiveVoucherDot');
+          if (mobDot) mobDot.classList.add('hidden');
+          return;
+        }
+
+        const resObj = JSON.parse(savedRaw);
+        if (!resObj || !resObj.code) {
+          localStorage.removeItem('medfinder_active_reservation');
+          const mobDot = document.getElementById('mobActiveVoucherDot');
+          if (mobDot) mobDot.classList.add('hidden');
+          return;
+        }
+
+        const res = await fetch(`/api/reservation/status/${resObj.code}`);
+        if (!res.ok) return;
+        const data = await res.json();
+        if (data.success && data.reservation) {
+          const r = data.reservation;
+          if (r.status === 'ACTIVE') {
+            currentReservationCode = r.reservationCode;
+            const mobDot = document.getElementById('mobActiveVoucherDot');
+            if (mobDot) mobDot.classList.remove('hidden');
+            startReservationPolling(r.reservationCode, resObj.lat, resObj.lng, resObj.pharmacyName, resObj.subCity);
+          } else if (r.status === 'FULFILLED') {
+            localStorage.removeItem('medfinder_active_reservation');
+            localStorage.setItem('medfinder_last_fulfilled', JSON.stringify({
+              code: r.reservationCode,
+              medicineName: r.medicineName,
+              pharmacyName: r.pharmacyName || resObj.pharmacyName,
+              price: r.lockedPriceETB,
+              dispensedAt: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+            }));
+            currentReservationCode = null;
+            const mobDot = document.getElementById('mobActiveVoucherDot');
+            if (mobDot) mobDot.classList.add('hidden');
+          } else {
+            localStorage.removeItem('medfinder_active_reservation');
+            currentReservationCode = null;
+            const mobDot = document.getElementById('mobActiveVoucherDot');
+            if (mobDot) mobDot.classList.add('hidden');
+          }
+        }
+      } catch (err) {
+        console.warn('[Voucher] Check saved state error:', err);
+      }
+    }
+
     // Auto-search if opened from Telegram, landing page, or deep-link with ?q=Medicine&mode=near_me
     window.addEventListener('DOMContentLoaded', () => {
       try {
+        // Restore or verify saved voucher status on load
+        checkSavedReservationState();
+
         const params = new URLSearchParams(window.location.search);
         const modeParam = params.get('mode');
         const subCityParam = params.get('subcity') || params.get('subCity');

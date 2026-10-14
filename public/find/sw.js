@@ -1,5 +1,5 @@
 // MedFinder Ethiopia - Patient Medicine Finder PWA Service Worker
-const CACHE_NAME = 'medfinder-patient-radar-v3';
+const CACHE_NAME = 'medfinder-patient-radar-v4';
 const STATIC_ASSETS = [
   '/find/',
   '/find/index.html',
