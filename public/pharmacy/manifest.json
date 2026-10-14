@@ -1,4 +1,5 @@
 {
+  "id": "/pharmacy/",
   "name": "MedFinder Ethiopia - Pharmacy Studio",
   "short_name": "MedFinder Studio",
   "description": "Professional Pharmacy Inventory, Voucher Verification & EFDA Compliance PWA for Ethiopian Pharmacies",
@@ -10,16 +11,28 @@
   "orientation": "portrait-primary",
   "icons": [
     {
-      "src": "data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 192 192'><rect width='192' height='192' rx='40' fill='%23059669'/><path d='M96 40 v112 M40 96 h112' stroke='white' stroke-width='24' stroke-linecap='round'/></svg>",
+      "src": "/pharmacy/icon-192.png",
       "sizes": "192x192",
-      "type": "image/svg+xml",
-      "purpose": "any maskable"
+      "type": "image/png",
+      "purpose": "any"
     },
     {
-      "src": "data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 512 512'><rect width='512' height='512' rx='100' fill='%23059669'/><path d='M256 100 v312 M100 256 h312' stroke='white' stroke-width='60' stroke-linecap='round'/></svg>",
+      "src": "/pharmacy/icon-512.png",
       "sizes": "512x512",
-      "type": "image/svg+xml",
-      "purpose": "any maskable"
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/pharmacy/icon-maskable-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "maskable"
+    },
+    {
+      "src": "/pharmacy/icon-maskable-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
     }
   ]
 }

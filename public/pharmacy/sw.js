@@ -1,9 +1,13 @@
 // MedFinder Ethiopia - Pharmacy Studio Service Worker (PWA)
-const CACHE_NAME = 'medfinder-pharmacy-v1';
+const CACHE_NAME = 'medfinder-pharmacy-v2';
 const STATIC_ASSETS = [
   '/pharmacy/',
   '/pharmacy/index.html',
   '/pharmacy/manifest.json',
+  '/pharmacy/icon-192.png',
+  '/pharmacy/icon-512.png',
+  '/pharmacy/icon-maskable-192.png',
+  '/pharmacy/icon-maskable-512.png',
   'https://cdn.tailwindcss.com',
   'https://cdn.sheetjs.com/xlsx-0.20.2/package/dist/xlsx.full.min.js',
   'https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css'

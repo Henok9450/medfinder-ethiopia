@@ -7,7 +7,9 @@
   <meta name="description" content="Find essential medicines in Addis Ababa and across Ethiopia in real-time. Live shelf stock, verified EFDA pharmacies, 15-minute price lock, and direct B2B supply.">
 
   <!-- PWA & Mobile Meta Tags -->
-  <link rel="manifest" href="/find/manifest.json">
+  <link rel="manifest" href="/manifest.json">
+  <link rel="icon" type="image/png" sizes="192x192" href="/assets/icon-192.png">
+  <link rel="apple-touch-icon" href="/assets/icon-192.png">
   <meta name="theme-color" content="#047857">
   <meta name="mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-capable" content="yes">
@@ -629,6 +631,15 @@
 
     function closeWholesaleInfoModal() {
       document.getElementById('wholesaleInfoModal').classList.add('hidden');
+    }
+
+    // Register PWA Service Worker for WebAPK Android installation
+    if ('serviceWorker' in navigator) {
+      window.addEventListener('load', () => {
+        navigator.serviceWorker.register('/sw.js')
+          .then((reg) => console.log('[MedFinder PWA] Root Service Worker active:', reg.scope))
+          .catch((err) => console.warn('[MedFinder PWA] Root SW registration failed:', err));
+      });
     }
   </script>
 

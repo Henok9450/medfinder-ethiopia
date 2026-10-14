@@ -1,9 +1,13 @@
 // MedFinder Ethiopia - Patient Medicine Finder PWA Service Worker
-const CACHE_NAME = 'medfinder-patient-radar-v1';
+const CACHE_NAME = 'medfinder-patient-radar-v2';
 const STATIC_ASSETS = [
   '/find/',
   '/find/index.html',
   '/find/manifest.json',
+  '/find/icon-192.png',
+  '/find/icon-512.png',
+  '/find/icon-maskable-192.png',
+  '/find/icon-maskable-512.png',
   'https://cdn.tailwindcss.com',
   'https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css',
   'https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap'
