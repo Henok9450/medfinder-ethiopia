@@ -321,7 +321,7 @@ export class InMemoryDatabase {
   }
 
   private seedPharmacies() {
-    const defaultPharm: Pharmacy = {
+    const pBole: Pharmacy = {
       id: 'pharm-bole-3527',
       name: 'St. Mary Pharmacy Bole',
       subCity: 'Bole',
@@ -339,15 +339,134 @@ export class InMemoryDatabase {
       strikeCount: 0,
       isShadowBanned: false,
       isPermanentlyBanned: false,
-      inStockItems: ['ventolin inhaler 100mcg', 'amoxicillin 500mg'],
+      inStockItems: ['ventolin inhaler 100mcg', 'amoxicillin 500mg', 'augmentin 625mg', 'insulin', 'metformin 500mg'],
       inventory: [
-        { name: 'Ventolin Inhaler 100mcg', genericName: 'Salbutamol', category: 'Respiratory', priceETB: 550, inStock: false, updatedAt: new Date().toISOString() },
+        { name: 'Ventolin Inhaler 100mcg', genericName: 'Salbutamol', category: 'Respiratory', priceETB: 550, inStock: true, updatedAt: new Date().toISOString() },
         { name: 'Amoxicillin 500mg', genericName: 'Amoxicillin', category: 'Antibiotics', priceETB: 220, inStock: true, updatedAt: new Date().toISOString() },
+        { name: 'Augmentin 625mg', genericName: 'Amoxicillin + Clavulanate', category: 'Antibiotics', priceETB: 410, inStock: true, updatedAt: new Date().toISOString() },
+        { name: 'Insulin (Humulin N)', genericName: 'Human Insulin', category: 'Diabetes', priceETB: 480, inStock: true, updatedAt: new Date().toISOString() },
+        { name: 'Metformin 500mg', genericName: 'Metformin Hydrochloride', category: 'Diabetes', priceETB: 120, inStock: true, updatedAt: new Date().toISOString() },
       ],
       analyticsAccess: { enabled: true, tier: 'PRO', allowedSubCities: ['Bole'] },
     };
-    this.pharmacies = [defaultPharm];
-    this.createOrGetPharmacyAccount(defaultPharm, defaultPharm.telegramChatId);
+
+    const pLemiKura: Pharmacy = {
+      id: 'pharm-lemikura-4102',
+      name: 'Ayat Care Pharmacy & Diagnostics',
+      subCity: 'Lemi Kura',
+      city: 'Addis Ababa',
+      phone: '0911556677',
+      telegramChatId: 'tg_user_44120',
+      latitude: 9.0180,
+      longitude: 38.8450,
+      address: 'Ayat Zone 3, Near LRT Terminal & Summit Junction',
+      isVerified: true,
+      efdaLicenseNumber: 'EFDA/PH/AA/2024/4102',
+      tinNumber: 'TIN-0091223344',
+      tier: 'PREMIUM',
+      trustScore: 99,
+      strikeCount: 0,
+      isShadowBanned: false,
+      isPermanentlyBanned: false,
+      inStockItems: ['ventolin inhaler 100mcg', 'augmentin 625mg', 'amoxicillin 500mg', 'coartem', 'paracetamol 500mg'],
+      inventory: [
+        { name: 'Ventolin Inhaler 100mcg', genericName: 'Salbutamol', category: 'Respiratory', priceETB: 530, inStock: true, updatedAt: new Date().toISOString() },
+        { name: 'Augmentin 625mg', genericName: 'Amoxicillin + Clavulanate', category: 'Antibiotics', priceETB: 395, inStock: true, updatedAt: new Date().toISOString() },
+        { name: 'Amoxicillin 500mg', genericName: 'Amoxicillin', category: 'Antibiotics', priceETB: 210, inStock: true, updatedAt: new Date().toISOString() },
+        { name: 'Coartem 20/120', genericName: 'Artemether + Lumefantrine', category: 'Antimalarial', priceETB: 160, inStock: true, updatedAt: new Date().toISOString() },
+        { name: 'Paracetamol 500mg', genericName: 'Paracetamol', category: 'Pain & Fever', priceETB: 30, inStock: true, updatedAt: new Date().toISOString() },
+      ],
+      analyticsAccess: { enabled: true, tier: 'PRO', allowedSubCities: ['Lemi Kura'] },
+    };
+
+    const pYeka: Pharmacy = {
+      id: 'pharm-yeka-5510',
+      name: 'Megenagna Central Pharmacy',
+      subCity: 'Yeka',
+      city: 'Addis Ababa',
+      phone: '0911889900',
+      telegramChatId: 'tg_user_55100',
+      latitude: 9.0280,
+      longitude: 38.8020,
+      address: 'Megenagna Roundabout, Next to Zefmesh Grand Mall',
+      isVerified: true,
+      efdaLicenseNumber: 'EFDA/PH/AA/2024/5510',
+      tinNumber: 'TIN-0078129034',
+      tier: 'BASIC',
+      trustScore: 96,
+      strikeCount: 0,
+      isShadowBanned: false,
+      isPermanentlyBanned: false,
+      inStockItems: ['ventolin inhaler 100mcg', 'insulin', 'eltroxin 100mcg', 'augmentin 625mg'],
+      inventory: [
+        { name: 'Ventolin Inhaler 100mcg', genericName: 'Salbutamol', category: 'Respiratory', priceETB: 560, inStock: true, updatedAt: new Date().toISOString() },
+        { name: 'Insulin (Humulin N)', genericName: 'Human Insulin', category: 'Diabetes', priceETB: 470, inStock: true, updatedAt: new Date().toISOString() },
+        { name: 'Eltroxin 100mcg', genericName: 'Levothyroxine', category: 'Thyroid', priceETB: 290, inStock: true, updatedAt: new Date().toISOString() },
+        { name: 'Augmentin 625mg', genericName: 'Amoxicillin + Clavulanate', category: 'Antibiotics', priceETB: 415, inStock: true, updatedAt: new Date().toISOString() },
+      ],
+      analyticsAccess: { enabled: true, tier: 'BASIC', allowedSubCities: ['Yeka'] },
+    };
+
+    const pKirkos: Pharmacy = {
+      id: 'pharm-kirkos-1120',
+      name: 'Mexico Square Community Pharmacy',
+      subCity: 'Kirkos',
+      city: 'Addis Ababa',
+      phone: '0922334455',
+      telegramChatId: 'tg_user_11200',
+      latitude: 9.0110,
+      longitude: 38.7520,
+      address: 'Mexico Sq, Opposite Kiamed Medical College',
+      isVerified: true,
+      efdaLicenseNumber: 'EFDA/PH/AA/2024/1120',
+      tinNumber: 'TIN-0065432190',
+      tier: 'PREMIUM',
+      trustScore: 97,
+      strikeCount: 0,
+      isShadowBanned: false,
+      isPermanentlyBanned: false,
+      inStockItems: ['metformin 500mg', 'amlodipine 10mg', 'losartan 50mg', 'amoxicillin 500mg'],
+      inventory: [
+        { name: 'Metformin 500mg', genericName: 'Metformin Hydrochloride', category: 'Diabetes', priceETB: 115, inStock: true, updatedAt: new Date().toISOString() },
+        { name: 'Amlodipine 10mg', genericName: 'Amlodipine', category: 'Hypertension', priceETB: 110, inStock: true, updatedAt: new Date().toISOString() },
+        { name: 'Losartan Potassium 50mg', genericName: 'Losartan', category: 'Hypertension', priceETB: 145, inStock: true, updatedAt: new Date().toISOString() },
+        { name: 'Amoxicillin 500mg', genericName: 'Amoxicillin', category: 'Antibiotics', priceETB: 215, inStock: true, updatedAt: new Date().toISOString() },
+      ],
+      analyticsAccess: { enabled: true, tier: 'BASIC', allowedSubCities: ['Kirkos'] },
+    };
+
+    const pAddisKetema: Pharmacy = {
+      id: 'pharm-addisketema-2290',
+      name: 'Merkato Commercial Pharmacy',
+      subCity: 'Addis Ketema',
+      city: 'Addis Ababa',
+      phone: '0933445566',
+      telegramChatId: 'tg_user_22900',
+      latitude: 9.0320,
+      longitude: 38.7350,
+      address: 'Autobis Tera, Merkato Commercial Center',
+      isVerified: true,
+      efdaLicenseNumber: 'EFDA/PH/AA/2024/2290',
+      tinNumber: 'TIN-0054321098',
+      tier: 'BASIC',
+      trustScore: 95,
+      strikeCount: 0,
+      isShadowBanned: false,
+      isPermanentlyBanned: false,
+      inStockItems: ['amoxicillin 500mg', 'paracetamol 500mg', 'coartem', 'ceftriaxone 1g'],
+      inventory: [
+        { name: 'Amoxicillin 500mg', genericName: 'Amoxicillin', category: 'Antibiotics', priceETB: 200, inStock: true, updatedAt: new Date().toISOString() },
+        { name: 'Paracetamol 500mg', genericName: 'Paracetamol', category: 'Pain & Fever', priceETB: 28, inStock: true, updatedAt: new Date().toISOString() },
+        { name: 'Coartem 20/120', genericName: 'Artemether + Lumefantrine', category: 'Antimalarial', priceETB: 155, inStock: true, updatedAt: new Date().toISOString() },
+        { name: 'Ceftriaxone 1g Vial', genericName: 'Ceftriaxone', category: 'Injectables', priceETB: 185, inStock: true, updatedAt: new Date().toISOString() },
+      ],
+      analyticsAccess: { enabled: true, tier: 'BASIC', allowedSubCities: ['Addis Ketema'] },
+    };
+
+    this.pharmacies = [pBole, pLemiKura, pYeka, pKirkos, pAddisKetema];
+    for (const ph of this.pharmacies) {
+      this.createOrGetPharmacyAccount(ph, ph.telegramChatId);
+    }
   }
 
   private seedSearchTelemetry() {

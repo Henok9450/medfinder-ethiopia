@@ -76,7 +76,19 @@ app.post('/api/prescription/scan', async (req: Request, res: Response) => {
 // 1. PATIENT / USER SEARCH ENDPOINT
 // ==========================================
 app.post('/api/search', async (req: Request, res: Response) => {
-  const { userId, medicineName, medicineNames, userLat, userLng, city = 'Addis Ababa', subCity, lang = 'am', silentPoll = false } = req.body;
+  const {
+    userId,
+    medicineName,
+    medicineNames,
+    userLat,
+    userLng,
+    city = 'Addis Ababa',
+    subCity,
+    searchParadigm = 'NEAR_ME', // 'NEAR_ME' (GPS proximity) | 'SUBCITY' (administrative filter)
+    maxRadiusKm,
+    lang = 'am',
+    silentPoll = false,
+  } = req.body;
 
   const rawItemList: string[] = Array.isArray(medicineNames) && medicineNames.length > 0
     ? medicineNames.map((s: any) => String(s).trim()).filter(Boolean)
@@ -136,7 +148,25 @@ app.post('/api/search', async (req: Request, res: Response) => {
 
   // 3. Search direct indexed inventory for each medicine in the list
   const allPharmacies = await dbRepo.getAllPharmacies();
-  const radius = configService.getPolicy().geoMatching.initialRadiusKm;
+  
+  // Radius calculation:
+  // NEAR_ME: ignores administrative boundaries, defaults to 35km or user selected radius (e.g. 3, 5, 10, 25)
+  // SUBCITY: allows filtering by specific sub-city with fallback to nearest
+  const policyRadius = configService.getPolicy().geoMatching.initialRadiusKm || 15;
+  let effectiveRadius = policyRadius;
+  if (maxRadiusKm !== undefined && !isNaN(Number(maxRadiusKm))) {
+    const numRadius = Number(maxRadiusKm);
+    effectiveRadius = numRadius > 0 ? numRadius : 9999;
+  } else if (searchParadigm === 'NEAR_ME') {
+    effectiveRadius = 35; // Default broad coverage for GPS proximity
+  }
+
+  const isSubCityExplicit = searchParadigm === 'SUBCITY' &&
+    Boolean(subCity) &&
+    subCity !== 'ALL' &&
+    subCity !== 'All Sub-Cities' &&
+    subCity !== 'All Addis Sub-Cities';
+  const targetSubCityLower = isSubCityExplicit ? String(subCity).toLowerCase().trim() : '';
 
   // Parse queries
   const parsedQueries = rawItemList.map(item => ({
@@ -168,6 +198,7 @@ app.post('/api/search', async (req: Request, res: Response) => {
     totalRequested: number;
     totalBasketPriceETB: number;
     isSingleStop: boolean; // Has ALL items in stock
+    isDirectSubCityMatch: boolean;
   }> = [];
 
   for (const pharmacy of allPharmacies) {
@@ -179,7 +210,11 @@ app.post('/api/search', async (req: Request, res: Response) => {
       pharmacy.latitude,
       pharmacy.longitude
     );
-    if (distance > radius) continue;
+    if (effectiveRadius < 9000 && distance > effectiveRadius) continue;
+
+    const isDirectSubCityMatch = isSubCityExplicit
+      ? Boolean(pharmacy.subCity && pharmacy.subCity.toLowerCase().includes(targetSubCityLower))
+      : true;
 
     const matchedItems: Array<{ queryName: string; matchedName: string; priceETB: number; inStock: boolean }> = [];
     let basketPrice = 0;
@@ -221,17 +256,32 @@ app.post('/api/search', async (req: Request, res: Response) => {
         totalRequested: rawItemList.length,
         totalBasketPriceETB: basketPrice,
         isSingleStop: matchedItems.length === rawItemList.length,
+        isDirectSubCityMatch,
       });
     }
   }
 
   // Sort candidate pharmacies:
-  // 1. Single-stop pharmacies (has all items) first
-  // 2. Highest matchedCount descending
-  // 3. Highest trustScore descending
+  // If Sub-City filter is active:
+  // 1. Exact sub-city matches first
+  // 2. Single-stop pharmacies (has all items)
+  // 3. MatchedCount descending
   // 4. Shortest distance ascending
+  //
+  // If NEAR_ME (GPS Proximity - Regardless of administrative borders):
+  // 1. Single-stop pharmacies (has all items)
+  // 2. Shortest physical distance ascending (PURE PROXIMITY FIRST)
+  // 3. Matched count descending
+  // 4. Trust score descending
   candidatePharmacies.sort((a, b) => {
+    if (isSubCityExplicit && a.isDirectSubCityMatch !== b.isDirectSubCityMatch) {
+      return a.isDirectSubCityMatch ? -1 : 1;
+    }
     if (a.isSingleStop !== b.isSingleStop) return a.isSingleStop ? -1 : 1;
+    if (searchParadigm === 'NEAR_ME') {
+      if (a.distanceKm !== b.distanceKm) return a.distanceKm - b.distanceKm;
+      return b.matchedCount - a.matchedCount;
+    }
     if (b.matchedCount !== a.matchedCount) return b.matchedCount - a.matchedCount;
     if (b.pharmacy.trustScore !== a.pharmacy.trustScore) return b.pharmacy.trustScore - a.pharmacy.trustScore;
     return a.distanceKm - b.distanceKm;
@@ -241,6 +291,10 @@ app.post('/api/search', async (req: Request, res: Response) => {
     return res.json({
       success: true,
       mode: 'INSTANT_CATALOG_MATCH',
+      searchParadigm: isSubCityExplicit ? 'SUBCITY' : 'NEAR_ME',
+      appliedRadiusKm: effectiveRadius >= 9000 ? null : effectiveRadius,
+      subCityFilter: isSubCityExplicit ? subCity : null,
+      subCityMatchedCount: candidatePharmacies.filter(m => m.isDirectSubCityMatch).length,
       accessReason: access.reason,
       freeUntilDate: access.freeUntilDate,
       remainingFreeSearches: access.remainingFreeSearches,
@@ -255,6 +309,7 @@ app.post('/api/search', async (req: Request, res: Response) => {
           subCity: m.pharmacy.subCity,
           phone: m.pharmacy.phone,
           distanceKm: m.distanceKm,
+          isDirectSubCityMatch: m.isDirectSubCityMatch,
           isVerified: m.pharmacy.isVerified,
           efdaLicenseNumber: m.pharmacy.efdaLicenseNumber,
           tinNumber: m.pharmacy.tinNumber,

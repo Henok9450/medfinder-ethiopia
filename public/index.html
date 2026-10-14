@@ -169,20 +169,24 @@
             >
           </div>
 
-          <!-- Sub-City Selector -->
-          <div class="sm:w-44 border-t sm:border-t-0 sm:border-l border-slate-100 pt-2 sm:pt-0 sm:pl-2">
+          <!-- Sub-City & Search Paradigm Selector -->
+          <div class="sm:w-56 border-t sm:border-t-0 sm:border-l border-slate-100 pt-2 sm:pt-0 sm:pl-2">
             <select id="heroSubCity" class="w-full py-2.5 sm:py-3.5 text-xs sm:text-sm font-semibold text-slate-700 bg-transparent outline-none cursor-pointer">
-              <option value="">All Addis Sub-Cities</option>
-              <option value="Bole">Bole (ቦሌ)</option>
-              <option value="Lemi Kura">Lemi Kura (ለሚ ኩራ / Ayat)</option>
-              <option value="Yeka">Yeka (የካ)</option>
-              <option value="Kirkos">Kirkos (ቂርቆስ)</option>
-              <option value="Arada">Arada (አራዳ)</option>
-              <option value="Lideta">Lideta (ልደታ)</option>
-              <option value="Nifas Silk-Lafto">Nifas Silk-Lafto (ንፋስ ስልክ)</option>
-              <option value="Kolfe Keranio">Kolfe Keranio (ኮልፌ)</option>
-              <option value="Gulele">Gulele (ጉለሌ)</option>
-              <option value="Akaky Kaliti">Akaky Kaliti (አቃቂ ቃሊቲ)</option>
+              <option value="NEAR_ME">📍 Near Me (Closest Distance)</option>
+              <option value="">All Ethiopia / All Sub-Cities</option>
+              <optgroup label="Addis Ababa (11 Sub-Cities)">
+                <option value="Bole">Bole (ቦሌ)</option>
+                <option value="Lemi Kura">Lemi Kura (ለሚ ኩራ / Ayat)</option>
+                <option value="Yeka">Yeka (የካ / Megenagna)</option>
+                <option value="Kirkos">Kirkos (ቂርቆስ / Mexico)</option>
+                <option value="Arada">Arada (አራዳ / Piazza)</option>
+                <option value="Lideta">Lideta (ልደታ)</option>
+                <option value="Addis Ketema">Addis Ketema (አዲስ ከተማ / Merkato)</option>
+                <option value="Gulele">Gulele (ጉለሌ)</option>
+                <option value="Kolfe Keranio">Kolfe Keranio (ኮልፌ)</option>
+                <option value="Nifas Silk-Lafto">Nifas Silk-Lafto (ንፋስ ስልክ)</option>
+                <option value="Akaky Kaliti">Akaky Kaliti (አቃቂ ቃሊቲ)</option>
+              </optgroup>
             </select>
           </div>
 
@@ -602,12 +606,17 @@
     function handleHeroSearch(event) {
       event.preventDefault();
       const medQuery = document.getElementById('heroMedicineQuery').value.trim();
-      const subCity = document.getElementById('heroSubCity').value.trim();
+      const subCityVal = document.getElementById('heroSubCity').value.trim();
       
       let targetUrl = '/find/?';
       const params = new URLSearchParams();
       if (medQuery) params.append('q', medQuery);
-      if (subCity) params.append('subcity', subCity);
+      if (subCityVal === 'NEAR_ME') {
+        params.append('mode', 'near_me');
+      } else if (subCityVal) {
+        params.append('subcity', subCityVal);
+        params.append('mode', 'subcity');
+      }
 
       window.location.href = targetUrl + params.toString();
     }

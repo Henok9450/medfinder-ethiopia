@@ -165,31 +165,81 @@
           </span>
         </div>
 
-        <!-- LOCATION SELECTOR & GPS -->
-        <div class="flex flex-col xs:flex-row sm:flex-row items-stretch sm:items-center justify-between gap-2 text-xs">
-          <div class="flex-1 relative min-w-0">
-            <select id="subCitySelect" onchange="handleSubCityChange()" class="w-full bg-slate-800/90 text-white border border-white/10 text-[11px] rounded-xl px-3 py-2.5 sm:py-2 outline-none focus:ring-1 focus:ring-emerald-400">
-              <option value="Bole" data-lat="8.9950" data-lng="38.7880">📍 Bole / ቦሌ (Airport, Edna Mall, CMC)</option>
-              <option value="Kirkos" data-lat="9.0110" data-lng="38.7520">📍 Kirkos / ቂርቆስ (Mexico, Kazanchis, Meskel Sq)</option>
-              <option value="Yeka" data-lat="9.0300" data-lng="38.8100">📍 Yeka / የካ (Megenagna, Shola, Signal)</option>
-              <option value="Arada" data-lat="9.0350" data-lng="38.7520">📍 Arada / አራዳ (Piazza, Churchill, 4 Kilo)</option>
-              <option value="Nifas Silk" data-lat="8.9567" data-lng="38.7450">📍 Nifas Silk / ንፋስ ስልክ (Saris, Gotera, Jomo)</option>
-              <option value="Lideta" data-lat="9.0100" data-lng="38.7300">📍 Lideta / ልደታ (Balcha, Mexico, Tor Hailoch)</option>
-              <option value="Addis Ketema" data-lat="9.0320" data-lng="38.7350">📍 Addis Ketema / አዲስ ከተማ (Merkato, Autobis Tera)</option>
-              <option value="Gullele" data-lat="9.0600" data-lng="38.7400">📍 Gullele / ጉለሌ (Shiro Meda, Semien Mazegaja)</option>
-              <option value="Kolfe Keranio" data-lat="9.0200" data-lng="38.7000">📍 Kolfe Keranio / ኮልፌ (Ayer Tena, Total)</option>
-              <option value="Akaki Kaliti" data-lat="8.8800" data-lng="38.7600">📍 Akaki Kaliti / አቃቂ (Kality, Crown)</option>
-              <option value="Lemi Kura" data-lat="9.0150" data-lng="38.8400">📍 Lemi Kura / ለሚ ኩራ (Ayat, Summit, Koye Feche)</option>
-            </select>
+        <!-- SEARCH PARADIGM: NEAR ME (GPS DISTANCE) VS SUB-CITY FILTER -->
+        <div class="space-y-2 pt-0.5">
+          <!-- Paradigm Mode Selector Tabs -->
+          <div class="flex items-center justify-between gap-1 bg-slate-950/60 p-1 rounded-2xl border border-white/10 text-xs">
+            <button 
+              type="button" 
+              id="paradigmNearMeBtn" 
+              onclick="setSearchParadigm('NEAR_ME')" 
+              class="flex-1 py-1.5 px-2.5 rounded-xl text-[11px] font-bold transition flex items-center justify-center gap-1.5 bg-emerald-500 text-slate-950 shadow-sm"
+            >
+              <i class="fa-solid fa-location-crosshairs text-[11px]"></i>
+              <span>📍 Near Me (GPS Distance)</span>
+            </button>
+            <button 
+              type="button" 
+              id="paradigmSubCityBtn" 
+              onclick="setSearchParadigm('SUBCITY')" 
+              class="flex-1 py-1.5 px-2.5 rounded-xl text-[11px] font-bold transition flex items-center justify-center gap-1.5 text-slate-300 hover:text-white"
+            >
+              <i class="fa-solid fa-city text-[11px]"></i>
+              <span>🏢 Sub-City Filter</span>
+            </button>
           </div>
-          <button type="button" id="findGpsBtn" onclick="detectGpsLocation()" class="group relative bg-emerald-600 hover:bg-emerald-500 active:scale-95 text-white px-3.5 py-2.5 sm:py-2 rounded-xl text-[11px] font-bold flex items-center justify-center gap-1.5 transition shadow-sm whitespace-nowrap shrink-0">
-            <span class="relative flex h-2 w-2">
-              <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-200 opacity-75"></span>
-              <span class="relative inline-flex rounded-full h-2 w-2 bg-white"></span>
-            </span>
-            <i class="fa-solid fa-location-crosshairs text-[11px]"></i>
-            <span id="findGpsBtnText">Enable Live GPS</span>
-          </button>
+
+          <!-- PARADIGM 1: NEAR ME (PURE DISTANCE - REGARDLESS OF ADMINISTRATIVE BORDERS) -->
+          <div id="nearMeControls" class="space-y-2">
+            <div class="flex flex-wrap items-center justify-between gap-1.5 text-[11px] text-slate-300">
+              <div class="flex items-center gap-1">
+                <span class="text-slate-400 font-medium">Radius:</span>
+                <span class="text-[10px] text-emerald-300 font-semibold">(Closest First)</span>
+              </div>
+              <div class="flex items-center gap-1">
+                <button type="button" onclick="setSearchRadius(3)" data-radius="3" class="radius-pill px-2.5 py-1 rounded-lg bg-white/10 text-slate-300 hover:bg-emerald-500 hover:text-slate-950 transition font-bold text-[11px]">3 km</button>
+                <button type="button" onclick="setSearchRadius(5)" data-radius="5" class="radius-pill px-2.5 py-1 rounded-lg bg-white/10 text-slate-300 hover:bg-emerald-500 hover:text-slate-950 transition font-bold text-[11px]">5 km</button>
+                <button type="button" onclick="setSearchRadius(10)" data-radius="10" class="radius-pill px-2.5 py-1 rounded-lg bg-emerald-500 text-slate-950 transition font-bold text-[11px]">10 km</button>
+                <button type="button" onclick="setSearchRadius(25)" data-radius="25" class="radius-pill px-2.5 py-1 rounded-lg bg-white/10 text-slate-300 hover:bg-emerald-500 hover:text-slate-950 transition font-bold text-[11px]">25 km</button>
+                <button type="button" onclick="setSearchRadius(0)" data-radius="0" class="radius-pill px-2.5 py-1 rounded-lg bg-white/10 text-slate-300 hover:bg-emerald-500 hover:text-slate-950 transition font-bold text-[11px]">Any</button>
+              </div>
+            </div>
+
+            <div class="flex items-center justify-between gap-2 p-2.5 bg-slate-950/40 rounded-xl border border-white/10 text-[11px]">
+              <div class="flex items-center gap-1.5 min-w-0">
+                <span class="relative flex h-2 w-2 shrink-0">
+                  <span id="gpsPulseDot" class="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                  <span class="relative inline-flex rounded-full h-2 w-2 bg-emerald-400"></span>
+                </span>
+                <span id="gpsLocationStatusText" class="truncate text-slate-300">Searching by closest distance • Borders ignored</span>
+              </div>
+              <button type="button" id="findGpsBtn" onclick="detectGpsLocation()" class="text-emerald-400 hover:text-emerald-300 font-bold underline shrink-0 flex items-center gap-1">
+                <i class="fa-solid fa-arrows-rotate text-[10px]"></i>
+                <span id="findGpsBtnText">Update GPS</span>
+              </button>
+            </div>
+          </div>
+
+          <!-- PARADIGM 2: SUB-CITY FILTER (ALL 11 SUB-CITIES) -->
+          <div id="subCityControls" class="hidden space-y-1.5">
+            <div class="relative">
+              <select id="subCitySelect" onchange="handleSubCityChange()" class="w-full bg-slate-800/90 text-white border border-white/10 text-[11px] rounded-xl px-3 py-2.5 sm:py-2 outline-none focus:ring-1 focus:ring-emerald-400">
+                <option value="ALL">🌐 All Addis Sub-Cities (Nationwide Mode)</option>
+                <option value="Lemi Kura" data-lat="9.0150" data-lng="38.8400">📍 Lemi Kura / ለሚ ኩራ (Ayat, Summit, CMC, Goro)</option>
+                <option value="Bole" data-lat="8.9950" data-lng="38.7880">📍 Bole / ቦሌ (Airport, Edna Mall, Atlas)</option>
+                <option value="Yeka" data-lat="9.0300" data-lng="38.8100">📍 Yeka / የካ (Megenagna, Shola, Signal)</option>
+                <option value="Kirkos" data-lat="9.0110" data-lng="38.7520">📍 Kirkos / ቂርቆስ (Mexico, Kazanchis, Meskel Sq)</option>
+                <option value="Arada" data-lat="9.0350" data-lng="38.7520">📍 Arada / አራዳ (Piazza, Churchill, 4 Kilo)</option>
+                <option value="Lideta" data-lat="9.0100" data-lng="38.7300">📍 Lideta / ልደታ (Balcha, Mexico, Tor Hailoch)</option>
+                <option value="Addis Ketema" data-lat="9.0320" data-lng="38.7350">📍 Addis Ketema / አዲስ ከተማ (Merkato, Autobis Tera)</option>
+                <option value="Gullele" data-lat="9.0600" data-lng="38.7400">📍 Gullele / ጉለሌ (Shiro Meda, Semien Mazegaja)</option>
+                <option value="Kolfe Keranio" data-lat="9.0200" data-lng="38.7000">📍 Kolfe Keranio / ኮልፌ (Ayer Tena, Total, ALERT)</option>
+                <option value="Nifas Silk" data-lat="8.9567" data-lng="38.7450">📍 Nifas Silk / ንፋስ ስልክ (Saris, Gotera, Jomo)</option>
+                <option value="Akaki Kaliti" data-lat="8.8800" data-lng="38.7600">📍 Akaki Kaliti / አቃቂ ቃሊቲ (Kality, Crown)</option>
+              </select>
+            </div>
+            <p class="text-[10px] text-slate-400 pl-1">💡 Focus specifically on pharmacies inside the selected sub-city.</p>
+          </div>
         </div>
       </div>
 
@@ -709,66 +759,99 @@
       }
     }
 
+    // --- SEARCH PARADIGM STATE & CONTROLS ---
+    let currentSearchParadigm = 'NEAR_ME'; // 'NEAR_ME' (GPS proximity) | 'SUBCITY' (administrative filter)
+    let currentSelectedRadiusKm = 10;
+    let userLiveLat = 9.0015;
+    let userLiveLng = 38.7845;
+    let userGpsLocked = false;
+
+    function setSearchParadigm(mode) {
+      currentSearchParadigm = mode;
+      const nearMeBtn = document.getElementById('paradigmNearMeBtn');
+      const subCityBtn = document.getElementById('paradigmSubCityBtn');
+      const nearMeControls = document.getElementById('nearMeControls');
+      const subCityControls = document.getElementById('subCityControls');
+
+      if (mode === 'NEAR_ME') {
+        nearMeBtn.className = 'flex-1 py-1.5 px-2.5 rounded-xl text-[11px] font-bold transition flex items-center justify-center gap-1.5 bg-emerald-500 text-slate-950 shadow-sm';
+        subCityBtn.className = 'flex-1 py-1.5 px-2.5 rounded-xl text-[11px] font-bold transition flex items-center justify-center gap-1.5 text-slate-300 hover:text-white';
+        nearMeControls.classList.remove('hidden');
+        subCityControls.classList.add('hidden');
+        if (!userGpsLocked) {
+          detectGpsLocation(false);
+        }
+      } else {
+        subCityBtn.className = 'flex-1 py-1.5 px-2.5 rounded-xl text-[11px] font-bold transition flex items-center justify-center gap-1.5 bg-emerald-500 text-slate-950 shadow-sm';
+        nearMeBtn.className = 'flex-1 py-1.5 px-2.5 rounded-xl text-[11px] font-bold transition flex items-center justify-center gap-1.5 text-slate-300 hover:text-white';
+        subCityControls.classList.remove('hidden');
+        nearMeControls.classList.add('hidden');
+      }
+
+      const input = document.getElementById('medicineInput').value.trim();
+      if (input) executeMedicineSearch();
+    }
+
+    function setSearchRadius(radiusKm) {
+      currentSelectedRadiusKm = radiusKm;
+      document.querySelectorAll('.radius-pill').forEach(btn => {
+        const r = parseInt(btn.getAttribute('data-radius'), 10);
+        if (r === radiusKm) {
+          btn.className = 'radius-pill px-2.5 py-1 rounded-lg bg-emerald-500 text-slate-950 transition font-bold text-[11px]';
+        } else {
+          btn.className = 'radius-pill px-2.5 py-1 rounded-lg bg-white/10 text-slate-300 hover:bg-emerald-500 hover:text-slate-950 transition font-bold text-[11px]';
+        }
+      });
+      const input = document.getElementById('medicineInput').value.trim();
+      if (input) executeMedicineSearch();
+    }
+
     // 4. Geolocation Detection with Interactive Error Handling & Guide
-    function detectGpsLocation() {
-      const btn = document.getElementById('findGpsBtn');
+    function detectGpsLocation(autoSearch = true) {
       const btnText = document.getElementById('findGpsBtnText');
+      const statusText = document.getElementById('gpsLocationStatusText');
 
       if (!navigator.geolocation) {
-        showGpsGuideModal('Device Not Supported', 'ይህ ብሮውዘር የጂፒኤስ አቀማመጥን (Geolocation) አይደግፍም። እባክዎ ከክፍለ ከተማ ዝርዝር ይምረጡ።');
+        if (statusText) statusText.innerText = 'GPS not supported on device • Using Addis Center';
         return;
       }
 
       if (btnText) btnText.innerText = 'Locating...';
+      if (statusText) statusText.innerText = 'Detecting satellite coordinates...';
 
       navigator.geolocation.getCurrentPosition(
         (pos) => {
-          const lat = pos.coords.latitude;
-          const lng = pos.coords.longitude;
-          const select = document.getElementById('subCitySelect');
-          let gpsOpt = select.querySelector('option[value="GPS"]');
-          if (!gpsOpt) {
-            gpsOpt = document.createElement('option');
-            gpsOpt.value = 'GPS';
-            select.insertBefore(gpsOpt, select.firstChild);
-          }
-          gpsOpt.setAttribute('data-lat', lat);
-          gpsOpt.setAttribute('data-lng', lng);
-          gpsOpt.textContent = `📍 My Live GPS (${lat.toFixed(4)}, ${lng.toFixed(4)})`;
-          select.value = 'GPS';
+          userLiveLat = pos.coords.latitude;
+          userLiveLng = pos.coords.longitude;
+          userGpsLocked = true;
 
           if (btnText) btnText.innerText = 'GPS Locked 🟢';
+          if (statusText) {
+            statusText.innerHTML = `<strong>Live GPS Active</strong> (${userLiveLat.toFixed(4)}, ${userLiveLng.toFixed(4)}) • Borders ignored`;
+          }
           closeGpsGuideModal();
 
-          // Auto-run search if medicine name already typed
           const input = document.getElementById('medicineInput').value.trim();
-          if (input) executeMedicineSearch();
+          if (input && autoSearch) executeMedicineSearch();
         },
         (err) => {
           console.warn('[GPS] Error code:', err.code, err.message);
-          if (btnText) btnText.innerText = 'Enable Live GPS';
+          if (btnText) btnText.innerText = 'Update GPS';
+          if (statusText) statusText.innerText = 'GPS unreached • Using closest Addis estimate';
 
           if (err.code === 1) {
-            // PERMISSION_DENIED
             showGpsGuideModal(
               'Location Access Blocked / ፍቃድ ተከልክሏል',
               'የስልክዎ ወይም የብሮውዘሩ የLocation ፍቃድ ጠፍቷል። በአቅራቢያዎ ያሉ ፋርማሲዎችን በትክክለኛ ርቀት ለማግኘት እባክዎ Location ፍቃድ ይስጡ ወይም ክፍለ ከተማ ይምረጡ።'
             );
           } else if (err.code === 2) {
-            // POSITION_UNAVAILABLE
             showGpsGuideModal(
               'GPS Signal Unavailable / ጂፒኤስ አልተገኘም',
               'የስልክዎ Location (GPS) ማብሪያ መጥፋቱን ያሳያል። እባክዎ የስልክዎን Location ያብሩና እንደገና ይሞክሩ።'
             );
-          } else {
-            // TIMEOUT or OTHER
-            showGpsGuideModal(
-              'GPS Request Timed Out',
-              'የጂፒኤስ መረጃ ለመቀበል ዘግይቷል። እባክዎ እንደገና ይሞክሩ ወይም ክፍለ ከተማ ይምረጡ።'
-            );
           }
         },
-        { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
+        { enableHighAccuracy: true, timeout: 8000, maximumAge: 60000 }
       );
     }
 
@@ -788,7 +871,6 @@
     }
 
     function handleSubCityChange() {
-      // Re-run search if query exists
       const input = document.getElementById('medicineInput').value.trim();
       if (input) executeMedicineSearch();
     }
@@ -813,11 +895,20 @@
         return;
       }
 
-      const select = document.getElementById('subCitySelect');
-      const selectedOption = select.options[select.selectedIndex];
-      const subCity = select.value;
-      const userLat = parseFloat(selectedOption.getAttribute('data-lat') || '8.9950');
-      const userLng = parseFloat(selectedOption.getAttribute('data-lng') || '38.7880');
+      const isNearMe = currentSearchParadigm === 'NEAR_ME';
+      let userLat = userLiveLat;
+      let userLng = userLiveLng;
+      let subCity = null;
+
+      if (!isNearMe) {
+        const select = document.getElementById('subCitySelect');
+        const selectedOption = select.options[select.selectedIndex];
+        subCity = select.value;
+        if (selectedOption.hasAttribute('data-lat')) {
+          userLat = parseFloat(selectedOption.getAttribute('data-lat'));
+          userLng = parseFloat(selectedOption.getAttribute('data-lng'));
+        }
+      }
 
       const container = document.getElementById('resultsContainer');
       const resultsHeader = document.getElementById('resultsHeader');
@@ -835,7 +926,7 @@
           <div class="inline-block animate-spin text-emerald-600 text-2xl mb-2">
             <i class="fa-solid fa-circle-notch"></i>
           </div>
-          <p class="text-xs text-slate-500">Pinging verified pharmacies near ${subCity}...</p>
+          <p class="text-xs text-slate-500">${isNearMe ? 'Scanning closest verified pharmacies regardless of borders...' : `Scanning verified pharmacies in ${subCity}...`}</p>
         </div>
       `;
 
@@ -858,6 +949,8 @@
             userLat,
             userLng,
             subCity,
+            searchParadigm: currentSearchParadigm,
+            maxRadiusKm: isNearMe ? currentSelectedRadiusKm : 40,
             lang: 'am'
           })
         });
@@ -865,6 +958,16 @@
         const data = await res.json();
         searchBtn.disabled = false;
         searchBtn.innerHTML = `<span>Search</span> <i class="fa-solid fa-arrow-right text-[10px]"></i>`;
+
+        // Update radius badge in results header
+        const radiusEl = document.getElementById('searchRadiusText');
+        if (radiusEl) {
+          if (isNearMe) {
+            radiusEl.innerHTML = `<strong>Mode:</strong> Near Me (${currentSelectedRadiusKm ? currentSelectedRadiusKm + ' km radius' : 'Any distance'}) • <span class="text-emerald-700 font-bold">Closest First</span>`;
+          } else {
+            radiusEl.innerHTML = `<strong>Filter:</strong> ${subCity === 'ALL' ? 'All Sub-Cities' : subCity} • (${data.subCityMatchedCount || 0} direct matches)`;
+          }
+        }
 
         if (data.success && data.pharmacies && data.pharmacies.length > 0) {
           if (data.isMultiItem) {
@@ -886,11 +989,11 @@
                   Live In-App Restock Radar
                 </span>
                 <h4 class="font-extrabold text-sm text-slate-900">Broadcast Ping Sent to ${data.pingedCount || 10} Nearby Pharmacies</h4>
-                <p class="text-xs text-slate-500 leading-relaxed">"${escapeHtml(medicineName)}" was broadcast to verified pharmacists in <strong>${escapeHtml(subCity)}</strong>. Keep this page open — your screen will automatically chime and display the pharmacy the moment they confirm stock!</p>
+                <p class="text-xs text-slate-500 leading-relaxed">"${escapeHtml(medicineName)}" was broadcast to verified pharmacists ${isNearMe ? 'within proximity' : 'in <strong>' + escapeHtml(subCity) + '</strong>'}. Keep this page open — your screen will automatically chime and display the pharmacy the moment they confirm stock!</p>
               </div>
               <div class="p-2.5 bg-slate-50 rounded-2xl border border-slate-200 flex items-center justify-center gap-2 text-[11px] font-semibold text-slate-700">
                 <i class="fa-solid fa-circle-notch fa-spin text-sky-600"></i>
-                <span id="inAppRadarPollStatus">Listening live for pharmacist confirmation in ${escapeHtml(subCity)}...</span>
+                <span id="inAppRadarPollStatus">Listening live for pharmacist confirmation...</span>
               </div>
               <div class="flex flex-col xs:flex-row items-center justify-center gap-2 pt-1">
                 <button onclick="enablePwaNotifications()" class="w-full xs:w-auto inline-flex items-center justify-center gap-1.5 bg-emerald-600 hover:bg-emerald-700 active:scale-95 text-white font-bold text-xs px-4 py-2.5 rounded-xl shadow-xs transition">
@@ -906,7 +1009,7 @@
             medicineNames: medicineNamesToSend,
             userLat,
             userLng,
-            subCity,
+            subCity: subCity || 'Nearby',
             requestId: data.requestId
           });
         } else {
@@ -914,8 +1017,8 @@
           container.innerHTML = `
             <div class="bg-white p-6 rounded-3xl border border-slate-200 text-center space-y-2">
               <i class="fa-solid fa-prescription-bottle text-2xl text-slate-400"></i>
-              <h4 class="font-bold text-sm text-slate-900">No Direct Matches in ${subCity}</h4>
-              <p class="text-xs text-slate-500">Try selecting a neighboring sub-city or search by generic ingredient name.</p>
+              <h4 class="font-bold text-sm text-slate-900">No Direct Stock Found</h4>
+              <p class="text-xs text-slate-500">${isNearMe ? 'Try widening your radius to 25 km or Any, or switch to Sub-City Filter.' : 'Try selecting another sub-city or switch to Near Me mode.'}</p>
             </div>
           `;
         }
@@ -932,13 +1035,22 @@
 
     function renderPharmacies(pharmacies, drugName, isMultiItem = false, searchedMedicines = []) {
       const container = document.getElementById('resultsContainer');
-      container.innerHTML = pharmacies.map((p, idx) => `
+      container.innerHTML = pharmacies.map((p, idx) => {
+        const dist = (typeof p.distanceKm === 'number' && !isNaN(p.distanceKm)) ? p.distanceKm : 0;
+        const distBadge = dist <= 1.0 
+          ? `<span class="bg-emerald-100 text-emerald-800 text-[10px] font-bold px-2 py-0.5 rounded-full inline-flex items-center gap-1"><i class="fa-solid fa-person-walking text-xs"></i> ${dist < 0.1 ? '< 0.1' : dist.toFixed(1)} km (~${Math.max(1, Math.round(dist * 12))} min walk)</span>`
+          : (dist <= 5.0
+             ? `<span class="bg-teal-50 text-teal-800 text-[10px] font-bold px-2 py-0.5 rounded-full inline-flex items-center gap-1"><i class="fa-solid fa-car text-[10px]"></i> ${dist.toFixed(1)} km (~${Math.max(3, Math.round(dist * 2.5))} min drive)</span>`
+             : `<span class="bg-slate-100 text-slate-700 text-[10px] font-semibold px-2 py-0.5 rounded-full">📍 ${dist.toFixed(1)} km away</span>`);
+
+        return `
         <div class="bg-white p-4 rounded-3xl border ${p.isSingleStop ? 'border-emerald-300 ring-1 ring-emerald-200' : 'border-slate-200'} shadow-xs space-y-3 hover:border-emerald-400 transition">
           <div class="flex items-start justify-between gap-2">
             <div>
               <div class="flex items-center gap-1.5 flex-wrap">
                 <h3 class="font-black text-sm text-slate-900">${escapeHtml(p.name)}</h3>
                 ${p.isVerified ? '<span class="text-[10px] bg-emerald-100 text-emerald-800 font-bold px-1.5 py-0.2 rounded" title="EFDA Licensed"><i class="fa-solid fa-check"></i> Verified</span>' : ''}
+                ${p.isDirectSubCityMatch === false ? '<span class="text-[10px] bg-amber-50 text-amber-800 border border-amber-200 font-bold px-1.5 py-0.5 rounded">Adjacent Sub-City</span>' : ''}
                 ${isMultiItem ? (p.isSingleStop ? `
                   <span class="text-[10px] bg-emerald-600 text-white font-bold px-2 py-0.5 rounded-full flex items-center gap-1 shadow-2xs">
                     <i class="fa-solid fa-check-double text-[9px]"></i> Single-Stop (All ${p.totalRequested} In Stock)
@@ -949,9 +1061,10 @@
                   </span>
                 `) : ''}
               </div>
-              <p class="text-xs text-slate-500 mt-0.5">
-                📍 ${p.subCity}, Addis Ababa • <strong class="text-emerald-700">${(typeof p.distanceKm === 'number' && !isNaN(p.distanceKm)) ? (p.distanceKm < 0.1 ? '< 0.1' : p.distanceKm.toFixed(1)) : '0.0'} km away</strong>
-              </p>
+              <div class="flex items-center gap-2 mt-1 flex-wrap">
+                <span class="text-xs text-slate-500">📍 ${p.subCity}, Addis Ababa</span>
+                ${distBadge}
+              </div>
               ${!isMultiItem && p.matchedDrugName && p.matchedDrugName.toLowerCase() !== drugName.toLowerCase() ? `
               <div class="mt-1">
                 <span class="inline-flex items-center gap-1 text-[10px] font-semibold bg-sky-50 text-sky-800 border border-sky-200 px-2 py-0.5 rounded-full">
@@ -999,7 +1112,7 @@
             </button>
           </div>
         </div>
-      `).join('');
+        `;
     }
 
     let pollReservationInterval = null;
@@ -1593,17 +1706,24 @@
       document.getElementById('prescriptionModal').classList.add('hidden');
     }
 
-    // Auto-search if opened from Telegram or deep-link with ?q=Medicine
+    // Auto-search if opened from Telegram, landing page, or deep-link with ?q=Medicine&mode=near_me
     window.addEventListener('DOMContentLoaded', () => {
       try {
         const params = new URLSearchParams(window.location.search);
+        const modeParam = params.get('mode');
         const subCityParam = params.get('subcity') || params.get('subCity');
-        if (subCityParam) {
-          const select = document.getElementById('subCitySelect');
-          if (select) {
-            select.value = subCityParam;
+
+        if (modeParam === 'subcity' || (subCityParam && subCityParam !== 'NEAR_ME')) {
+          setSearchParadigm('SUBCITY');
+          if (subCityParam) {
+            const select = document.getElementById('subCitySelect');
+            if (select) select.value = subCityParam;
           }
+        } else {
+          // Default to Near Me GPS Proximity (regardless of administrative borders)
+          setSearchParadigm('NEAR_ME');
         }
+
         const q = params.get('q') || params.get('search');
         if (q) {
           const input = document.getElementById('medicineInput');
