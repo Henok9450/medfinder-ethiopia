@@ -66,11 +66,16 @@
         </div>
       </div>
 
-      <!-- Quick Location Badge -->
-      <button onclick="requestGpsLocation()" class="flex items-center space-x-1.5 px-2.5 py-1.5 rounded-full bg-emerald-50 border border-emerald-200/80 text-emerald-800 text-[11px] font-bold active:scale-95 transition shrink-0">
-        <i class="fa-solid fa-location-dot text-emerald-600 text-[10px]"></i>
-        <span id="activeLocationLabel">Bole</span>
-      </button>
+      <!-- Quick Header Controls: Voice Assist + Sub-city Location -->
+      <div class="flex items-center gap-1.5 shrink-0">
+        <button id="miniVoiceToggleBtn" onclick="toggleMiniVoiceAssist()" class="w-8 h-8 rounded-full bg-slate-100 hover:bg-slate-200 text-slate-700 flex items-center justify-center text-xs active:scale-95 transition" title="Voice Assistance (On/Off)">
+          <i id="miniVoiceIcon" class="fa-solid fa-headset text-emerald-600"></i>
+        </button>
+        <button onclick="requestGpsLocation()" class="flex items-center space-x-1.5 px-2.5 py-1.5 rounded-full bg-emerald-50 border border-emerald-200/80 text-emerald-800 text-[11px] font-bold active:scale-95 transition">
+          <i class="fa-solid fa-location-dot text-emerald-600 text-[10px]"></i>
+          <span id="activeLocationLabel">Bole</span>
+        </button>
+      </div>
     </div>
   </header>
 
@@ -239,9 +244,14 @@
             <p id="resModalStatusText" class="text-[10px] text-emerald-700 font-semibold">Live Pharmacist Notification Sent</p>
           </div>
         </div>
-        <button onclick="minimizeMiniReservationModal()" class="w-7 h-7 rounded-full bg-slate-100 text-slate-500 hover:text-slate-800 flex items-center justify-center text-xs">
-          <i class="fa-solid fa-xmark"></i>
-        </button>
+        <div class="flex items-center gap-1.5">
+          <button onclick="toggleMiniVoiceAssist()" id="modalVoiceToggleBtn" class="w-7 h-7 rounded-full bg-emerald-50 text-emerald-700 hover:bg-emerald-100 flex items-center justify-center text-xs transition" title="Voice Assistance">
+            <i id="modalVoiceIcon" class="fa-solid fa-headset"></i>
+          </button>
+          <button onclick="minimizeMiniReservationModal()" class="w-7 h-7 rounded-full bg-slate-100 text-slate-500 hover:text-slate-800 flex items-center justify-center text-xs">
+            <i class="fa-solid fa-xmark"></i>
+          </button>
+        </div>
       </div>
 
       <div class="bg-gradient-to-br from-slate-900 to-emerald-950 p-4 rounded-2xl text-white text-center space-y-1 shadow-sm">
@@ -592,6 +602,130 @@
 
     // 7. Open 60-Minute Price Lock Reservation Modal (Real Backend Hold)
     let miniPollInterval = null;
+    let miniAcknowledgedHandled = false;
+    let isMiniVoiceMuted = false;
+
+    // Web Speech API Voice Initialization
+    if ('speechSynthesis' in window) {
+      window.speechSynthesis.onvoiceschanged = () => {
+        try { window.speechSynthesis.getVoices(); } catch (_) {}
+      };
+    }
+
+    function toggleMiniVoiceAssist() {
+      isMiniVoiceMuted = !isMiniVoiceMuted;
+      const icons = [document.getElementById('miniVoiceIcon'), document.getElementById('modalVoiceIcon')];
+      icons.forEach(icon => {
+        if (!icon) return;
+        if (isMiniVoiceMuted) {
+          icon.className = 'fa-solid fa-volume-xmark text-slate-400';
+        } else {
+          icon.className = 'fa-solid fa-headset text-emerald-600';
+        }
+      });
+      if (isMiniVoiceMuted) {
+        try { if ('speechSynthesis' in window) window.speechSynthesis.cancel(); } catch (_) {}
+      } else {
+        speakMiniAppVoice('Voice assistance turned on');
+      }
+    }
+
+    function playMiniAppChime(type) {
+      try {
+        const AudioCtx = window.AudioContext || window.webkitAudioContext;
+        if (!AudioCtx) return;
+        const ctx = new AudioCtx();
+        const now = ctx.currentTime;
+
+        if (type === 'cancel') {
+          // Warning low descending buzz
+          const osc = ctx.createOscillator();
+          const gain = ctx.createGain();
+          osc.type = 'sawtooth';
+          osc.frequency.setValueAtTime(340, now);
+          osc.frequency.setValueAtTime(220, now + 0.15);
+          gain.gain.setValueAtTime(0.2, now);
+          gain.gain.exponentialRampToValueAtTime(0.01, now + 0.4);
+          osc.connect(gain);
+          gain.connect(ctx.destination);
+          osc.start(now);
+          osc.stop(now + 0.4);
+        } else if (type === 'confirmed') {
+          // Dual-pulse "ding ding" for pharmacy stock confirmation
+          const osc1 = ctx.createOscillator();
+          const gain1 = ctx.createGain();
+          osc1.type = 'sine';
+          osc1.frequency.setValueAtTime(880, now);
+          gain1.gain.setValueAtTime(0.25, now);
+          gain1.gain.exponentialRampToValueAtTime(0.01, now + 0.15);
+          osc1.connect(gain1);
+          gain1.connect(ctx.destination);
+          osc1.start(now);
+          osc1.stop(now + 0.15);
+
+          const osc2 = ctx.createOscillator();
+          const gain2 = ctx.createGain();
+          osc2.type = 'sine';
+          osc2.frequency.setValueAtTime(1174, now + 0.18);
+          gain2.gain.setValueAtTime(0.28, now + 0.18);
+          gain2.gain.exponentialRampToValueAtTime(0.01, now + 0.45);
+          osc2.connect(gain2);
+          gain2.connect(ctx.destination);
+          osc2.start(now + 0.18);
+          osc2.stop(now + 0.45);
+        } else if (type === 'fulfilled') {
+          // Happy 3-note ascending chime
+          [523.25, 659.25, 783.99].forEach((freq, idx) => {
+            const osc = ctx.createOscillator();
+            const gain = ctx.createGain();
+            osc.type = 'sine';
+            osc.frequency.setValueAtTime(freq, now + idx * 0.12);
+            gain.gain.setValueAtTime(0.2, now + idx * 0.12);
+            gain.gain.exponentialRampToValueAtTime(0.01, now + idx * 0.12 + 0.35);
+            osc.connect(gain);
+            gain.connect(ctx.destination);
+            osc.start(now + idx * 0.12);
+            osc.stop(now + idx * 0.12 + 0.35);
+          });
+        } else {
+          // Regular hold placed pleasant chime
+          const osc = ctx.createOscillator();
+          const gain = ctx.createGain();
+          osc.type = 'sine';
+          osc.frequency.setValueAtTime(587.33, now);
+          osc.frequency.setValueAtTime(880, now + 0.12);
+          gain.gain.setValueAtTime(0.22, now);
+          gain.gain.exponentialRampToValueAtTime(0.01, now + 0.4);
+          osc.connect(gain);
+          gain.connect(ctx.destination);
+          osc.start(now);
+          osc.stop(now + 0.4);
+        }
+      } catch (e) {
+        console.warn('[MiniApp Audio] Chime failed:', e);
+      }
+    }
+
+    function speakMiniAppVoice(text) {
+      if (isMiniVoiceMuted || !('speechSynthesis' in window)) return;
+      try {
+        window.speechSynthesis.cancel();
+        const utterance = new SpeechSynthesisUtterance(text);
+        utterance.rate = 0.95;
+        utterance.pitch = 1.0;
+        utterance.volume = 1.0;
+        const voices = window.speechSynthesis.getVoices();
+        if (voices && voices.length > 0) {
+          const preferredVoice = voices.find(v => v.lang.startsWith('en') && (v.name.includes('Natural') || v.name.includes('Google') || v.name.includes('Samantha') || v.name.includes('Siri') || v.name.includes('Female')))
+            || voices.find(v => v.lang.startsWith('en'))
+            || voices[0];
+          if (preferredVoice) utterance.voice = preferredVoice;
+        }
+        window.speechSynthesis.speak(utterance);
+      } catch (err) {
+        console.warn('[MiniApp Voice] Speech synthesis error:', err);
+      }
+    }
 
     async function openReservationModal(idx) {
       if (tg?.HapticFeedback) tg.HapticFeedback.impactOccurred('medium');
@@ -634,6 +768,8 @@
         expiresInSeconds: 3600
       };
 
+      miniAcknowledgedHandled = false;
+
       document.getElementById('resModalCode').innerText = activeHold.code;
       document.getElementById('resModalPharmacy').innerText = activeHold.pharmacy;
       document.getElementById('resModalMedicine').innerText = activeHold.medicine;
@@ -650,6 +786,12 @@
 
       const dot = document.getElementById('miniActiveHoldDot');
       if (dot) dot.classList.remove('hidden');
+
+      // Play chime & speak voice-assisted hold confirmation
+      playMiniAppChime('created');
+      setTimeout(() => {
+        speakMiniAppVoice(`Price-lock hold placed for ${activeHold.medicine}. Waiting for pharmacist confirmation.`);
+      }, 400);
 
       // Start countdown
       if (holdTimerInterval) clearInterval(holdTimerInterval);
@@ -674,6 +816,10 @@
           if (sData.success && sData.reservation) {
             const r = sData.reservation;
             if (r.status === 'CANCELLED') {
+              playMiniAppChime('cancel');
+              setTimeout(() => {
+                speakMiniAppVoice(`Notice: Hold #${activeHold ? activeHold.rawCode : ''} cancelled. Medicine is out of stock.`);
+              }, 400);
               if (statusEl) statusEl.innerText = '❌ Out of Stock — Declined by Pharmacist';
               if (miniPollInterval) { clearInterval(miniPollInterval); miniPollInterval = null; }
               if (holdTimerInterval) { clearInterval(holdTimerInterval); holdTimerInterval = null; }
@@ -681,6 +827,10 @@
               if (dot) dot.classList.add('hidden');
               activeHold = null;
             } else if (r.status === 'FULFILLED') {
+              playMiniAppChime('fulfilled');
+              setTimeout(() => {
+                speakMiniAppVoice('Medicine dispensed successfully! Thank you for using MedFinder.');
+              }, 400);
               if (statusEl) statusEl.innerText = '✅ Dispensed & Completed at Counter!';
               if (miniPollInterval) { clearInterval(miniPollInterval); miniPollInterval = null; }
               if (holdTimerInterval) { clearInterval(holdTimerInterval); holdTimerInterval = null; }
@@ -690,6 +840,13 @@
               if (dot) dot.classList.add('hidden');
               activeHold = null;
             } else if (r.pharmacistAcknowledged) {
+              if (!miniAcknowledgedHandled) {
+                miniAcknowledgedHandled = true;
+                playMiniAppChime('confirmed');
+                setTimeout(() => {
+                  speakMiniAppVoice(`Stock confirmed! Your medicine is physically held at the counter for 60 minutes.`);
+                }, 400);
+              }
               if (statusEl) statusEl.innerText = '✅ Confirmed & Held at Counter (60m Active)';
             }
           }

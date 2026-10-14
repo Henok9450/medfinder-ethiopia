@@ -340,6 +340,10 @@
           <button onclick="switchStudioTab('vouchers')" class="flex-1 sm:flex-initial bg-white text-rose-700 hover:bg-rose-50 active:scale-95 font-black text-xs px-4 py-2.5 rounded-xl shadow transition text-center">
             View & Confirm Hold
           </button>
+          <button onclick="toggleVoiceAssist()" id="voiceToggleBtn" class="bg-rose-700 hover:bg-rose-800 active:scale-95 text-white text-xs px-3 py-2.5 rounded-xl transition flex items-center justify-center gap-1.5 shrink-0" title="Toggle Voice Assistance">
+            <i id="voiceAssistIcon" class="fa-solid fa-headset"></i>
+            <span id="voiceAssistText">Voice ON</span>
+          </button>
           <button onclick="toggleAlarmMute()" id="muteAlarmBtn" class="bg-rose-700 hover:bg-rose-800 active:scale-95 text-white text-xs px-3 py-2.5 rounded-xl transition flex items-center justify-center gap-1.5 shrink-0" title="Mute/Unmute Chime">
             <i id="muteAlarmIcon" class="fa-solid fa-volume-high"></i>
             <span id="muteAlarmText">Mute</span>
@@ -507,6 +511,10 @@
               <span id="holdsQueueCountBadge" class="text-[10px] font-bold bg-slate-100 text-slate-700 px-2 py-0.5 rounded-full">0 Active</span>
             </div>
             <div class="flex items-center gap-2">
+              <button onclick="toggleVoiceAssist()" class="text-xs text-slate-600 hover:text-slate-900 flex items-center gap-1 px-2.5 py-1 rounded-lg border border-slate-200">
+                <i id="queueVoiceIcon" class="fa-solid fa-headset text-emerald-600"></i>
+                <span id="queueVoiceText">Voice ON</span>
+              </button>
               <button onclick="toggleAlarmMute()" class="text-xs text-slate-500 hover:text-slate-900 flex items-center gap-1 px-2.5 py-1 rounded-lg border border-slate-200">
                 <i id="queueMuteIcon" class="fa-solid fa-volume-high"></i>
                 <span id="queueMuteText">Sound ON</span>
@@ -2231,6 +2239,8 @@
 
         const hold = data.hold || data.reservation;
         if (data.success && hold) {
+          playPositiveDing();
+          speakVoiceAssisted(`Voucher ${hold.reservationCode} verified and fulfilled for ${hold.medicineName}.`);
           resultBox.className = 'p-4 rounded-xl text-xs space-y-2 bg-emerald-50 border border-emerald-200 text-emerald-900';
           resultBox.innerHTML = `
             <div class="flex items-center space-x-2 font-bold text-sm text-emerald-800">
@@ -2277,6 +2287,59 @@
       }
     });
 
+    let currentAlarmMedicine = '';
+    let currentAlarmCode = '';
+    let isVoiceMuted = false;
+
+    // Initialize Web Speech API voices early
+    if ('speechSynthesis' in window) {
+      window.speechSynthesis.onvoiceschanged = () => {
+        try { window.speechSynthesis.getVoices(); } catch (_) {}
+      };
+    }
+
+    function speakVoiceAssisted(text) {
+      if (isAlarmMuted || isVoiceMuted || !('speechSynthesis' in window)) return;
+      try {
+        window.speechSynthesis.cancel(); // Clear any queued announcements
+        const utterance = new SpeechSynthesisUtterance(text);
+        utterance.rate = 0.95;
+        utterance.pitch = 1.0;
+        utterance.volume = 1.0;
+        const voices = window.speechSynthesis.getVoices();
+        if (voices && voices.length > 0) {
+          const preferredVoice = voices.find(v => v.lang.startsWith('en') && (v.name.includes('Natural') || v.name.includes('Google') || v.name.includes('Samantha') || v.name.includes('Siri') || v.name.includes('Female')))
+            || voices.find(v => v.lang.startsWith('en'))
+            || voices[0];
+          if (preferredVoice) utterance.voice = preferredVoice;
+        }
+        window.speechSynthesis.speak(utterance);
+      } catch (err) {
+        console.warn('[VoiceAssisted] Speech synthesis error:', err);
+      }
+    }
+
+    function playPositiveDing() {
+      if (isAlarmMuted) return;
+      try {
+        const AudioCtx = window.AudioContext || window.webkitAudioContext;
+        if (!AudioCtx) return;
+        const ctx = new AudioCtx();
+        const now = ctx.currentTime;
+        const osc = ctx.createOscillator();
+        const gain = ctx.createGain();
+        osc.type = 'sine';
+        osc.frequency.setValueAtTime(880, now);
+        osc.frequency.setValueAtTime(1318.5, now + 0.15);
+        gain.gain.setValueAtTime(0.2, now);
+        gain.gain.exponentialRampToValueAtTime(0.001, now + 0.45);
+        osc.connect(gain);
+        gain.connect(ctx.destination);
+        osc.start(now);
+        osc.stop(now + 0.45);
+      } catch (_) {}
+    }
+
     function playRepeatingPosAlarm() {
       if (isAlarmMuted) return;
       try {
@@ -2285,7 +2348,7 @@
         const ctx = new AudioCtx();
         const now = ctx.currentTime;
         
-        // High-salience dual pulse square wave (retail order siren)
+        // High-salience dual pulse square wave (retail order siren "ding ding")
         const osc1 = ctx.createOscillator();
         const gain1 = ctx.createGain();
         osc1.type = 'square';
@@ -2307,6 +2370,14 @@
         gain2.connect(ctx.destination);
         osc2.start(now + 0.18);
         osc2.stop(now + 0.4);
+
+        // Voice-assisted spoken alert right beside the ding-ding!
+        if (!isVoiceMuted) {
+          const medText = currentAlarmMedicine ? `for ${currentAlarmMedicine}` : 'received';
+          setTimeout(() => {
+            speakVoiceAssisted(`Attention Pharmacist: New medicine hold request ${medText}. Please check counter shelf.`);
+          }, 450);
+        }
       } catch (e) {
         console.warn('[Audio] POS alarm chime failed:', e);
       }
@@ -2315,13 +2386,39 @@
     function startCounterAlarmLoop() {
       if (counterAlarmInterval) return;
       playRepeatingPosAlarm();
-      counterAlarmInterval = setInterval(playRepeatingPosAlarm, 6000);
+      counterAlarmInterval = setInterval(playRepeatingPosAlarm, 8000);
     }
 
     function stopCounterAlarmLoop() {
       if (counterAlarmInterval) {
         clearInterval(counterAlarmInterval);
         counterAlarmInterval = null;
+      }
+      try {
+        if ('speechSynthesis' in window) window.speechSynthesis.cancel();
+      } catch (_) {}
+    }
+
+    function toggleVoiceAssist() {
+      isVoiceMuted = !isVoiceMuted;
+      const btn = document.getElementById('voiceToggleBtn');
+      const icon = document.getElementById('voiceAssistIcon');
+      const txt = document.getElementById('voiceAssistText');
+      const qIcon = document.getElementById('queueVoiceIcon');
+      const qTxt = document.getElementById('queueVoiceText');
+      if (isVoiceMuted) {
+        if (icon) icon.className = 'fa-solid fa-volume-xmark';
+        if (txt) txt.innerText = 'Voice OFF';
+        if (qIcon) qIcon.className = 'fa-solid fa-volume-xmark text-slate-400';
+        if (qTxt) qTxt.innerText = 'Voice OFF';
+        if (btn) btn.classList.add('opacity-75');
+      } else {
+        if (icon) icon.className = 'fa-solid fa-headset';
+        if (txt) txt.innerText = 'Voice ON';
+        if (qIcon) qIcon.className = 'fa-solid fa-headset text-emerald-600';
+        if (qTxt) qTxt.innerText = 'Voice ON';
+        if (btn) btn.classList.remove('opacity-75');
+        speakVoiceAssisted('Voice assistance activated.');
       }
     }
 
@@ -2336,6 +2433,7 @@
         if (txt) txt.innerText = 'Unmute';
         if (qIcon) qIcon.className = 'fa-solid fa-volume-xmark text-rose-500';
         if (qTxt) qTxt.innerText = 'Sound Muted';
+        try { if ('speechSynthesis' in window) window.speechSynthesis.cancel(); } catch (_) {}
       } else {
         if (icon) icon.className = 'fa-solid fa-volume-high';
         if (txt) txt.innerText = 'Mute';
@@ -2380,13 +2478,17 @@
             mobBadge.classList.remove('hidden');
             mobBadge.innerText = `${pendingUnacknowledged.length}`;
           }
+          const top = pendingUnacknowledged[0];
+          currentAlarmMedicine = top.medicineName || '';
+          currentAlarmCode = top.reservationCode || '';
           if (alarmBanner) {
             alarmBanner.classList.remove('hidden');
-            const top = pendingUnacknowledged[0];
             document.getElementById('urgentAlarmDesc').innerText = `Customer placed hold #${top.reservationCode} for ${top.medicineName} (${top.lockedPriceETB} ETB). Tap below to confirm or decline!`;
           }
           startCounterAlarmLoop();
         } else {
+          currentAlarmMedicine = '';
+          currentAlarmCode = '';
           if (navBadge) navBadge.classList.add('hidden');
           if (mobBadge) mobBadge.classList.add('hidden');
           if (alarmBanner) alarmBanner.classList.add('hidden');
@@ -2462,6 +2564,8 @@
         });
         const d = await res.json();
         if (d.success) {
+          playPositiveDing();
+          speakVoiceAssisted(`Hold #${code} confirmed. Medicine is physically held at counter.`);
           loadCounterReservations();
         } else {
           alert('Could not confirm hold: ' + (d.message || d.error));
@@ -2479,6 +2583,7 @@
         });
         const d = await res.json();
         if (d.success) {
+          speakVoiceAssisted(`Hold #${code} cancelled. Marked out of stock.`);
           loadCounterReservations();
         } else {
           alert('Could not reject hold: ' + (d.message || d.error));

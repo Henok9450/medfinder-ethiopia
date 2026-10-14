@@ -1157,6 +1157,25 @@
       }
     }
 
+    function speakPatientVoice(text) {
+      if (!('speechSynthesis' in window)) return;
+      try {
+        window.speechSynthesis.cancel();
+        const utterance = new SpeechSynthesisUtterance(text);
+        utterance.rate = 0.95;
+        utterance.pitch = 1.0;
+        utterance.volume = 1.0;
+        const voices = window.speechSynthesis.getVoices();
+        if (voices && voices.length > 0) {
+          const preferredVoice = voices.find(v => v.lang.startsWith('en') && (v.name.includes('Natural') || v.name.includes('Google') || v.name.includes('Samantha') || v.name.includes('Siri') || v.name.includes('Female')))
+            || voices.find(v => v.lang.startsWith('en'))
+            || voices[0];
+          if (preferredVoice) utterance.voice = preferredVoice;
+        }
+        window.speechSynthesis.speak(utterance);
+      } catch (_) {}
+    }
+
     function updateVoucherDirections(lat, lng, pharmacyName, subCity) {
       const dirBtn = document.getElementById('voucherDirectionsBtn');
       if (!dirBtn) return;
@@ -1284,6 +1303,10 @@
           const mobDot = document.getElementById('mobActiveVoucherDot');
           if (mobDot) mobDot.classList.remove('hidden');
 
+          setTimeout(() => {
+            speakPatientVoice(`Hold placed for ${r.medicineName}. Waiting for pharmacy stock confirmation.`);
+          }, 400);
+
           document.getElementById('reservationModal').classList.remove('hidden');
         } else {
           alert('Could not lock price: ' + (data.error || 'Unknown issue'));
@@ -1298,6 +1321,9 @@
       if (countdownInterval) { clearInterval(countdownInterval); countdownInterval = null; }
       stopSafetyTimer();
       playAlertChime('confirm');
+      setTimeout(() => {
+        speakPatientVoice('Medicine dispensed successfully. Thank you for using MedFinder.');
+      }, 400);
       sendNativePwaNotification(
         `✅ Medicine Dispensed (#${r.reservationCode})`,
         `${r.medicineName} was verified and dispensed at ${r.pharmacyName || ph?.name || 'the pharmacy'}.`
@@ -1399,6 +1425,9 @@
             if (countdownInterval) { clearInterval(countdownInterval); countdownInterval = null; }
             stopSafetyTimer();
             playAlertChime('cancel');
+            setTimeout(() => {
+              speakPatientVoice(`Notice: Hold #${r.reservationCode} cancelled. Medicine is out of stock.`);
+            }, 400);
             sendNativePwaNotification(
               `❌ Hold #${r.reservationCode} Declined`,
               `${r.pharmacyName || origName} reported ${r.medicineName} is out of stock. Tap to search another pharmacy.`
@@ -1471,6 +1500,9 @@
               stockAcknowledgedHandled = true;
               stopSafetyTimer();
               playAlertChime('confirm');
+              setTimeout(() => {
+                speakPatientVoice('Stock confirmed! Your medicine is physically held for 60 minutes.');
+              }, 400);
               sendNativePwaNotification(
                 `✅ Stock Confirmed! Hold #${r.reservationCode} Active`,
                 `${r.pharmacyName || origName} physically set aside ${r.medicineName} at ${r.lockedPriceETB} ETB for 60 minutes.`
