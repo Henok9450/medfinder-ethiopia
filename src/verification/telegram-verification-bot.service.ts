@@ -229,6 +229,7 @@ export class TelegramVerificationBotService {
   // Dual Dedicated Bot Architecture (Roadmap 2: Industry Standard)
   public pharmacyBot: TelegramBotEndpoint;
   public patientBot: TelegramBotEndpoint;
+  private pendingAuthByChatId = new Map<string, string>();
 
   constructor() {
     this.db = InMemoryDatabase.getInstance();
@@ -921,11 +922,18 @@ export class TelegramVerificationBotService {
             continue;
           }
 
+          const lowerR = r.toLowerCase();
           if (
             r.includes('Share SIM Phone') ||
             r.includes('ስልክ ቁጥር አጋራ') ||
             r.includes('Share Phone Number') ||
-            r.includes('Verify Phone')
+            r.includes('Verify Phone') ||
+            r.includes('Share My Phone') ||
+            r.includes('ስልክ ቁጥሬን ላክ') ||
+            r.includes('ስልክ ቁጥር') ||
+            r.includes('ስልክ') ||
+            lowerR.includes('share my phone') ||
+            lowerR.includes('share phone')
           ) {
             btn.request_contact = true;
             if (currentRow.length > 0) {
@@ -1649,16 +1657,34 @@ ${patientPhone ? `📱 Verified Phone: \`${patientPhone}\`\n` : ''}━━━━�
     }
     session.mode = sourceBotType;
 
-    // 0A. Handle Telegram 1-Tap SIM Phone Verification (request_contact)
+    // 0A. Handle Telegram 1-Tap SIM Phone Verification (request_contact or direct text entry)
+    let extractedPhone: string | undefined;
     if (contact && contact.phone_number) {
-      session.verifiedPhoneNumber = contact.phone_number.trim();
+      let rawPhone = contact.phone_number.trim().replace(/[\s\-()]/g, '');
+      if (!rawPhone.startsWith('+')) rawPhone = '+' + rawPhone;
+      extractedPhone = rawPhone;
+    } else if (
+      session.step === 'PATIENT_HOLD_PHONE_VERIFY' ||
+      session.pendingAuthToken ||
+      this.pendingAuthByChatId.has(String(chatId))
+    ) {
+      const ethioPattern = /^(?:\+251|0)?([79]\d{8})$/;
+      const match = cleanText.replace(/[\s\-()]/g, '').match(ethioPattern);
+      if (match) {
+        extractedPhone = '+251' + match[1];
+      }
+    }
+
+    if (extractedPhone) {
+      session.verifiedPhoneNumber = extractedPhone;
 
       // Check if patient was verifying for MedFinder Web App session!
-      if (session.pendingAuthToken) {
-        const token = session.pendingAuthToken;
+      const authToken = session.pendingAuthToken || this.pendingAuthByChatId.get(String(chatId));
+      if (authToken) {
         session.pendingAuthToken = undefined;
+        this.pendingAuthByChatId.delete(String(chatId));
         session.step = 'PATIENT_SEARCH';
-        await this.repo.verifyPatientAuthSession(token, session.verifiedPhoneNumber, chatId, username);
+        await this.repo.verifyPatientAuthSession(authToken, session.verifiedPhoneNumber, chatId, username);
         const webUrl = this.getPatientPwaUrl();
         return {
           chatId,
@@ -1678,7 +1704,7 @@ Return to your browser — your 60-minute price-lock voucher is being finalized 
         };
       }
 
-      // Auto-fulfill pending hold if patient was waiting on phone verification
+      // Auto-fulfill pending hold if patient was waiting on phone verification in Telegram bot
       if (session.pendingHoldPharmacyId && session.pendingHoldDrug) {
         const pId = session.pendingHoldPharmacyId;
         const dName = session.pendingHoldDrug;
@@ -1702,11 +1728,29 @@ Return to your browser — your 60-minute price-lock voucher is being finalized 
       };
     }
 
+    // Fallback if client sent text matching "Share My Phone" without native contact payload:
+    if (
+      (session.step === 'PATIENT_HOLD_PHONE_VERIFY' || session.pendingAuthToken || this.pendingAuthByChatId.has(String(chatId))) &&
+      (cleanText.includes('ስልክ ቁጥሬን ላክ') || cleanText.includes('Share My Phone') || cleanText.includes('ስልክ ቁጥር'))
+    ) {
+      return {
+        chatId,
+        replyText: `📱 **ስልክዎን በ 1-ጠቅታ ያረጋግጡ**
+━━━━━━━━━━━━━━━━━━━━━━━━━━
+ከታች ያለውን **[📱 ስልክ ቁጥሬን ላክ (Share My Phone)]** ቁልፍ ተጭነው "Share" ይበሉ፣ ወይም ስልክ ቁጥርዎን (ለምሳሌ፦ \`0911223344\`) እዚህ በፅሁፍ ይላኩ፦`,
+        quickReplies: ['📱 ስልክ ቁጥሬን ላክ (Share My Phone)', '❌ ሰርዝ / Cancel'],
+        sessionStep: 'PATIENT_HOLD_PHONE_VERIFY',
+      };
+    }
+
     // 0A-2. Handle Web App 1-Tap SIM Auth Deep-Link (/start auth_XXXX)
     const authMatch = cleanText.match(/^\/start\s+auth[_-]([A-Za-z0-9_-]+)/i);
     if (authMatch) {
       session.mode = 'PATIENT';
       const authToken = 'AUTH_' + authMatch[1].replace(/^auth[_-]/i, '').toUpperCase();
+      this.pendingAuthByChatId.set(String(chatId), authToken);
+      session.pendingAuthToken = authToken;
+
       if (session.verifiedPhoneNumber) {
         await this.repo.verifyPatientAuthSession(authToken, session.verifiedPhoneNumber, chatId, username);
         const webUrl = this.getPatientPwaUrl();
@@ -1726,14 +1770,13 @@ Return to your browser — your medicine hold is being confirmed automatically.`
           sessionStep: 'PATIENT_SEARCH',
         };
       } else {
-        session.pendingAuthToken = authToken;
         return {
           chatId,
           replyText: `📱 **ስልክዎን በ 1-ጠቅታ ያረጋግጡ (Verify Phone for MedFinder Web App)**
 ━━━━━━━━━━━━━━━━━━━━━━━━━━
 በMedFinder ድረ-ገጽ ላይ የመድኃኒት ዋጋን ለ60 ደቂቃ በካውንተር ለማስያዝ እና ማጭበርበርን ለመከላከል የተረጋገጠ ስልክ ያስፈልጋል።
 
-ከታች ያለውን **[📱 ስልክ ቁጥሬን ላክ (Share My Phone)]** ቁልፍ በመጫን በ1-ጠቅታ ያረጋግጡ (Ethio Telecom / Safaricom)፦`,
+ከታች ያለውን **[📱 ስልክ ቁጥሬን ላክ (Share My Phone)]** ቁልፍ በመጫን በ1-ጠቅታ ያረጋግጡ (Ethio Telecom / Safaricom)፣ ወይም ስልክ ቁጥርዎን እዚህ በፅሁፍ ይላኩ (ምሳሌ፦ \`0911223344\`)፦`,
           quickReplies: ['📱 ስልክ ቁጥሬን ላክ (Share My Phone)', '❌ ሰርዝ / Cancel'],
           sessionStep: 'PATIENT_HOLD_PHONE_VERIFY',
         };

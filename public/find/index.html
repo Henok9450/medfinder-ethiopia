@@ -626,12 +626,16 @@
         </div>
 
         <div class="space-y-2 pt-1">
-          <a id="authReopenTelegramLink" href="#" target="_blank" class="w-full bg-[#229ED9] hover:bg-[#1E88E5] text-white font-bold text-xs py-2.5 rounded-xl shadow transition flex items-center justify-center gap-2">
-            <i class="fa-solid fa-arrow-up-right-from-square"></i>
+          <button onclick="checkAuthSessionStatus(activeAuthToken || localStorage.getItem('medfinder_active_auth_token'))" class="w-full bg-emerald-600 hover:bg-emerald-700 active:scale-98 text-white font-bold text-xs py-2.5 rounded-xl shadow transition flex items-center justify-center gap-2 cursor-pointer">
+            <i class="fa-solid fa-circle-check"></i>
+            <span>I Shared My Phone — Check Status (አረጋግጫለሁ)</span>
+          </button>
+          <a id="authReopenTelegramLink" href="#" target="_blank" class="w-full bg-[#229ED9] hover:bg-[#1E88E5] text-white font-bold text-xs py-2.5 rounded-xl shadow transition flex items-center justify-center gap-2 cursor-pointer">
+            <i class="fa-brands fa-telegram text-base"></i>
             <span>Re-open Telegram Bot (ቴሌግራም ክፈት)</span>
           </a>
-          <button onclick="cancelTelegramPolling()" class="w-full bg-slate-100 hover:bg-slate-200 text-slate-700 font-semibold text-xs py-2 rounded-xl transition">
-            Use Phone Number Instead (በስልክ ቀጥል)
+          <button onclick="cancelTelegramPolling()" class="w-full bg-slate-100 hover:bg-slate-200 text-slate-700 font-semibold text-xs py-2 rounded-xl transition cursor-pointer">
+            Use Direct Phone Input (በስልክ ቀጥል)
           </button>
         </div>
       </div>
@@ -1607,6 +1611,68 @@
       }
     }
 
+    async function checkAuthSessionStatus(token) {
+      const activeToken = token || activeAuthToken || localStorage.getItem('medfinder_active_auth_token');
+      if (!activeToken) return false;
+
+      try {
+        const checkRes = await fetch(`/api/auth/session/${activeToken}`);
+        const checkData = await checkRes.json();
+
+        if (checkData.success && checkData.verified && checkData.phone) {
+          if (telegramPollingTimer) {
+            clearInterval(telegramPollingTimer);
+            telegramPollingTimer = null;
+          }
+          activeAuthToken = null;
+          localStorage.removeItem('medfinder_active_auth_token');
+
+          // Save verified state
+          localStorage.setItem('medfinder_patient_phone', checkData.phone);
+          localStorage.setItem('medfinder_patient_verified', 'true');
+
+          if (window.Telegram?.WebApp?.HapticFeedback) {
+            window.Telegram.WebApp.HapticFeedback.notificationOccurred('success');
+          }
+
+          // Close verification modal
+          const modal = document.getElementById('patientVerificationModal');
+          if (modal) modal.classList.add('hidden');
+
+          // Retrieve pending hold parameters if any
+          let p = pendingHoldParams;
+          if (!p) {
+            try {
+              const saved = localStorage.getItem('medfinder_pending_hold');
+              if (saved) p = JSON.parse(saved);
+            } catch (_) {}
+          }
+          localStorage.removeItem('medfinder_pending_hold');
+          pendingHoldParams = null;
+
+          if (p) {
+            createPriceLockHold(p.pharmacyId, p.pharmacyName, p.medicineName, p.lockedPriceETB, p.phone, p.lat, p.lng, p.subCity);
+          }
+          return true;
+        }
+      } catch (pollErr) {
+        console.warn('[checkAuthSessionStatus] Poll error:', pollErr);
+      }
+      return false;
+    }
+
+    // React immediately when patient returns from Telegram back into browser / PWA
+    document.addEventListener('visibilitychange', () => {
+      if (document.visibilityState === 'visible') {
+        const token = activeAuthToken || localStorage.getItem('medfinder_active_auth_token');
+        if (token) checkAuthSessionStatus(token);
+      }
+    });
+    window.addEventListener('focus', () => {
+      const token = activeAuthToken || localStorage.getItem('medfinder_active_auth_token');
+      if (token) checkAuthSessionStatus(token);
+    });
+
     async function startTelegramAuthFlow() {
       const btn = document.getElementById('authTelegramBtn');
       const originalHtml = btn ? btn.innerHTML : '';
@@ -1630,6 +1696,11 @@
         }
 
         activeAuthToken = data.token;
+        localStorage.setItem('medfinder_active_auth_token', activeAuthToken);
+        if (pendingHoldParams) {
+          localStorage.setItem('medfinder_pending_hold', JSON.stringify(pendingHoldParams));
+        }
+
         const reopenLink = document.getElementById('authReopenTelegramLink');
         if (reopenLink) reopenLink.href = data.telegramDeepLink;
 
@@ -1657,35 +1728,7 @@
             return;
           }
 
-          try {
-            const checkRes = await fetch(`/api/auth/session/${activeAuthToken}`);
-            const checkData = await checkRes.json();
-            if (checkData.success && checkData.verified && checkData.phone) {
-              clearInterval(telegramPollingTimer);
-              telegramPollingTimer = null;
-
-              // Save verified state
-              localStorage.setItem('medfinder_patient_phone', checkData.phone);
-              localStorage.setItem('medfinder_patient_verified', 'true');
-
-              if (window.Telegram?.WebApp?.HapticFeedback) {
-                window.Telegram.WebApp.HapticFeedback.notificationOccurred('success');
-              }
-
-              // Close verification modal
-              const modal = document.getElementById('patientVerificationModal');
-              if (modal) modal.classList.add('hidden');
-
-              // Proceed with hold creation
-              if (pendingHoldParams) {
-                const p = pendingHoldParams;
-                pendingHoldParams = null;
-                createPriceLockHold(p.pharmacyId, p.pharmacyName, p.medicineName, p.lockedPriceETB, p.phone, p.lat, p.lng, p.subCity);
-              }
-            }
-          } catch (pollErr) {
-            console.warn('[TelegramAuth] Polling error:', pollErr);
-          }
+          await checkAuthSessionStatus(activeAuthToken);
         }, 1500);
 
       } catch (err) {
@@ -1704,6 +1747,7 @@
         telegramPollingTimer = null;
       }
       activeAuthToken = null;
+      localStorage.removeItem('medfinder_active_auth_token');
       const waitingContainer = document.getElementById('authWaitingContainer');
       const choiceContainer = document.getElementById('authChoiceContainer');
       if (waitingContainer) waitingContainer.classList.add('hidden');
@@ -2676,6 +2720,12 @@
 
         // Restore or verify saved voucher status on load
         checkSavedReservationState();
+
+        // Check if patient was waiting for Telegram phone verification while tab was away
+        const savedAuthToken = localStorage.getItem('medfinder_active_auth_token');
+        if (savedAuthToken) {
+          checkAuthSessionStatus(savedAuthToken);
+        }
 
         const params = new URLSearchParams(window.location.search);
         const modeParam = params.get('mode');

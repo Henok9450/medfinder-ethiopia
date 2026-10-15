@@ -1164,8 +1164,14 @@ export class InMemoryDatabase {
   }
 
   public getPatientAuthSession(token: string): PatientAuthSession | undefined {
-    const cleanToken = token.trim().toUpperCase();
-    const s = this.patientAuthSessions.get(cleanToken);
+    let cleanToken = token.trim().toUpperCase();
+    let s = this.patientAuthSessions.get(cleanToken);
+    if (!s && !cleanToken.startsWith('AUTH_')) {
+      s = this.patientAuthSessions.get('AUTH_' + cleanToken);
+    }
+    if (!s && cleanToken.startsWith('AUTH_')) {
+      s = this.patientAuthSessions.get(cleanToken.replace(/^AUTH_/, ''));
+    }
     if (!s) return undefined;
     if (s.status === 'PENDING' && new Date() > new Date(s.expiresAt)) {
       s.status = 'EXPIRED';
@@ -1174,8 +1180,7 @@ export class InMemoryDatabase {
   }
 
   public verifyPatientAuthSession(token: string, phone: string, telegramUserId?: string, telegramUsername?: string): boolean {
-    const cleanToken = token.trim().toUpperCase();
-    const s = this.getPatientAuthSession(cleanToken);
+    const s = this.getPatientAuthSession(token);
     if (!s || s.status === 'EXPIRED') return false;
     s.status = 'VERIFIED';
     s.verifiedPhone = phone.trim();
