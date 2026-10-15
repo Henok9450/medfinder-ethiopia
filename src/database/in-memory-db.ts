@@ -323,6 +323,7 @@ export interface WholesalePurchaseOrder {
 export interface ReservationHold {
   reservationCode: string; // 4-digit code e.g. "8492"
   patientUserId: string;
+  patientPhone?: string;
   pharmacyId: string;
   pharmacyName: string;
   medicineName: string;
@@ -339,6 +340,7 @@ export interface ReservationHold {
   address?: string;
   fulfilledAt?: string;
   cancelledAt?: string;
+  cancelledBy?: 'PATIENT' | 'PHARMACIST' | 'SYSTEM_TIMEOUT';
   reason?: string;
 }
 
@@ -376,13 +378,16 @@ export interface PharmacyVerificationApplication {
 export interface TelegramBotSession {
   chatId: string;
   username?: string;
-  step: 'START' | 'LANGUAGE' | 'PHARMACY_NAME' | 'LOCATION_GPS' | 'PHONE' | 'PHARMACIST_INFO' | 'EFDA_LICENSE' | 'LICENSE_PHOTO' | 'TIN_NUMBER' | 'COUNTER_PHOTO' | 'CONFIRM' | 'AWAITING_INFO_UPDATE' | 'PATIENT_SEARCH' | 'AWAITING_SEARCH_LOCATION';
+  step: 'START' | 'LANGUAGE' | 'PHARMACY_NAME' | 'LOCATION_GPS' | 'PHONE' | 'PHARMACIST_INFO' | 'EFDA_LICENSE' | 'LICENSE_PHOTO' | 'TIN_NUMBER' | 'COUNTER_PHOTO' | 'CONFIRM' | 'AWAITING_INFO_UPDATE' | 'PATIENT_SEARCH' | 'AWAITING_SEARCH_LOCATION' | 'PATIENT_HOLD_PHONE_VERIFY';
   mode?: 'PATIENT' | 'PHARMACY';
   patientSearchDrug?: string;
   patientLat?: number;
   patientLng?: number;
   patientSubCity?: string;
   updatingApplicationId?: string;
+  verifiedPhoneNumber?: string;
+  pendingHoldPharmacyId?: string;
+  pendingHoldDrug?: string;
   data: Partial<PharmacyVerificationApplication>;
   language: 'am' | 'en';
 }
@@ -681,7 +686,94 @@ export class InMemoryDatabase {
     return sub;
   }
 
-  // --- ANTI-SCAM 1-HOUR PRICE-LOCK RESERVATION ENGINE ---
+  // --- ANTI-SCAM 1-HOUR PRICE-LOCK RESERVATION ENGINE & HOLD FAIRNESS ---
+
+  public getActiveHoldForPatient(patientUserId: string, patientPhone?: string): ReservationHold | null {
+    const now = new Date();
+    const cleanPhone = patientPhone ? patientPhone.replace(/[^0-9]/g, '') : '';
+
+    for (const r of this.reservations.values()) {
+      if (r.status === 'ACTIVE' && now < new Date(r.expiresAt)) {
+        if (r.patientUserId === patientUserId) return r;
+        if (cleanPhone && r.patientPhone) {
+          const rPhone = r.patientPhone.replace(/[^0-9]/g, '');
+          if (rPhone && (rPhone === cleanPhone || rPhone.endsWith(cleanPhone) || cleanPhone.endsWith(rPhone))) {
+            return r;
+          }
+        }
+      }
+    }
+    return null;
+  }
+
+  public checkPatientHoldEligibility(patientUserId: string, patientPhone?: string): {
+    eligible: boolean;
+    reason?: 'ACTIVE_HOLD_EXISTS' | 'NO_SHOW_PENALTY' | 'BANNED';
+    activeHold?: ReservationHold;
+    cooldownUntil?: string;
+    message: string;
+    messageAm: string;
+  } {
+    const now = new Date();
+
+    // 1. Max 1 Active Hold Safeguard: Prevents phantom locking across multiple pharmacies
+    const activeHold = this.getActiveHoldForPatient(patientUserId, patientPhone);
+    if (activeHold) {
+      return {
+        eligible: false,
+        reason: 'ACTIVE_HOLD_EXISTS',
+        activeHold,
+        message: `You already have an active hold (#${activeHold.reservationCode}) for "${activeHold.medicineName}" at ${activeHold.pharmacyName}. Please collect or cancel your active voucher before reserving another item.`,
+        messageAm: `እርስዎ ቀደም ሲል የያዙት ንቁ ማቆያ (#${activeHold.reservationCode} - "${activeHold.medicineName}") በ${activeHold.pharmacyName} አለዎት። እባክዎ አዲሱን ከማስያዝዎ በፊት ያንን ይውሰዱ ወይም ይሰርዙ።`,
+      };
+    }
+
+    // 2. No-Show Penalty Rule: If patient has >= 3 uncollected/expired holds in last 7 days with zero fulfillments
+    const sevenDaysAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+    const cleanPhone = patientPhone ? patientPhone.replace(/[^0-9]/g, '') : '';
+    let expiredStrikes = 0;
+    let fulfilledCount = 0;
+    let latestExpiredAt: Date | null = null;
+
+    for (const r of this.reservations.values()) {
+      const isMatch = r.patientUserId === patientUserId || 
+        (cleanPhone && r.patientPhone && r.patientPhone.replace(/[^0-9]/g, '').endsWith(cleanPhone));
+      if (!isMatch) continue;
+
+      const created = new Date(r.createdAt);
+      if (created < sevenDaysAgo) continue;
+
+      if (r.status === 'FULFILLED') {
+        fulfilledCount++;
+      } else if (r.status === 'EXPIRED' || (r.status === 'ACTIVE' && now > new Date(r.expiresAt))) {
+        expiredStrikes++;
+        const expDate = new Date(r.expiresAt);
+        if (!latestExpiredAt || expDate > latestExpiredAt) {
+          latestExpiredAt = expDate;
+        }
+      }
+    }
+
+    if (expiredStrikes >= 3 && fulfilledCount === 0 && latestExpiredAt) {
+      const cooldownEnd = new Date(latestExpiredAt.getTime() + 24 * 60 * 60 * 1000);
+      if (now < cooldownEnd) {
+        const remainingHours = Math.max(1, Math.ceil((cooldownEnd.getTime() - now.getTime()) / (60 * 60 * 1000)));
+        return {
+          eligible: false,
+          reason: 'NO_SHOW_PENALTY',
+          cooldownUntil: cooldownEnd.toISOString(),
+          message: `Hold privilege paused for ${remainingHours}h due to 3 consecutive uncollected reservations. Please purchase directly at the counter.`,
+          messageAm: `በተከታታይ 3 ጊዜ ማቆያዎችን ባለመውሰድዎ ምክንያት ለ${remainingHours} ሰዓት አዲስ ማቆያ መያዝ አይችሉም። እባክዎ በቀጥታ ፋርማሲው ድረስ ሄደው ይግዙ።`,
+        };
+      }
+    }
+
+    return {
+      eligible: true,
+      message: 'Eligible to place medicine hold',
+      messageAm: 'ማቆያ ለማስያዝ ብቁ ናቸው',
+    };
+  }
 
   public createReservationHold(params: {
     patientUserId: string;
@@ -689,19 +781,15 @@ export class InMemoryDatabase {
     medicineName: string;
     lockedPriceETB: number;
     durationMinutes?: number;
+    patientPhone?: string;
   }): ReservationHold | null {
     const pharmacy = this.pharmacies.find((p) => p.id === params.pharmacyId);
     if (!pharmacy || pharmacy.isPermanentlyBanned) return null;
 
-    // Anti-Ghosting Quota: max 2 active holds per patient
-    let activeCount = 0;
-    for (const r of this.reservations.values()) {
-      if (r.patientUserId === params.patientUserId && r.status === 'ACTIVE' && new Date() < new Date(r.expiresAt)) {
-        activeCount++;
-      }
-    }
-    if (activeCount >= 2) {
-      console.warn(`[AntiGhosting] Patient ${params.patientUserId} exceeded active reservation quota (${activeCount}/2)`);
+    // Hold Fairness Rule: Check eligibility
+    const eligibility = this.checkPatientHoldEligibility(params.patientUserId, params.patientPhone);
+    if (!eligibility.eligible) {
+      console.warn(`[HoldFairness] Patient ${params.patientUserId} blocked from hold: ${eligibility.reason}`);
       return null;
     }
 
@@ -714,6 +802,7 @@ export class InMemoryDatabase {
     const hold: ReservationHold = {
       reservationCode: randomCode,
       patientUserId: params.patientUserId,
+      patientPhone: params.patientPhone,
       pharmacyId: pharmacy.id,
       pharmacyName: pharmacy.name,
       medicineName: params.medicineName,
@@ -731,6 +820,31 @@ export class InMemoryDatabase {
 
     this.reservations.set(randomCode, hold);
     return hold;
+  }
+
+  public cancelReservationHold(params: {
+    reservationCode: string;
+    cancelledBy: 'PATIENT' | 'PHARMACIST' | 'SYSTEM_TIMEOUT';
+    reason?: string;
+  }): { success: boolean; message: string; reservation?: ReservationHold } {
+    const cleanCode = params.reservationCode.trim().replace(/^#/, '');
+    const hold = this.getReservationHold(cleanCode);
+    if (!hold) return { success: false, message: 'Reservation code not found' };
+
+    if (hold.status === 'FULFILLED') {
+      return { success: false, message: 'Cannot cancel an already fulfilled transaction' };
+    }
+
+    hold.status = 'CANCELLED';
+    hold.cancelledBy = params.cancelledBy;
+    hold.cancelledAt = new Date().toISOString();
+    hold.reason = params.reason || (params.cancelledBy === 'PATIENT' ? 'Cancelled by patient' : 'Cancelled by pharmacy');
+
+    return {
+      success: true,
+      message: `Reservation #${cleanCode} has been cancelled successfully.`,
+      reservation: hold,
+    };
   }
 
   public getReservationHold(code: string): ReservationHold | null {

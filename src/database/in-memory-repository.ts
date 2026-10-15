@@ -98,8 +98,32 @@ export class InMemoryRepository implements IDatabaseRepository {
     medicineName: string;
     lockedPriceETB: number;
     durationMinutes?: number;
+    patientPhone?: string;
   }): Promise<ReservationHold | null> {
     return this.db.createReservationHold(holdData);
+  }
+
+  public async getActiveHoldForPatient(patientUserId: string, patientPhone?: string): Promise<ReservationHold | null> {
+    return this.db.getActiveHoldForPatient(patientUserId, patientPhone);
+  }
+
+  public async checkPatientHoldEligibility(patientUserId: string, patientPhone?: string): Promise<{
+    eligible: boolean;
+    reason?: 'ACTIVE_HOLD_EXISTS' | 'NO_SHOW_PENALTY' | 'BANNED';
+    activeHold?: ReservationHold;
+    cooldownUntil?: string;
+    message: string;
+    messageAm: string;
+  }> {
+    return this.db.checkPatientHoldEligibility(patientUserId, patientPhone);
+  }
+
+  public async cancelReservationHold(params: {
+    reservationCode: string;
+    cancelledBy: 'PATIENT' | 'PHARMACIST' | 'SYSTEM_TIMEOUT';
+    reason?: string;
+  }): Promise<{ success: boolean; message: string; reservation?: ReservationHold }> {
+    return this.db.cancelReservationHold(params);
   }
 
   public async getReservationHold(code: string): Promise<ReservationHold | null> {

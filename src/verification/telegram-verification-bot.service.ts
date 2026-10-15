@@ -69,6 +69,7 @@ export interface TelegramIncomingMessage {
   photoUrl?: string;
   documentUrl?: string;
   location?: { latitude: number; longitude: number };
+  contact?: { phone_number: string; first_name?: string; user_id?: number };
 }
 
 export interface TelegramBotResponse {
@@ -562,6 +563,17 @@ export class TelegramVerificationBotService {
       text = `📍 GPS Location: ${message.location.latitude}, ${message.location.longitude}`;
     }
 
+    // Handle Contact sharing (Native Phone Tap from Telegram)
+    let contact: { phone_number: string; first_name?: string; user_id?: number } | undefined;
+    if (message.contact) {
+      contact = {
+        phone_number: message.contact.phone_number,
+        first_name: message.contact.first_name,
+        user_id: message.contact.user_id,
+      };
+      text = `📱 Verified Phone: ${message.contact.phone_number}`;
+    }
+
     // Pass into conversational state machine with source bot type
     const botReply = await this.handleIncomingMessage({
       chatId,
@@ -570,6 +582,7 @@ export class TelegramVerificationBotService {
       photoUrl,
       documentUrl,
       location,
+      contact,
     }, ep.type);
 
     // Send reply back to the real Telegram app on the user's phone!
@@ -882,11 +895,11 @@ export class TelegramVerificationBotService {
         };
       } else if (reply.quickReplies && reply.quickReplies.length > 0) {
         // Arrange quick replies cleanly in 2-column rows for native Telegram mobile display
-        const rows: Array<Array<{ text: string; request_location?: boolean }>> = [];
-        let currentRow: Array<{ text: string; request_location?: boolean }> = [];
+        const rows: Array<Array<{ text: string; request_location?: boolean; request_contact?: boolean }>> = [];
+        let currentRow: Array<{ text: string; request_location?: boolean; request_contact?: boolean }> = [];
 
         for (const r of reply.quickReplies) {
-          const btn: { text: string; request_location?: boolean } = { text: r };
+          const btn: { text: string; request_location?: boolean; request_contact?: boolean } = { text: r };
           if (
             r.includes('Share Current GPS') ||
             r.includes('Share Pharmacy GPS') ||
@@ -896,6 +909,21 @@ export class TelegramVerificationBotService {
             r.includes('የኔን ጂፒኤስ ላክ')
           ) {
             btn.request_location = true;
+            if (currentRow.length > 0) {
+              rows.push(currentRow);
+              currentRow = [];
+            }
+            rows.push([btn]);
+            continue;
+          }
+
+          if (
+            r.includes('Share SIM Phone') ||
+            r.includes('ስልክ ቁጥር አጋራ') ||
+            r.includes('Share Phone Number') ||
+            r.includes('Verify Phone')
+          ) {
+            btn.request_contact = true;
             if (currentRow.length > 0) {
               rows.push(currentRow);
               currentRow = [];
@@ -1217,6 +1245,7 @@ export class TelegramVerificationBotService {
     reservationCode: string;
     expiresAt: string;
     patientChatId?: string;
+    patientPhone?: string;
   }): Promise<boolean> {
     const alertText = `🚨 **አዲስ የመድኃኒት ዋጋ ማስያዣ ደርሶዎታል! (New 60-Minute Counter Hold)**
 ━━━━━━━━━━━━━━━━━━━━━━━━━━
@@ -1226,7 +1255,7 @@ export class TelegramVerificationBotService {
 💊 መድኃኒት፦ **${params.drugName}**
 💰 የተቆለፈ ዋጋ፦ **${params.priceETB} ETB**
 ⏳ ተቀባይነት ያለው፦ **ለ 60 ደቂቃ ብቻ (እስከ ${params.expiresAt})**
-━━━━━━━━━━━━━━━━━━━━━━━━━━
+${params.patientPhone ? `📱 የተረጋገጠ የታካሚ ስልክ፦ \`${params.patientPhone}\` (SIM Verified)\n` : ''}━━━━━━━━━━━━━━━━━━━━━━━━━━
 📋 **የካውንተር መመሪያ፦**
 1️⃣ ታካሚው በአንድ ሰዓት ውስጥ መጥቶ ኮድ \`#${params.reservationCode}\` ያሳያል።
 2️⃣ እባክዎ ይህን መድኃኒት በካውንተር ላይ ለታካሚው ለ60 ደቂቃ አስቀምጠው በ **${params.priceETB} ETB** ያስረክቡ።
@@ -1250,6 +1279,35 @@ export class TelegramVerificationBotService {
       replyText: alertText,
       quickReplies: ['✅ አረጋግጥ (Confirm)', '❌ አልቋል (Out of Stock)', '/status'],
       inlineKeyboard,
+    }, ep);
+
+    return true;
+  }
+
+  /**
+   * Alert dispatched to pharmacy when patient cancels an active hold
+   */
+  public async notifyPharmacyReservationCancelled(params: {
+    pharmacyChatId: string;
+    pharmacyName: string;
+    drugName: string;
+    reservationCode: string;
+    cancelledBy: string;
+  }): Promise<boolean> {
+    const alertText = `ℹ️ **የማስያዣ ቫውቸር ተሰርዟል (Hold Released)**
+━━━━━━━━━━━━━━━━━━━━━━━━━━
+🔐 ቫውቸር ኮድ፦ \`#${params.reservationCode}\`
+💊 መድኃኒት፦ **${params.drugName}**
+⚠️ ሁኔታ፦ በታካሚው ፍላጎት የተሰረዘ ሲሆን እቃው ከካውንተር ማቆያ ተለቋል።
+Item is released back to regular counter shelf.`;
+
+    const ep = this.pharmacyBot.token ? this.pharmacyBot : this.patientBot;
+    if (!ep.token || !params.pharmacyChatId) return false;
+
+    await this.sendRealTelegramReply(params.pharmacyChatId, {
+      chatId: params.pharmacyChatId,
+      replyText: alertText,
+      quickReplies: ['/status', '📋 Counter Shelf'],
     }, ep);
 
     return true;
@@ -1384,13 +1442,184 @@ MedFinder Ethiopia ን ስለተጠቀሙ እናመሰግናለን።`;
   }
 
   /**
+   * Executes verified patient hold after phone auth and anti-hoarding eligibility check
+   */
+  public async executePatientHold(params: {
+    chatId: string;
+    pharmacyId: string;
+    drugName: string;
+    session: TelegramBotSession;
+    patientPhone?: string;
+  }): Promise<TelegramBotResponse> {
+    const { chatId, pharmacyId, drugName, session, patientPhone } = params;
+
+    // 1. Anti-Hoarding & Fairness Safeguards: Max 1 active hold & 3-strike no-show cooldown
+    const elig = await this.repo.checkPatientHoldEligibility(chatId, patientPhone);
+    if (!elig.eligible) {
+      if (elig.reason === 'ACTIVE_HOLD_EXISTS' && elig.activeHold) {
+        const act = elig.activeHold;
+        const actExp = new Date(act.expiresAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+        return {
+          chatId,
+          replyText: `⚠️ **አስቀድመው የያዙት ንቁ የመድኃኒት ማቆያ አለ! (Active Hold Exists)**
+━━━━━━━━━━━━━━━━━━━━━━━━━━
+የመድኃኒት ክምችት ለሁሉም ታካሚዎች እኩል እንዲዳረስ በአንድ ጊዜ ከአንድ በላይ መድኃኒት ማስያዝ አይፈቀድም።
+
+🔐 **የአሁኑ ቫውቸር ኮድ፦** \`#${act.reservationCode}\`
+💊 **መድኃኒት፦** ${act.medicineName}
+🏥 **ፋርማሲ፦** ${act.pharmacyName}
+⏳ **የሚያበቃው፦** እስከ ${actExp}
+━━━━━━━━━━━━━━━━━━━━━━━━━━
+አዲስ መድኃኒት ለማስያዝ አሁን ያለዎትን ማቆያ መጠቀም ወይም ከታች መሰረዝ ይችላሉ።`,
+          quickReplies: [`cancel_hold_${act.reservationCode}`, `check_hold_${act.reservationCode}`, '/start'],
+          inlineKeyboard: [
+            [
+              { text: '❌ የአሁኑን ማቆያ ሰርዝ (Cancel Hold)', callback_data: `cancel_hold_${act.reservationCode}` },
+              { text: '📋 ሁኔታውን ተመልከት (Check Status)', callback_data: `check_hold_${act.reservationCode}` },
+            ],
+            [
+              { text: '🔄 ወደ ዋና ገጽ (/start)', callback_data: '/start' }
+            ]
+          ],
+          sessionStep: 'PATIENT_SEARCH'
+        };
+      } else if (elig.reason === 'NO_SHOW_PENALTY') {
+        return {
+          chatId,
+          replyText: `🚫 **ማስያዣ ለጊዜው ታግዷል (Reservation Cooldown Active)**
+━━━━━━━━━━━━━━━━━━━━━━━━━━
+ባለፉት 7 ቀናት ውስጥ 3 ተከታታይ ያሲያዟቸውን መድኃኒቶች ባለመውሰድዎ (No-show) ምክንያት ሲስተሙ ለ24 ሰዓታት አዲስ ማቆያ እንዳይፈጥሩ ገድቧል።
+
+ይህ የተደረገው ፋርማሲዎች መድኃኒት አስቀምጠው እንዳይጎዱና ሌሎች ታካሚዎች እንዳያጡ ለመከላከል ነው።
+ከ 24 ሰዓት በኋላ እንደገና መሞከር ይችላሉ። ፍለጋን ያለ ማቆያ መጠቀም ይችላሉ።`,
+          quickReplies: ['/start', '💊 አዲስ ፍለጋ'],
+          sessionStep: 'PATIENT_SEARCH'
+        };
+      }
+    }
+
+    const pharmacy = this.db.pharmacies.find((p) => p.id === pharmacyId) || 
+                     this.db.pharmacies.find((p) => p.name.toLowerCase().includes(pharmacyId.toLowerCase())) ||
+                     this.db.pharmacies[0];
+    const inv = pharmacy.inventory?.find((it) => it.name.toLowerCase().includes(drugName.toLowerCase()));
+    const lockedPrice = inv?.priceETB || 320;
+
+    const opStatus = evaluatePharmacyOperatingStatus(pharmacy);
+    if (!opStatus.canAcceptHold) {
+      return {
+        chatId,
+        replyText: `🔴 **${pharmacy.name} በአሁኑ ሰዓት ዝግ ነው (${opStatus.badgeText})**\n━━━━━━━━━━━━━━━━━━━━━━━━━━\nይህ ፋርማሲ በዚህ ሰዓት የመድኃኒት ማቆያ (Hold) አይቀበልም። እባክዎ ክፍት ከሆኑት ሌሎች ፋርማሲዎች አንዱን ይምረጡ።\n\nPharmacy is currently closed and not accepting counter holds. Please choose an open pharmacy.`,
+        quickReplies: ['/start', '💊 Insulin', '💊 Augmentin', '💊 Ventolin'],
+      };
+    }
+
+    const hold = (await this.repo.createReservationHold({
+      patientUserId: chatId,
+      patientPhone,
+      pharmacyId: pharmacy.id,
+      medicineName: drugName,
+      lockedPriceETB: lockedPrice,
+      durationMinutes: opStatus.maxHoldMinutes,
+    })) || this.db.createReservationHold({
+      patientUserId: chatId,
+      patientPhone,
+      pharmacyId: pharmacy.id,
+      medicineName: drugName,
+      lockedPriceETB: lockedPrice,
+      durationMinutes: opStatus.maxHoldMinutes,
+    });
+
+    if (!hold) {
+      return {
+        chatId,
+        replyText: `⚠️ ይቅርታ፣ ዋጋ ማስያዝ አልተቻለም። እባክዎ እንደገና ይሞክሩ።\nCould not create reservation hold. Please try again.`,
+        quickReplies: ['/start', '💊 Insulin', '💊 Augmentin'],
+      };
+    }
+
+    const expTime = new Date(hold.expiresAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+
+    // Real-time notification to the pharmacy counter with verified phone
+    if (pharmacy.telegramChatId) {
+      this.notifyPharmacyReservationHold({
+        pharmacyChatId: pharmacy.telegramChatId,
+        pharmacyName: pharmacy.name,
+        drugName,
+        priceETB: lockedPrice,
+        reservationCode: hold.reservationCode,
+        expiresAt: expTime,
+        patientChatId: chatId,
+        patientPhone,
+      }).catch((err) => {
+        console.warn('[TelegramBot] Could not alert pharmacy of hold:', err.message);
+      });
+    }
+
+    const mapsUrl = `https://maps.google.com/?q=${pharmacy.latitude},${pharmacy.longitude}`;
+
+    const replyText = session.language === 'am' ? `
+🎟️ **የመድኃኒት ዋጋ ማስያዣ ደረሰኝ (60-Min Price Lock Voucher)**
+━━━━━━━━━━━━━━━━━━━━━━━━━━
+🔐 **የማስያዣ ቫውቸር ኮድ፦**  \`#${hold.reservationCode}\`
+━━━━━━━━━━━━━━━━━━━━━━━━━━
+💊 መድኃኒት፦ **${drugName}**
+🏥 ፋርማሲ፦ **${pharmacy.name}**
+📍 አድራሻ፦ **${pharmacy.subCity} Sub-City**
+💰 የተቆለፈ ዋጋ፦ **${lockedPrice} ETB** (በህግ የተረጋገጠ)
+⏳ ተቀባይነት ያለው፦ **ለ 60 ደቂቃ ብቻ (እስከ ${expTime})**
+📞 የፋርማሲ ስልክ፦ \`${pharmacy.phone}\`
+${patientPhone ? `📱 የተረጋገጠ ስልክዎ፦ \`${patientPhone}\`\n` : ''}━━━━━━━━━━━━━━━━━━━━━━━━━━
+📋 **የካውንተር መመሪያ ለታካሚው፦**
+1️⃣ በአንድ ሰዓት (60 ደቂቃ) ውስጥ ወደ ፋርማሲው በአካል ይሂዱ።
+2️⃣ ካውንተር ላይ ኮድ \`#${hold.reservationCode}\` ለፋርማሲስቱ ያሳዩ።
+3️⃣ በታሸገው **${lockedPrice} ETB** ዋጋ መድኃኒትዎን ይረከቡ!
+━━━━━━━━━━━━━━━━━━━━━━━━━━
+🛡️ *ማስታወሻ፦ በኢትዮጵያ ምግብና መድኃኒት ባለስልጣን (EFDA) ደንብ መሰረት ፋርማሲው ዋጋ የመጨመርም ሆነ መድኃኒቱን ለሌላ ሰው የመስጠት መብት የለውም።*
+` : `
+🎟️ **60-Minute Price Lock Reservation Voucher**
+━━━━━━━━━━━━━━━━━━━━━━━━━━
+🔐 **Voucher Code:**  \`#${hold.reservationCode}\`
+━━━━━━━━━━━━━━━━━━━━━━━━━━
+💊 Medicine: **${drugName}**
+🏥 Pharmacy: **${pharmacy.name}**
+📍 Location: **${pharmacy.subCity} Sub-City**
+💰 Locked Price: **${lockedPrice} ETB** (Verified Anti-Gouging)
+⏳ Valid Duration: **60 Minutes (Until ${expTime})**
+📞 Contact: \`${pharmacy.phone}\`
+${patientPhone ? `📱 Verified Phone: \`${patientPhone}\`\n` : ''}━━━━━━━━━━━━━━━━━━━━━━━━━━
+📋 **Patient Instructions:**
+1️⃣ Visit the pharmacy counter within 60 minutes.
+2️⃣ Present code \`#${hold.reservationCode}\` to the pharmacist.
+3️⃣ Pay the locked price of **${lockedPrice} ETB**.
+━━━━━━━━━━━━━━━━━━━━━━━━━━
+🛡️ *Notice: Protected by EFDA fair pricing regulations. Report any overpricing via /report.*
+`;
+
+    return {
+      chatId,
+      replyText,
+      quickReplies: [`cancel_hold_${hold.reservationCode}`, '💊 ሌላ መድኃኒት ፈልግ', '/start'],
+      inlineKeyboard: [
+        [
+          { text: '🗺️ ወደ ፋርማሲው አቅጣጫ (Google Maps)', url: mapsUrl },
+        ],
+        [
+          { text: '❌ ማቆያውን ሰርዝ (Cancel Hold)', callback_data: `cancel_hold_${hold.reservationCode}` },
+          { text: '🔄 አዲስ ፍለጋ (Search Another)', callback_data: 'search_new' },
+        ],
+      ],
+      sessionStep: 'PATIENT_SEARCH'
+    };
+  }
+
+  /**
    * Conversational state machine with Dedicated Dual-Bot Routing (Roadmap 2)
    */
   public async handleIncomingMessage(
     msg: TelegramIncomingMessage,
     sourceBotType: 'PHARMACY' | 'PATIENT' = 'PHARMACY'
   ): Promise<TelegramBotResponse> {
-    const { chatId, username = 'pharmacist_et', text = '', photoUrl, documentUrl, location } = msg;
+    const { chatId, username = 'pharmacist_et', text = '', photoUrl, documentUrl, location, contact } = msg;
     const cleanText = text.trim();
     const pharmUsername = this.pharmacyBot.botInfo?.username || 'MedFinder_Verifier_bot';
     const patientUsername = this.patientBot.botInfo?.username || 'MedFinder_ET_bot';
@@ -1415,6 +1644,121 @@ MedFinder Ethiopia ን ስለተጠቀሙ እናመሰግናለን።`;
       this.db.botSessions.set(sessionKey, session);
     }
     session.mode = sourceBotType;
+
+    // 0A. Handle Telegram 1-Tap SIM Phone Verification (request_contact)
+    if (contact && contact.phone_number) {
+      session.verifiedPhoneNumber = contact.phone_number.trim();
+      // Auto-fulfill pending hold if patient was waiting on phone verification
+      if (session.pendingHoldPharmacyId && session.pendingHoldDrug) {
+        const pId = session.pendingHoldPharmacyId;
+        const dName = session.pendingHoldDrug;
+        session.pendingHoldPharmacyId = undefined;
+        session.pendingHoldDrug = undefined;
+        session.step = 'PATIENT_SEARCH';
+        return this.executePatientHold({
+          chatId,
+          pharmacyId: pId,
+          drugName: dName,
+          session,
+          patientPhone: session.verifiedPhoneNumber,
+        });
+      }
+
+      return {
+        chatId,
+        replyText: `✅ **ስልክዎ በተሳካ ሁኔታ ተረጋግጧል (${session.verifiedPhoneNumber})!**\nYour phone has been verified with 1-tap carrier confirmation.\n\nየሚፈልጉትን መድኃኒት ስም በመጻፍ ፍለጋዎን መቀጠል ወይም ማቆያ መያዝ ይችላሉ፦`,
+        quickReplies: ['/start', '💊 Insulin', '💊 Augmentin', '💊 Ventolin'],
+        sessionStep: 'PATIENT_SEARCH',
+      };
+    }
+
+    // 0B. Cancellation of pending phone verification
+    if (
+      session.step === 'PATIENT_HOLD_PHONE_VERIFY' &&
+      (cleanText.includes('ሰርዝ') || cleanText.toLowerCase().includes('cancel'))
+    ) {
+      session.pendingHoldPharmacyId = undefined;
+      session.pendingHoldDrug = undefined;
+      session.step = 'PATIENT_SEARCH';
+      return {
+        chatId,
+        replyText: `❌ **የመድኃኒት ማቆያ ሂደቱ ተሰርዟል (Hold Request Cancelled)**\n\nየሚፈልጉትን መድኃኒት ስም በመጻፍ ፍለጋዎን መቀጠል ይችላሉ።`,
+        quickReplies: ['/start', '💊 Insulin', '💊 Augmentin'],
+        sessionStep: 'PATIENT_SEARCH',
+      };
+    }
+
+    // 0C. Instant Self-Cancellation of Active Hold (/cancel_hold or cancel_hold_<CODE>)
+    if (
+      cleanText.startsWith('/cancel_hold') ||
+      cleanText.startsWith('cancel_hold_') ||
+      (cleanText === '/cancel' && sourceBotType === 'PATIENT')
+    ) {
+      const cancelMatch = cleanText.match(/^(?:\/cancel_hold|cancel_hold_)\s*([A-Za-z0-9_-]*)/i);
+      let targetCode = cancelMatch ? cancelMatch[1].replace(/^#/, '').trim() : '';
+
+      let holdToCancel: ReservationHold | null | undefined;
+      if (targetCode) {
+        holdToCancel = await this.repo.getReservationHold(targetCode);
+      } else {
+        holdToCancel = await this.repo.getActiveHoldForPatient(chatId, session.verifiedPhoneNumber);
+      }
+
+      if (!holdToCancel) {
+        return {
+          chatId,
+          replyText: `ℹ️ **ምንም ንቁ የመድኃኒት ማቆያ አልተገኘም (No Active Hold Found)**\n\nየተሰረዘ ወይም ጊዜው ያለፈበት ሊሆን ይችላል። አዲስ ፍለጋ ለማድረግ /start ብለው ይጻፉ።`,
+          quickReplies: ['/start', '💊 Insulin', '💊 Augmentin'],
+          sessionStep: 'PATIENT_SEARCH',
+        };
+      }
+
+      const cancelRes = await this.repo.cancelReservationHold({
+        reservationCode: holdToCancel.reservationCode,
+        cancelledBy: 'PATIENT',
+        reason: 'Patient self-cancelled reservation via Telegram bot',
+      });
+
+      if (cancelRes.success) {
+        const pharmacy = this.db.pharmacies.find((p) => p.id === holdToCancel!.pharmacyId);
+        if (pharmacy && pharmacy.telegramChatId) {
+          this.notifyPharmacyReservationCancelled({
+            pharmacyChatId: pharmacy.telegramChatId,
+            pharmacyName: pharmacy.name,
+            drugName: holdToCancel.medicineName,
+            reservationCode: holdToCancel.reservationCode,
+            cancelledBy: 'PATIENT',
+          }).catch((e) => console.warn('[CancelHoldAlert] Error alerting pharmacy:', e.message));
+        }
+
+        return {
+          chatId,
+          replyText: `✅ **የመድኃኒት ማቆያዎ (#${holdToCancel.reservationCode}) በተሳካ ሁኔታ ተሰርዟል!**
+**Reservation Hold Cancelled & Released**
+━━━━━━━━━━━━━━━━━━━━━━━━━━
+💊 መድኃኒት፦ **${holdToCancel.medicineName}**
+🏥 ፋርማሲ፦ **${holdToCancel.pharmacyName}**
+ℹ️ መድኃኒቱ ለሌሎች ታካሚዎች ክፍት እንዲሆን ለፋርማሲው መልእክት ተላልፏል። አዲስ መድኃኒት አሁን መፈለግ እና ማስያዝ ይችላሉ።`,
+          quickReplies: [`search_${holdToCancel.medicineName}`, '/start', '💊 አዲስ ፍለጋ'],
+          inlineKeyboard: [
+            [
+              { text: `🔍 ሌላ ፋርማሲ ፈልግ (${holdToCancel.medicineName})`, callback_data: `search_${holdToCancel.medicineName}` },
+            ],
+            [
+              { text: '💊 አዲስ ፍለጋ / New Search', callback_data: '/start' },
+            ]
+          ],
+          sessionStep: 'PATIENT_SEARCH'
+        };
+      } else {
+        return {
+          chatId,
+          replyText: `⚠️ **ማቆያውን መሰረዝ አልተቻለም (Could not cancel hold)**: ${cancelRes.message || 'Please try again.'}`,
+          quickReplies: ['/start', '💊 Insulin'],
+          sessionStep: 'PATIENT_SEARCH',
+        };
+      }
+    }
 
     // ==========================================
     // DEDICATED PATIENT BOT FLOW (sourceBotType: PATIENT)
@@ -2291,109 +2635,33 @@ Type **/status** at any time to monitor progress.
       const inv = pharmacy.inventory?.find((it) => it.name.toLowerCase().includes(drugName.toLowerCase()));
       const lockedPrice = inv?.priceETB || 320;
 
-      const opStatus = evaluatePharmacyOperatingStatus(pharmacy);
-      if (!opStatus.canAcceptHold) {
+      // 1-Tap SIM Phone Auth Requirement (Anti-Hoarding / Fair Access Policy)
+      if (!session.verifiedPhoneNumber) {
+        session.pendingHoldPharmacyId = pharmacy.id;
+        session.pendingHoldDrug = drugName;
         return {
           chatId,
-          replyText: `🔴 **${pharmacy.name} በአሁኑ ሰዓት ዝግ ነው (${opStatus.badgeText})**\n━━━━━━━━━━━━━━━━━━━━━━━━━━\nይህ ፋርማሲ በዚህ ሰዓት የመድኃኒት ማቆያ (Hold) አይቀበልም። እባክዎ ክፍት ከሆኑት ሌሎች ፋርማሲዎች አንዱን ይምረጡ።\n\nPharmacy is currently closed and not accepting counter holds. Please choose an open pharmacy.`,
-          quickReplies: ['/start', '💊 Insulin', '💊 Augmentin', '💊 Ventolin'],
+          replyText: `📱 **ስልክዎን በ 1-ጠቅታ ያረጋግጡ (Verify Phone to Lock Price)**
+━━━━━━━━━━━━━━━━━━━━━━━━━━
+🏥 **ፋርማሲ፦** ${pharmacy.name}
+💊 **መድኃኒት፦** ${drugName}
+💰 **የተቆለፈ ዋጋ፦** ${lockedPrice} ETB
+
+የመድኃኒት ዋጋን ለ60 ደቂቃ በካውንተር ለማስያዝ እና ማጭበርበርን ለመከላከል በቴሌግራም የተረጋገጠ ስልክ ያስፈልጋል።
+
+ከታች ያለውን **[📱 ስልክ ቁጥሬን ላክ (Share My Phone)]** ቁልፍ በመጫን በቅጽበት ያረጋግጡ (Ethio Telecom / Safaricom)፦`,
+          quickReplies: ['📱 ስልክ ቁጥሬን ላክ (Share My Phone)', '❌ ሰርዝ / Cancel'],
+          sessionStep: 'PATIENT_HOLD_PHONE_VERIFY',
         };
       }
 
-      const hold = (await this.repo.createReservationHold({
-        patientUserId: chatId,
-        pharmacyId: pharmacy.id,
-        medicineName: drugName,
-        lockedPriceETB: lockedPrice,
-        durationMinutes: opStatus.maxHoldMinutes,
-      })) || this.db.createReservationHold({
-        patientUserId: chatId,
-        pharmacyId: pharmacy.id,
-        medicineName: drugName,
-        lockedPriceETB: lockedPrice,
-        durationMinutes: opStatus.maxHoldMinutes,
-      });
-
-      if (!hold) {
-        return {
-          chatId,
-          replyText: `⚠️ ይቅርታ፣ ዋጋ ማስያዝ አልተቻለም። እባክዎ እንደገና ይሞክሩ።\nCould not create reservation hold. Please try again.`,
-          quickReplies: ['/start', '💊 Insulin', '💊 Augmentin'],
-        };
-      }
-
-      const expTime = new Date(hold.expiresAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-
-      // Real-time notification to the pharmacy counter!
-      if (pharmacy.telegramChatId) {
-        this.notifyPharmacyReservationHold({
-          pharmacyChatId: pharmacy.telegramChatId,
-          pharmacyName: pharmacy.name,
-          drugName,
-          priceETB: lockedPrice,
-          reservationCode: hold.reservationCode,
-          expiresAt: expTime,
-          patientChatId: chatId,
-        }).catch((err) => {
-          console.warn('[TelegramBot] Could not alert pharmacy of hold:', err.message);
-        });
-      }
-
-      const mapsUrl = `https://maps.google.com/?q=${pharmacy.latitude},${pharmacy.longitude}`;
-
-      const replyText = session.language === 'am' ? `
-🎟️ **የመድኃኒት ዋጋ ማስያዣ ደረሰኝ (60-Min Price Lock Voucher)**
-━━━━━━━━━━━━━━━━━━━━━━━━━━
-🔐 **የማስያዣ ቫውቸር ኮድ፦**  \`#${hold.reservationCode}\`
-━━━━━━━━━━━━━━━━━━━━━━━━━━
-💊 መድኃኒት፦ **${drugName}**
-🏥 ፋርማሲ፦ **${pharmacy.name}**
-📍 አድራሻ፦ **${pharmacy.subCity} Sub-City**
-💰 የተቆለፈ ዋጋ፦ **${lockedPrice} ETB** (በህግ የተረጋገጠ)
-⏳ ተቀባይነት ያለው፦ **ለ 60 ደቂቃ ብቻ (እስከ ${expTime})**
-📞 የፋርማሲ ስልክ፦ \`${pharmacy.phone}\`
-━━━━━━━━━━━━━━━━━━━━━━━━━━
-📋 **የካውንተር መመሪያ ለታካሚው፦**
-1️⃣ በአንድ ሰዓት (60 ደቂቃ) ውስጥ ወደ ፋርማሲው በአካል ይሂዱ።
-2️⃣ ካውንተር ላይ ኮድ \`#${hold.reservationCode}\` ለፋርማሲስቱ ያሳዩ።
-3️⃣ በታሸገው **${lockedPrice} ETB** ዋጋ መድኃኒትዎን ይረከቡ!
-━━━━━━━━━━━━━━━━━━━━━━━━━━
-🛡️ *ማስታወሻ፦ በኢትዮጵያ ምግብና መድኃኒት ባለስልጣን (EFDA) ደንብ መሰረት ፋርማሲው ዋጋ የመጨመርም ሆነ መድኃኒቱን ለሌላ ሰው የመስጠት መብት የለውም።*
-` : `
-🎟️ **60-Minute Price Lock Reservation Voucher**
-━━━━━━━━━━━━━━━━━━━━━━━━━━
-🔐 **Voucher Code:**  \`#${hold.reservationCode}\`
-━━━━━━━━━━━━━━━━━━━━━━━━━━
-💊 Medicine: **${drugName}**
-🏥 Pharmacy: **${pharmacy.name}**
-📍 Location: **${pharmacy.subCity} Sub-City**
-💰 Locked Price: **${lockedPrice} ETB** (Verified Anti-Gouging)
-⏳ Valid Duration: **60 Minutes (Until ${expTime})**
-📞 Contact: \`${pharmacy.phone}\`
-━━━━━━━━━━━━━━━━━━━━━━━━━━
-📋 **Patient Instructions:**
-1️⃣ Visit the pharmacy counter within 60 minutes.
-2️⃣ Present code \`#${hold.reservationCode}\` to the pharmacist.
-3️⃣ Pay the locked price of **${lockedPrice} ETB**.
-━━━━━━━━━━━━━━━━━━━━━━━━━━
-🛡️ *Notice: Protected by EFDA fair pricing regulations. Report any overpricing via /report.*
-`;
-
-      return {
+      return this.executePatientHold({
         chatId,
-        replyText,
-        quickReplies: ['💊 ሌላ መድኃኒት ፈልግ', '📍 ክፍለ ከተማ ቀይር', '/start'],
-        inlineKeyboard: [
-          [
-            { text: '🗺️ ወደ ፋርማሲው አቅጣጫ (Google Maps)', url: mapsUrl },
-          ],
-          [
-            { text: '🔄 አዲስ ፍለጋ (Search Another)', callback_data: 'search_new' },
-            { text: '📍 ክፍለ ከተማ ቀይር', callback_data: 'subcity_menu' },
-          ],
-        ],
-        sessionStep: 'PATIENT_SEARCH'
-      };
+        pharmacyId: pharmacy.id,
+        drugName,
+        session,
+        patientPhone: session.verifiedPhoneNumber,
+      });
     }
 
     // Acknowledge hold by pharmacist

@@ -181,12 +181,166 @@ export class PostgresRepository implements IDatabaseRepository {
     return res.rows.map((r) => this.mapPharmacyRow(r));
   }
 
+  private mapReservationRow(r: any): ReservationHold {
+    return {
+      reservationCode: r.reservation_code,
+      patientUserId: r.patient_user_id,
+      patientPhone: r.patient_phone || r.phone || undefined,
+      pharmacyId: r.pharmacy_id,
+      pharmacyName: r.pharmacy_name,
+      medicineName: r.medicine_name,
+      lockedPriceETB: parseFloat(r.locked_price_etb),
+      phone: r.phone,
+      status: r.status,
+      pharmacistAcknowledged: Boolean(r.pharmacist_acknowledged),
+      acknowledgedAt: r.acknowledged_at ? new Date(r.acknowledged_at).toISOString() : undefined,
+      cancelledBy: r.cancelled_by || undefined,
+      createdAt: new Date(r.created_at).toISOString(),
+      expiresAt: new Date(r.expires_at).toISOString(),
+      latitude: r.latitude != null ? parseFloat(r.latitude) : undefined,
+      longitude: r.longitude != null ? parseFloat(r.longitude) : undefined,
+      subCity: r.sub_city || r.subCity || undefined,
+      address: r.address || undefined,
+    };
+  }
+
+  public async getActiveHoldForPatient(patientUserId: string, patientPhone?: string): Promise<ReservationHold | null> {
+    const pool = getDbPool();
+    if (!pool) return null;
+
+    const res = await pool.query(
+      `SELECT r.*, p.latitude, p.longitude, p.sub_city, p.address
+       FROM reservations r
+       JOIN pharmacies p ON r.pharmacy_id = p.id
+       WHERE (r.patient_user_id = $1 OR ($2 <> '' AND r.phone = $2))
+         AND r.status = 'ACTIVE'
+         AND r.expires_at > NOW()
+       ORDER BY r.created_at DESC
+       LIMIT 1`,
+      [patientUserId, patientPhone || '']
+    );
+
+    if (res.rows.length === 0) return null;
+    return this.mapReservationRow(res.rows[0]);
+  }
+
+  public async checkPatientHoldEligibility(patientUserId: string, patientPhone?: string): Promise<{
+    eligible: boolean;
+    reason?: 'ACTIVE_HOLD_EXISTS' | 'NO_SHOW_PENALTY' | 'BANNED';
+    activeHold?: ReservationHold;
+    cooldownUntil?: string;
+    message: string;
+    messageAm: string;
+  }> {
+    const activeHold = await this.getActiveHoldForPatient(patientUserId, patientPhone);
+    if (activeHold) {
+      return {
+        eligible: false,
+        reason: 'ACTIVE_HOLD_EXISTS',
+        activeHold,
+        message: `You already have an active hold (#${activeHold.reservationCode}) for "${activeHold.medicineName}" at ${activeHold.pharmacyName}. Please collect or cancel your active voucher before reserving another item.`,
+        messageAm: `እርስዎ ቀደም ሲል የያዙት ንቁ ማቆያ (#${activeHold.reservationCode} - "${activeHold.medicineName}") በ${activeHold.pharmacyName} አለዎት። እባክዎ አዲሱን ከማስያዝዎ በፊት ያንን ይውሰዱ ወይም ይሰርዙ።`,
+      };
+    }
+
+    const pool = getDbPool();
+    if (!pool) {
+      return { eligible: true, message: 'Eligible to place medicine hold', messageAm: 'ማቆያ ለማስያዝ ብቁ ናቸው' };
+    }
+
+    // Check no-shows in the last 7 days
+    const strikeRes = await pool.query(
+      `SELECT status, expires_at
+       FROM reservations
+       WHERE (patient_user_id = $1 OR ($2 <> '' AND phone = $2))
+         AND created_at > NOW() - INTERVAL '7 days'
+       ORDER BY expires_at DESC`,
+      [patientUserId, patientPhone || '']
+    );
+
+    let expiredStrikes = 0;
+    let fulfilledCount = 0;
+    let latestExpiredAt: Date | null = null;
+    const now = new Date();
+
+    for (const row of strikeRes.rows) {
+      if (row.status === 'FULFILLED') {
+        fulfilledCount++;
+      } else if (row.status === 'EXPIRED' || (row.status === 'ACTIVE' && now > new Date(row.expires_at))) {
+        expiredStrikes++;
+        const expDate = new Date(row.expires_at);
+        if (!latestExpiredAt || expDate > latestExpiredAt) {
+          latestExpiredAt = expDate;
+        }
+      }
+    }
+
+    if (expiredStrikes >= 3 && fulfilledCount === 0 && latestExpiredAt) {
+      const cooldownEnd = new Date(latestExpiredAt.getTime() + 24 * 60 * 60 * 1000);
+      if (now < cooldownEnd) {
+        const remainingHours = Math.max(1, Math.ceil((cooldownEnd.getTime() - now.getTime()) / (60 * 60 * 1000)));
+        return {
+          eligible: false,
+          reason: 'NO_SHOW_PENALTY',
+          cooldownUntil: cooldownEnd.toISOString(),
+          message: `Hold privilege paused for ${remainingHours}h due to 3 consecutive uncollected reservations. Please purchase directly at the counter.`,
+          messageAm: `በተከታታይ 3 ጊዜ ማቆያዎችን ባለመውሰድዎ ምክንያት ለ${remainingHours} ሰዓት አዲስ ማቆያ መያዝ አይችሉም። እባክዎ በቀጥታ ፋርማሲው ድረስ ሄደው ይግዙ።`,
+        };
+      }
+    }
+
+    return {
+      eligible: true,
+      message: 'Eligible to place medicine hold',
+      messageAm: 'ማቆያ ለማስያዝ ብቁ ናቸው',
+    };
+  }
+
+  public async cancelReservationHold(params: {
+    reservationCode: string;
+    cancelledBy: 'PATIENT' | 'PHARMACIST' | 'SYSTEM_TIMEOUT';
+    reason?: string;
+  }): Promise<{ success: boolean; message: string; reservation?: ReservationHold }> {
+    const pool = getDbPool();
+    if (!pool) return { success: false, message: 'Database unavailable' };
+
+    const cleanCode = params.reservationCode.trim().replace(/^#/, '');
+    const hold = await this.getReservationHold(cleanCode);
+    if (!hold) return { success: false, message: 'Reservation code not found' };
+
+    if (hold.status === 'FULFILLED') {
+      return { success: false, message: 'Cannot cancel an already fulfilled transaction' };
+    }
+
+    const cancelReason = params.reason || (params.cancelledBy === 'PATIENT' ? 'Cancelled by patient' : 'Cancelled by pharmacy');
+    await pool.query(
+      `UPDATE reservations
+       SET status = 'CANCELLED',
+           cancelled_at = NOW(),
+           reason = $1
+       WHERE reservation_code = $2`,
+      [cancelReason, cleanCode]
+    );
+
+    hold.status = 'CANCELLED';
+    hold.cancelledBy = params.cancelledBy;
+    hold.cancelledAt = new Date().toISOString();
+    hold.reason = cancelReason;
+
+    return {
+      success: true,
+      message: `Reservation #${cleanCode} has been cancelled successfully.`,
+      reservation: hold,
+    };
+  }
+
   public async createReservationHold(holdData: {
     patientUserId: string;
     pharmacyId: string;
     medicineName: string;
     lockedPriceETB: number;
     durationMinutes?: number;
+    patientPhone?: string;
   }): Promise<ReservationHold | null> {
     const pool = getDbPool();
     if (!pool) return null;
@@ -194,14 +348,10 @@ export class PostgresRepository implements IDatabaseRepository {
     const pharmacy = await this.getPharmacyById(holdData.pharmacyId);
     if (!pharmacy || pharmacy.isPermanentlyBanned) return null;
 
-    // Anti-Ghosting Quota: Limit each patient to max 2 active holds
-    const countRes = await pool.query(
-      `SELECT COUNT(*) FROM reservations WHERE patient_user_id = $1 AND status = 'ACTIVE' AND expires_at > NOW()`,
-      [holdData.patientUserId]
-    );
-    const activeCount = parseInt(countRes.rows[0]?.count || '0', 10);
-    if (activeCount >= 2) {
-      console.warn(`[AntiGhosting] Patient ${holdData.patientUserId} exceeded active reservation quota (${activeCount}/2)`);
+    // Check hold eligibility (max 1 active hold & no-show check)
+    const eligibility = await this.checkPatientHoldEligibility(holdData.patientUserId, holdData.patientPhone);
+    if (!eligibility.eligible) {
+      console.warn(`[HoldFairness] Patient ${holdData.patientUserId} blocked from hold: ${eligibility.reason}`);
       return null;
     }
 
@@ -226,7 +376,7 @@ export class PostgresRepository implements IDatabaseRepository {
       pharmacy.name,
       holdData.medicineName,
       holdData.lockedPriceETB,
-      pharmacy.phone,
+      holdData.patientPhone || pharmacy.phone,
       now,
       expiresAt,
     ]);
@@ -234,6 +384,7 @@ export class PostgresRepository implements IDatabaseRepository {
     return {
       reservationCode: randomCode,
       patientUserId: holdData.patientUserId,
+      patientPhone: holdData.patientPhone,
       pharmacyId: pharmacy.id,
       pharmacyName: pharmacy.name,
       medicineName: holdData.medicineName,

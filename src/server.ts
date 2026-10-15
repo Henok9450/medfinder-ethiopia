@@ -32,6 +32,8 @@ app.use(express.static(path.join(__dirname, '../public'), {
 const port = process.env.PORT || 4000;
 
 // Initialize core services
+import { RateLimiterService } from './security/rate-limiter.service';
+
 const configService = DynamicConfigService.getInstance();
 const monetizationService = new MonetizationService();
 const broadcastService = new BroadcastMatchingService();
@@ -41,6 +43,18 @@ const db = InMemoryDatabase.getInstance();
 const dbRepo = getDatabaseRepository();
 const telegramBotService = new TelegramVerificationBotService();
 const prescriptionVision = PrescriptionVisionService.getInstance();
+const rateLimiter = RateLimiterService.getInstance();
+
+function getClientIp(req: Request): string {
+  const forwarded = req.headers['x-forwarded-for'];
+  if (typeof forwarded === 'string') {
+    return forwarded.split(',')[0].trim();
+  }
+  if (Array.isArray(forwarded) && forwarded[0]) {
+    return forwarded[0].trim();
+  }
+  return req.ip || req.socket.remoteAddress || '127.0.0.1';
+}
 
 // ==========================================
 // 0. PRESCRIPTION & MEDICINE VISION AI SCAN
@@ -76,6 +90,19 @@ app.post('/api/prescription/scan', async (req: Request, res: Response) => {
 // 1. PATIENT / USER SEARCH ENDPOINT
 // ==========================================
 app.post('/api/search', async (req: Request, res: Response) => {
+  const clientIp = getClientIp(req);
+  const userAgent = req.headers['user-agent'] as string | undefined;
+
+  // 1. Anti-Scraping / Bot Inspection
+  const botCheck = rateLimiter.detectBot(userAgent);
+  if (botCheck.isBot) {
+    return res.status(403).json({
+      success: false,
+      error: 'Automated scraping is prohibited on MedFinder. Please use the official patient application.',
+      reason: botCheck.reason,
+    });
+  }
+
   const {
     userId,
     medicineName,
@@ -89,6 +116,21 @@ app.post('/api/search', async (req: Request, res: Response) => {
     lang = 'am',
     silentPoll = false,
   } = req.body;
+
+  // 2. Sliding Window Rate Limiting (per IP & user)
+  const clientKey = `${clientIp}_${userId || 'anon'}`;
+  const rateCheck = rateLimiter.checkSearchRateLimit(clientKey);
+  if (!rateCheck.allowed && !silentPoll) {
+    res.setHeader('Retry-After', rateCheck.resetInSeconds.toString());
+    res.setHeader('X-RateLimit-Limit', rateCheck.limit.toString());
+    res.setHeader('X-RateLimit-Remaining', '0');
+    return res.status(429).json({
+      success: false,
+      rateLimited: true,
+      retryAfterSeconds: rateCheck.resetInSeconds,
+      error: 'የፍለጋ መጠን ገደብ ላይ ደርሰዋል። እባክዎ ጥቂት ሰከንዶች ቆይተው እንደገና ይሞክሩ። / Search rate limit reached. Please wait a moment before trying again.',
+    });
+  }
 
   const rawItemList: string[] = Array.isArray(medicineNames) && medicineNames.length > 0
     ? medicineNames.map((s: any) => String(s).trim()).filter(Boolean)
@@ -752,9 +794,35 @@ app.delete('/api/pharmacy/:pharmacyId/inventory/:medicineName', async (req: Requ
 // ==========================================
 // 1. Create a 60-Minute Price Lock Reservation Hold (Protects patient from bait-and-switch)
 app.post('/api/reservation/create', async (req: Request, res: Response) => {
-  const { patientUserId, pharmacyId, medicineName, lockedPriceETB } = req.body;
+  const { patientUserId, pharmacyId, medicineName, lockedPriceETB, phone, patientPhone } = req.body;
   if (!patientUserId || !pharmacyId || !medicineName || lockedPriceETB === undefined) {
     return res.status(400).json({ success: false, error: 'Missing required reservation fields' });
+  }
+
+  const clientIp = getClientIp(req);
+  const effectivePhone = String(patientPhone || phone || '').trim();
+
+  // 1. Rate Limiting Protection on Hold Creation
+  const holdRateCheck = rateLimiter.checkHoldRateLimit(`${clientIp}_${patientUserId}`);
+  if (!holdRateCheck.allowed) {
+    return res.status(429).json({
+      success: false,
+      error: 'Too many reservation hold attempts. Please wait a few minutes before trying again.',
+      retryAfterSeconds: holdRateCheck.resetInSeconds,
+    });
+  }
+
+  // 2. Hold Fairness Safeguard: Max 1 active hold & 3-strike no-show penalty check
+  const eligibility = await dbRepo.checkPatientHoldEligibility(patientUserId, effectivePhone);
+  if (!eligibility.eligible) {
+    return res.status(400).json({
+      success: false,
+      error: eligibility.message,
+      errorAm: eligibility.messageAm,
+      reason: eligibility.reason,
+      activeHold: eligibility.activeHold,
+      cooldownUntil: eligibility.cooldownUntil,
+    });
   }
 
   const pharmacy = await dbRepo.getPharmacyById(pharmacyId);
@@ -762,7 +830,7 @@ app.post('/api/reservation/create', async (req: Request, res: Response) => {
     return res.status(404).json({ success: false, error: 'Pharmacy not found' });
   }
 
-  // 1. Evaluate real-time store operating hours & counter availability
+  // 3. Evaluate real-time store operating hours & counter availability
   const opStatus = evaluatePharmacyOperatingStatus(pharmacy);
   if (!opStatus.canAcceptHold) {
     return res.status(400).json({
@@ -772,7 +840,7 @@ app.post('/api/reservation/create', async (req: Request, res: Response) => {
     });
   }
 
-  // 2. Dynamic Closing-Time Truncation (e.g. if pharmacy closes in 20m, lock for 20m, not 60m!)
+  // 4. Dynamic Closing-Time Truncation (e.g. if pharmacy closes in 20m, lock for 20m, not 60m!)
   const durationMinutes = opStatus.maxHoldMinutes || 60;
 
   const hold = await dbRepo.createReservationHold({
@@ -781,12 +849,13 @@ app.post('/api/reservation/create', async (req: Request, res: Response) => {
     medicineName,
     lockedPriceETB: Number(lockedPriceETB),
     durationMinutes,
+    patientPhone: effectivePhone,
   });
 
   if (!hold) {
     return res.status(400).json({
       success: false,
-      error: 'Could not create reservation hold. You may have reached the maximum quota of 2 active reservations.',
+      error: 'Could not create reservation hold. You already have an active reservation.',
       operatingStatus: opStatus,
     });
   }
@@ -825,6 +894,42 @@ app.post('/api/reservation/create', async (req: Request, res: Response) => {
       longitude: pharmacy.longitude,
     },
   });
+});
+
+// 1B. Cancel active reservation hold (by patient or pharmacist)
+app.post('/api/reservation/cancel', async (req: Request, res: Response) => {
+  const { reservationCode, code, patientUserId, reason } = req.body;
+  const rawCode = String(reservationCode || code || '').trim().replace(/^#/, '');
+  if (!rawCode) {
+    return res.status(400).json({ success: false, error: 'reservationCode is required' });
+  }
+
+  const result = await dbRepo.cancelReservationHold({
+    reservationCode: rawCode,
+    cancelledBy: patientUserId ? 'PATIENT' : 'PHARMACIST',
+    reason: reason || (patientUserId ? 'Cancelled by patient' : 'Cancelled at counter'),
+  });
+
+  if (!result.success) {
+    return res.status(400).json(result);
+  }
+
+  // If pharmacy has telegram chat, alert them inventory was released
+  const hold = result.reservation;
+  if (hold) {
+    const pharmacy = await dbRepo.getPharmacyById(hold.pharmacyId);
+    if (pharmacy?.telegramChatId) {
+      telegramBotService.notifyPharmacyReservationCancelled({
+        pharmacyChatId: pharmacy.telegramChatId,
+        pharmacyName: pharmacy.name,
+        drugName: hold.medicineName,
+        reservationCode: hold.reservationCode,
+        cancelledBy: hold.cancelledBy || 'PATIENT',
+      }).catch((err: any) => console.warn('[ReservationCancel] Notify pharmacy error:', err.message));
+    }
+  }
+
+  res.json(result);
 });
 
 // 2. Counter verification by pharmacist when patient arrives

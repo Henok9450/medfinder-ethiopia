@@ -483,6 +483,10 @@
           <i class="fa-solid fa-magnifying-glass"></i>
           <span>Search Another Pharmacy Nearby (ሌላ ፈልግ)</span>
         </button>
+        <button id="voucherCancelBtn" onclick="cancelActiveReservation()" class="w-full bg-rose-50 hover:bg-rose-100 active:scale-95 text-rose-700 border border-rose-200 text-xs font-bold py-2.5 rounded-xl transition flex items-center justify-center gap-1.5">
+          <i class="fa-solid fa-ban"></i>
+          <span>Cancel Hold & Release Stock (ማቆያውን ሰርዝ)</span>
+        </button>
         <button id="voucherCloseBtn" onclick="minimizeReservationModal()" class="w-full bg-slate-900 hover:bg-black active:scale-95 text-white text-xs font-bold py-2.5 rounded-xl transition">
           Minimize / Keep Voucher Active
         </button>
@@ -1408,12 +1412,23 @@
       try {
         updateVoucherDirections(lat, lng, pharmacyName, subCity);
 
+        let patientPhone = localStorage.getItem('medfinder_patient_phone');
+        if (!patientPhone) {
+          const prompted = prompt('📱 Please enter your phone number to lock this medicine (e.g. 0911223344):\nስልክ ቁጥርዎን ያስገቡ፦');
+          if (!prompted || !prompted.trim()) {
+            return;
+          }
+          patientPhone = prompted.trim();
+          localStorage.setItem('medfinder_patient_phone', patientPhone);
+        }
+
         const patientUserId = 'patient_' + Math.floor(100000 + Math.random() * 900000);
         const res = await fetch('/api/reservation/create', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             patientUserId,
+            patientPhone,
             pharmacyId,
             medicineName,
             lockedPriceETB
@@ -1421,6 +1436,21 @@
         });
 
         const data = await res.json();
+
+        if (data.code === 'ACTIVE_HOLD_EXISTS' && data.activeHold) {
+          const act = data.activeHold;
+          if (confirm(`⚠️ You already have an active hold for ${act.medicineName} at ${act.pharmacyName || 'a pharmacy'} (Code: #${act.reservationCode}).\n\nMedFinder enforces a 1-active-hold policy to prevent hoarding.\n\nWould you like to view your active voucher now?`)) {
+            currentReservationCode = act.reservationCode;
+            document.getElementById('reservationModal').classList.remove('hidden');
+          }
+          return;
+        }
+
+        if (res.status === 429) {
+          alert('⚠️ ' + (data.error || 'Too many requests. Please wait a moment before trying again.'));
+          return;
+        }
+
         if (data.success && data.reservation) {
           const r = data.reservation;
           const ph = data.pharmacy || {};
@@ -1529,6 +1559,50 @@
         }
       } catch (err) {
         alert('Reservation hold failed: ' + err.message);
+      }
+    }
+
+    async function cancelActiveReservation() {
+      let codeToCancel = currentReservationCode;
+      if (!codeToCancel) {
+        try {
+          const s = localStorage.getItem('medfinder_active_reservation');
+          if (s) {
+            const p = JSON.parse(s);
+            if (p && p.code) codeToCancel = p.code;
+          }
+        } catch (_) {}
+      }
+
+      if (!codeToCancel) {
+        alert('No active reservation code found to cancel.');
+        return;
+      }
+
+      if (!confirm(`Are you sure you want to cancel reservation #${codeToCancel}?\n\nThe medicine will be immediately released back to the pharmacy shelf for other patients.`)) {
+        return;
+      }
+
+      try {
+        const res = await fetch('/api/reservation/cancel', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            reservationCode: codeToCancel,
+            cancelledBy: 'PATIENT',
+            reason: 'Patient self-cancelled in web app'
+          })
+        });
+
+        const data = await res.json();
+        if (data.success) {
+          alert(`✅ Reservation #${codeToCancel} has been cancelled and released.`);
+          closeReservationModal();
+        } else {
+          alert('Could not cancel hold: ' + (data.error || 'Unknown error'));
+        }
+      } catch (err) {
+        alert('Cancellation failed: ' + err.message);
       }
     }
 

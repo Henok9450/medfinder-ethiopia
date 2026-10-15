@@ -41,7 +41,34 @@ export interface IDatabaseRepository {
     medicineName: string;
     lockedPriceETB: number;
     durationMinutes?: number;
+    patientPhone?: string;
   }): Promise<ReservationHold | null>;
+
+  /**
+   * Look up any active, unexpired hold for a patient
+   */
+  getActiveHoldForPatient(patientUserId: string, patientPhone?: string): Promise<ReservationHold | null>;
+
+  /**
+   * Check hold fairness eligibility (max 1 active hold & no-show penalty check)
+   */
+  checkPatientHoldEligibility(patientUserId: string, patientPhone?: string): Promise<{
+    eligible: boolean;
+    reason?: 'ACTIVE_HOLD_EXISTS' | 'NO_SHOW_PENALTY' | 'BANNED';
+    activeHold?: ReservationHold;
+    cooldownUntil?: string;
+    message: string;
+    messageAm: string;
+  }>;
+
+  /**
+   * Cancel an active reservation hold (by patient or pharmacist)
+   */
+  cancelReservationHold(params: {
+    reservationCode: string;
+    cancelledBy: 'PATIENT' | 'PHARMACIST' | 'SYSTEM_TIMEOUT';
+    reason?: string;
+  }): Promise<{ success: boolean; message: string; reservation?: ReservationHold }>;
 
   /**
    * Look up an existing reservation by its 4-digit code

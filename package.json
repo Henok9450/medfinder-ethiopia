@@ -10,7 +10,8 @@
     "prod": "npm run build && node dist/server.js",
     "simulate": "tsx src/test-simulation.ts",
     "test:operating-status": "tsx src/test-operating-status.ts",
-    "test": "tsx src/test-operating-status.ts && tsx src/test-simulation.ts",
+    "test:patient-fairness": "tsx src/test-patient-fairness.ts",
+    "test": "tsx src/test-operating-status.ts && tsx src/test-simulation.ts && tsx src/test-patient-fairness.ts",
     "db:migrate": "tsx src/database/migrate.ts"
   },
   "keywords": [],
