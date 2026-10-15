@@ -324,6 +324,145 @@ export class PostgresRepository implements IDatabaseRepository {
     }));
   }
 
+  public async getPharmacyReservationHistory(
+    pharmacyId: string,
+    options?: { limit?: number; status?: string }
+  ): Promise<{
+    reservations: ReservationHold[];
+    metrics: {
+      totalReceived: number;
+      fulfilledCount: number;
+      fulfilledRevenueETB: number;
+      cancelledCount: number;
+      expiredCount: number;
+      activeCount: number;
+      conversionRate: number;
+      missedDemand: { medicineName: string; count: number; lostRevenueETB: number }[];
+    };
+  }> {
+    const pool = getDbPool();
+    if (!pool) {
+      return {
+        reservations: [],
+        metrics: {
+          totalReceived: 0,
+          fulfilledCount: 0,
+          fulfilledRevenueETB: 0,
+          cancelledCount: 0,
+          expiredCount: 0,
+          activeCount: 0,
+          conversionRate: 0,
+          missedDemand: []
+        }
+      };
+    }
+
+    try {
+      // Auto-expire active holds past expires_at
+      await pool.query(
+        `UPDATE reservations SET status = 'EXPIRED' WHERE pharmacy_id = $1 AND status = 'ACTIVE' AND expires_at < NOW()`,
+        [pharmacyId]
+      ).catch(() => {});
+
+      let query = `SELECT * FROM reservations WHERE pharmacy_id = $1`;
+      const params: any[] = [pharmacyId];
+
+      if (options?.status && options.status !== 'ALL') {
+        params.push(options.status);
+        query += ` AND status = $${params.length}`;
+      }
+
+      query += ` ORDER BY created_at DESC LIMIT $${params.length + 1}`;
+      params.push(options?.limit || 100);
+
+      const res = await pool.query(query, params);
+
+      // Compute metrics across all pharmacy records
+      const metricsRes = await pool.query(
+        `SELECT 
+           COUNT(*) as total_received,
+           COUNT(*) FILTER (WHERE status = 'FULFILLED') as fulfilled_count,
+           COALESCE(SUM(locked_price_etb) FILTER (WHERE status = 'FULFILLED'), 0) as fulfilled_revenue,
+           COUNT(*) FILTER (WHERE status = 'CANCELLED') as cancelled_count,
+           COUNT(*) FILTER (WHERE status = 'EXPIRED') as expired_count,
+           COUNT(*) FILTER (WHERE status = 'ACTIVE') as active_count
+         FROM reservations 
+         WHERE pharmacy_id = $1`,
+        [pharmacyId]
+      );
+
+      const m = metricsRes.rows[0] || {};
+      const totalReceived = parseInt(m.total_received || '0', 10);
+      const fulfilledCount = parseInt(m.fulfilled_count || '0', 10);
+      const fulfilledRevenueETB = parseFloat(m.fulfilled_revenue || '0');
+      const cancelledCount = parseInt(m.cancelled_count || '0', 10);
+      const expiredCount = parseInt(m.expired_count || '0', 10);
+      const activeCount = parseInt(m.active_count || '0', 10);
+      const conversionRate = totalReceived > 0 ? Math.round((fulfilledCount / totalReceived) * 100) : 0;
+
+      // Missed demand aggregation
+      const missedRes = await pool.query(
+        `SELECT medicine_name, COUNT(*) as count, COALESCE(SUM(locked_price_etb), 0) as lost_revenue
+         FROM reservations
+         WHERE pharmacy_id = $1 AND status = 'CANCELLED'
+         GROUP BY medicine_name
+         ORDER BY count DESC
+         LIMIT 10`,
+        [pharmacyId]
+      );
+
+      const missedDemand = missedRes.rows.map(r => ({
+        medicineName: r.medicine_name,
+        count: parseInt(r.count, 10),
+        lostRevenueETB: parseFloat(r.lost_revenue)
+      }));
+
+      const reservations: ReservationHold[] = res.rows.map(r => ({
+        reservationCode: r.reservation_code,
+        patientUserId: r.patient_user_id,
+        pharmacyId: r.pharmacy_id,
+        pharmacyName: r.pharmacy_name,
+        medicineName: r.medicine_name,
+        lockedPriceETB: parseFloat(r.locked_price_etb),
+        phone: r.phone,
+        status: r.status,
+        pharmacistAcknowledged: Boolean(r.pharmacist_acknowledged),
+        acknowledgedAt: r.acknowledged_at ? new Date(r.acknowledged_at).toISOString() : undefined,
+        createdAt: new Date(r.created_at).toISOString(),
+        expiresAt: new Date(r.expires_at).toISOString(),
+      }));
+
+      return {
+        reservations,
+        metrics: {
+          totalReceived,
+          fulfilledCount,
+          fulfilledRevenueETB,
+          cancelledCount,
+          expiredCount,
+          activeCount,
+          conversionRate,
+          missedDemand
+        }
+      };
+    } catch (e) {
+      console.warn('[PostgresRepo] getPharmacyReservationHistory failed:', e);
+      return {
+        reservations: [],
+        metrics: {
+          totalReceived: 0,
+          fulfilledCount: 0,
+          fulfilledRevenueETB: 0,
+          cancelledCount: 0,
+          expiredCount: 0,
+          activeCount: 0,
+          conversionRate: 0,
+          missedDemand: []
+        }
+      };
+    }
+  }
+
   public async confirmReservationHold(
     code: string
   ): Promise<{ success: boolean; message: string; reservation?: ReservationHold }> {

@@ -834,6 +834,24 @@ app.get('/api/reservation/active/:pharmacyId', async (req: Request, res: Respons
   });
 });
 
+// 2B-2. Retrieve comprehensive operational reservation history & sales metrics for a pharmacy
+app.get('/api/reservation/history/:pharmacyId', async (req: Request, res: Response) => {
+  const pharmacyId = String(req.params.pharmacyId);
+  const status = req.query.status ? String(req.query.status) : undefined;
+  const limit = req.query.limit ? parseInt(String(req.query.limit), 10) : 100;
+
+  try {
+    const result = await dbRepo.getPharmacyReservationHistory(pharmacyId, { status, limit });
+    res.json({
+      success: true,
+      pharmacyId,
+      ...result,
+    });
+  } catch (err: any) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
 // 2C. Pharmacist two-way acknowledgment of shelf stock
 app.post('/api/reservation/confirm', async (req: Request, res: Response) => {
   const { reservationCode } = req.body;

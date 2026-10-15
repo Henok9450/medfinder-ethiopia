@@ -358,8 +358,8 @@
           <span>Shelf Stock</span>
         </button>
         <button onclick="switchStudioTab('vouchers')" id="tabNavVouchers" class="relative px-3.5 sm:px-4 py-2.5 text-xs font-semibold border-b-2 border-transparent text-slate-500 hover:text-slate-900 whitespace-nowrap transition flex items-center gap-1.5">
-          <i class="fa-solid fa-ticket"></i>
-          <span>Hold Vouchers</span>
+          <i class="fa-solid fa-receipt"></i>
+          <span>Sales & Holds Ledger</span>
           <span id="navPendingHoldsBadge" class="hidden px-2 py-0.5 rounded-full bg-rose-600 text-white font-extrabold text-[10px] animate-pulse">0 Pending</span>
         </button>
         <button onclick="switchStudioTab('medsupply')" id="tabNavMedsupply" class="px-3.5 sm:px-4 py-2.5 text-xs font-semibold border-b-2 border-transparent text-slate-500 hover:text-slate-900 whitespace-nowrap transition flex items-center gap-1.5">
@@ -561,6 +561,121 @@
           </form>
 
           <div id="voucherResultBox" class="hidden p-4 rounded-xl text-xs space-y-2 border"></div>
+        </div>
+
+        <!-- ============================================================ -->
+        <!-- COUNTER OPERATIONAL TRANSACTION HISTORY & SALES LEDGER       -->
+        <!-- ============================================================ -->
+        <div class="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden space-y-4 p-4 sm:p-5">
+          <div class="flex flex-col sm:flex-row sm:items-center justify-between pb-3 border-b border-slate-100 gap-2.5">
+            <div>
+              <div class="flex items-center gap-2">
+                <i class="fa-solid fa-receipt text-emerald-600 text-base"></i>
+                <h3 class="font-extrabold text-sm sm:text-base text-slate-900">Counter Sales Ledger & Hold Transaction History</h3>
+                <span class="text-[10px] font-bold bg-emerald-100 text-emerald-800 px-2 py-0.5 rounded-full">EFDA Audit Shield</span>
+              </div>
+              <p class="text-xs text-slate-500 mt-0.5">Comprehensive audit trail of customer holds received, medicines sold/dispensed, and out-of-stock events.</p>
+            </div>
+            <div class="flex items-center gap-2">
+              <button onclick="exportCounterLedgerCsv()" class="bg-slate-100 hover:bg-slate-200 active:scale-95 text-slate-700 text-xs font-bold px-3 py-2 rounded-xl transition flex items-center gap-1.5 border border-slate-200 shrink-0" title="Export Shift Summary to Excel / CSV">
+                <i class="fa-solid fa-file-excel text-emerald-600"></i>
+                <span>Export CSV</span>
+              </button>
+              <button onclick="loadCounterReservationHistory()" class="bg-white hover:bg-slate-50 active:scale-95 text-slate-700 text-xs font-bold px-3 py-2 rounded-xl transition flex items-center gap-1.5 border border-slate-200 shrink-0" title="Refresh Sales Ledger">
+                <i class="fa-solid fa-rotate-right"></i>
+                <span class="hidden sm:inline">Refresh</span>
+              </button>
+            </div>
+          </div>
+
+          <!-- OPERATIONAL SHIFT KPI METRICS -->
+          <div class="grid grid-cols-2 lg:grid-cols-5 gap-3">
+            <div class="p-3.5 bg-emerald-50 rounded-2xl border border-emerald-200/80">
+              <span class="text-[10px] uppercase font-bold text-emerald-800 block">Fulfilled Revenue</span>
+              <strong id="kpiFulfilledRevenue" class="text-base sm:text-lg font-black text-emerald-900 block mt-0.5">0.00 ETB</strong>
+              <span class="text-[10px] text-emerald-700">Counter cash/Telebirr</span>
+            </div>
+            <div class="p-3.5 bg-slate-50 rounded-2xl border border-slate-200">
+              <span class="text-[10px] uppercase font-bold text-slate-500 block">Vouchers Sold</span>
+              <strong id="kpiFulfilledCount" class="text-base sm:text-lg font-black text-slate-900 block mt-0.5">0 Dispensed</strong>
+              <span class="text-[10px] text-slate-500">Customer pickups</span>
+            </div>
+            <div class="p-3.5 bg-slate-50 rounded-2xl border border-slate-200">
+              <span class="text-[10px] uppercase font-bold text-slate-500 block">Holds Received</span>
+              <strong id="kpiTotalHolds" class="text-base sm:text-lg font-black text-slate-900 block mt-0.5">0 Total</strong>
+              <span class="text-[10px] text-slate-500">Inbound 60-min locks</span>
+            </div>
+            <div class="p-3.5 bg-rose-50 rounded-2xl border border-rose-200/80">
+              <span class="text-[10px] uppercase font-bold text-rose-800 block">Out of Stock</span>
+              <strong id="kpiCancelledCount" class="text-base sm:text-lg font-black text-rose-900 block mt-0.5">0 Declined</strong>
+              <span class="text-[10px] text-rose-700">Missed demand</span>
+            </div>
+            <div class="p-3.5 bg-indigo-50 rounded-2xl border border-indigo-200/80 col-span-2 lg:col-span-1">
+              <span class="text-[10px] uppercase font-bold text-indigo-800 block">Fulfillment Rate</span>
+              <strong id="kpiConversionRate" class="text-base sm:text-lg font-black text-indigo-900 block mt-0.5">0%</strong>
+              <span class="text-[10px] text-indigo-700">Lock-to-sale ratio</span>
+            </div>
+          </div>
+
+          <!-- MISSED DEMAND / LOST REVENUE INSIGHT CARD -->
+          <div id="missedDemandAlertBox" class="hidden p-3.5 rounded-2xl bg-amber-50 border border-amber-300 text-amber-950 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+            <div class="flex items-start gap-2.5">
+              <i class="fa-solid fa-triangle-exclamation text-amber-600 text-base mt-0.5 shrink-0"></i>
+              <div class="space-y-0.5">
+                <h4 class="font-bold text-xs">⚠️ Missed Demand Detected (Out-of-Stock Holds)</h4>
+                <p id="missedDemandDesc" class="text-[11px] text-amber-800 leading-snug">Patients attempted to buy medicines that you marked Out of Stock.</p>
+              </div>
+            </div>
+            <button onclick="switchStudioTab('medsupply')" class="bg-amber-600 hover:bg-amber-700 active:scale-95 text-white font-bold text-xs px-3.5 py-2 rounded-xl transition shadow-xs flex items-center justify-center gap-1.5 shrink-0">
+              <i class="fa-solid fa-truck-ramp-box"></i>
+              <span>Order on MedSupply B2B</span>
+            </button>
+          </div>
+
+          <!-- FILTER BAR & SEARCH -->
+          <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pt-1">
+            <!-- Filter Pills -->
+            <div class="flex items-center space-x-1.5 overflow-x-auto hide-scrollbar pb-1 sm:pb-0">
+              <button onclick="filterCounterLedger('ALL')" id="filterLedgerBtn_ALL" class="ledger-filter-btn px-3 py-1.5 rounded-xl text-xs font-bold bg-slate-900 text-white transition whitespace-nowrap">All Holds</button>
+              <button onclick="filterCounterLedger('FULFILLED')" id="filterLedgerBtn_FULFILLED" class="ledger-filter-btn px-3 py-1.5 rounded-xl text-xs font-semibold bg-slate-100 hover:bg-slate-200 text-slate-700 transition whitespace-nowrap">✅ Fulfilled Sales</button>
+              <button onclick="filterCounterLedger('ACTIVE')" id="filterLedgerBtn_ACTIVE" class="ledger-filter-btn px-3 py-1.5 rounded-xl text-xs font-semibold bg-slate-100 hover:bg-slate-200 text-slate-700 transition whitespace-nowrap">🔒 Active Holds</button>
+              <button onclick="filterCounterLedger('CANCELLED')" id="filterLedgerBtn_CANCELLED" class="ledger-filter-btn px-3 py-1.5 rounded-xl text-xs font-semibold bg-slate-100 hover:bg-slate-200 text-slate-700 transition whitespace-nowrap">❌ Out of Stock</button>
+              <button onclick="filterCounterLedger('EXPIRED')" id="filterLedgerBtn_EXPIRED" class="ledger-filter-btn px-3 py-1.5 rounded-xl text-xs font-semibold bg-slate-100 hover:bg-slate-200 text-slate-700 transition whitespace-nowrap">⏱️ Expired</button>
+            </div>
+            <!-- Search within ledger -->
+            <div class="relative w-full sm:w-64">
+              <i class="fa-solid fa-magnifying-glass absolute left-3 top-2.5 text-slate-400 text-xs"></i>
+              <input type="text" id="ledgerSearchInput" onkeyup="searchCounterLedger()" placeholder="Search medicine or code..." class="w-full text-xs pl-8 pr-3 py-2 rounded-xl border border-slate-300 focus:ring-2 focus:ring-emerald-500 outline-none">
+            </div>
+          </div>
+
+          <!-- LEDGER TABLE (DESKTOP) -->
+          <div class="hidden sm:block overflow-x-auto rounded-xl border border-slate-200">
+            <table class="w-full text-left text-xs">
+              <thead class="bg-slate-50 text-slate-600 font-bold border-b border-slate-200">
+                <tr>
+                  <th class="p-3">Voucher #</th>
+                  <th class="p-3">Medicine Name</th>
+                  <th class="p-3">Price (ETB)</th>
+                  <th class="p-3">Patient Contact</th>
+                  <th class="p-3">Status</th>
+                  <th class="p-3">Created</th>
+                  <th class="p-3">Handover / Outcome</th>
+                </tr>
+              </thead>
+              <tbody id="ledgerDesktopTableBody" class="divide-y divide-slate-100 bg-white">
+                <tr>
+                  <td colspan="7" class="p-6 text-center text-slate-400">Loading sales and hold history...</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+
+          <!-- LEDGER CARDS (MOBILE) -->
+          <div id="ledgerMobileCardsContainer" class="sm:hidden space-y-2.5">
+            <div class="p-6 text-center text-slate-400 text-xs">Loading sales and hold history...</div>
+          </div>
+
         </div>
       </div>
 
@@ -905,8 +1020,8 @@
         <span class="text-[10px] mt-0.5">Shelf</span>
       </button>
       <button onclick="switchStudioTab('vouchers')" id="mobNavVouchers" class="relative flex flex-col items-center justify-center py-1.5 text-slate-400 font-medium transition active:scale-95">
-        <i class="fa-solid fa-ticket text-base"></i>
-        <span class="text-[10px] mt-0.5">Holds</span>
+        <i class="fa-solid fa-receipt text-base"></i>
+        <span class="text-[10px] mt-0.5">Sales/Holds</span>
         <span id="mobilePendingHoldsBadge" class="hidden absolute top-0.5 right-3 min-w-[16px] h-4 px-1 rounded-full bg-rose-600 text-white font-black text-[9px] flex items-center justify-center animate-bounce shadow">0</span>
       </button>
       <button onclick="openSingleAddModal()" class="flex flex-col items-center justify-center py-1 text-white transition active:scale-95">
@@ -1575,6 +1690,7 @@
 
       loadPharmacyInventory();
       startCounterReservationsPolling();
+      loadCounterReservationHistory();
       requestScreenWakeLock();
     }
 
@@ -1719,7 +1835,10 @@
         }
       });
       if (tab === 'broadcasts') loadActiveBroadcasts();
-      if (tab === 'vouchers') loadCounterReservations();
+      if (tab === 'vouchers') {
+        loadCounterReservations();
+        loadCounterReservationHistory();
+      }
       if (tab === 'analytics') loadPwaDemandRadar();
       if (tab === 'medsupply') loadMedSupplyExchange();
     }
@@ -2241,6 +2360,8 @@
         if (data.success && hold) {
           playPositiveDing();
           speakVoiceAssisted(`Voucher ${hold.reservationCode} verified and fulfilled for ${hold.medicineName}.`);
+          loadCounterReservations();
+          loadCounterReservationHistory();
           resultBox.className = 'p-4 rounded-xl text-xs space-y-2 bg-emerald-50 border border-emerald-200 text-emerald-900';
           resultBox.innerHTML = `
             <div class="flex items-center space-x-2 font-bold text-sm text-emerald-800">
@@ -2567,6 +2688,7 @@
           playPositiveDing();
           speakVoiceAssisted(`Hold #${code} confirmed. Medicine is physically held at counter.`);
           loadCounterReservations();
+          loadCounterReservationHistory();
         } else {
           alert('Could not confirm hold: ' + (d.message || d.error));
         }
@@ -2585,6 +2707,7 @@
         if (d.success) {
           speakVoiceAssisted(`Hold #${code} cancelled. Marked out of stock.`);
           loadCounterReservations();
+          loadCounterReservationHistory();
         } else {
           alert('Could not reject hold: ' + (d.message || d.error));
         }
@@ -2596,6 +2719,297 @@
       const evt = { preventDefault: () => {} };
       await handleVoucherVerify(evt);
       loadCounterReservations();
+      loadCounterReservationHistory();
+    }
+
+    // ==============================================================
+    // COUNTER SALES LEDGER & OPERATIONAL TRANSACTION HISTORY
+    // ==============================================================
+    let counterLedgerCache = [];
+    let currentLedgerFilter = 'ALL';
+    let currentLedgerMetrics = null;
+
+    function escapeLedgerHtml(str) {
+      if (!str) return '';
+      return String(str)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#039;');
+    }
+
+    function formatLedgerDateTime(isoStr) {
+      if (!isoStr) return '-';
+      try {
+        const d = new Date(isoStr);
+        return d.toLocaleDateString([], { month: 'short', day: 'numeric' }) + ' ' + d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+      } catch (_) { return isoStr; }
+    }
+
+    function formatLedgerTime(isoStr) {
+      if (!isoStr) return '-';
+      try {
+        const d = new Date(isoStr);
+        return d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+      } catch (_) { return isoStr; }
+    }
+
+    async function loadCounterReservationHistory(statusFilter) {
+      const pharmacyId = currentAuthSession?.account?.pharmacyId || currentAuthSession?.pharmacy?.id;
+      if (!pharmacyId) return;
+
+      if (statusFilter) {
+        currentLedgerFilter = statusFilter;
+      }
+
+      try {
+        const res = await fetch(`/api/reservation/history/${pharmacyId}?limit=250`);
+        if (!res.ok) return;
+        const data = await res.json();
+        if (!data.success) return;
+
+        counterLedgerCache = Array.isArray(data.reservations) ? data.reservations : [];
+        currentLedgerMetrics = data.metrics || null;
+
+        // 1. Update Shift & Operational KPIs
+        if (currentLedgerMetrics) {
+          const revEl = document.getElementById('kpiFulfilledRevenue');
+          const countEl = document.getElementById('kpiFulfilledCount');
+          const totalEl = document.getElementById('kpiTotalHolds');
+          const cancEl = document.getElementById('kpiCancelledCount');
+          const convEl = document.getElementById('kpiConversionRate');
+
+          if (revEl) revEl.innerText = `${Number(currentLedgerMetrics.fulfilledRevenueETB || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} ETB`;
+          if (countEl) countEl.innerText = `${currentLedgerMetrics.fulfilledCount || 0} Dispensed`;
+          if (totalEl) totalEl.innerText = `${currentLedgerMetrics.totalReceived || 0} Total`;
+          if (cancEl) cancEl.innerText = `${currentLedgerMetrics.cancelledCount || 0} Declined`;
+          if (convEl) convEl.innerText = `${currentLedgerMetrics.conversionRate || 0}%`;
+
+          // 2. Missed Demand / Lost Revenue Insight Banner
+          const missedBox = document.getElementById('missedDemandAlertBox');
+          const missedDesc = document.getElementById('missedDemandDesc');
+          if (currentLedgerMetrics.missedDemand && currentLedgerMetrics.missedDemand.length > 0) {
+            if (missedBox) missedBox.classList.remove('hidden');
+            const topMissed = currentLedgerMetrics.missedDemand.slice(0, 3).map(m => `${m.medicineName} (${m.count}x)`).join(', ');
+            const totalLost = currentLedgerMetrics.missedDemand.reduce((acc, m) => acc + (m.lostRevenueETB || 0), 0);
+            if (missedDesc) {
+              missedDesc.innerHTML = `Patients attempted to buy <strong>${escapeLedgerHtml(topMissed)}</strong> which were marked Out of Stock. Estimated <strong>${totalLost.toFixed(2)} ETB</strong> in missed sales. Restock directly on MedSupply B2B below!`;
+            }
+          } else {
+            if (missedBox) missedBox.classList.add('hidden');
+          }
+        }
+
+        // 3. Render Table & Mobile Cards
+        applyLedgerFilterAndRender();
+      } catch (err) {
+        console.warn('[Ledger] Failed loading counter transaction history:', err);
+      }
+    }
+
+    function filterCounterLedger(status) {
+      currentLedgerFilter = status;
+
+      // Update button pill active states
+      const filterKeys = ['ALL', 'FULFILLED', 'ACTIVE', 'CANCELLED', 'EXPIRED'];
+      filterKeys.forEach(k => {
+        const btn = document.getElementById(`filterLedgerBtn_${k}`);
+        if (!btn) return;
+        if (k === status) {
+          btn.className = 'ledger-filter-btn px-3 py-1.5 rounded-xl text-xs font-bold bg-slate-900 text-white transition whitespace-nowrap shadow-xs';
+        } else {
+          btn.className = 'ledger-filter-btn px-3 py-1.5 rounded-xl text-xs font-semibold bg-slate-100 hover:bg-slate-200 text-slate-700 transition whitespace-nowrap';
+        }
+      });
+
+      applyLedgerFilterAndRender();
+    }
+
+    function searchCounterLedger() {
+      applyLedgerFilterAndRender();
+    }
+
+    function applyLedgerFilterAndRender() {
+      const searchInput = document.getElementById('ledgerSearchInput');
+      const term = (searchInput ? searchInput.value : '').toLowerCase().trim();
+
+      let list = counterLedgerCache;
+      if (currentLedgerFilter !== 'ALL') {
+        list = list.filter(r => r.status === currentLedgerFilter);
+      }
+
+      if (term) {
+        list = list.filter(r => {
+          const med = (r.medicineName || '').toLowerCase();
+          const code = (r.reservationCode || '').toLowerCase();
+          const phone = (r.phone || r.patientUserId || '').toLowerCase();
+          return med.includes(term) || code.includes(term) || phone.includes(term);
+        });
+      }
+
+      renderCounterLedger(list);
+    }
+
+    function renderCounterLedger(items) {
+      const tbody = document.getElementById('ledgerDesktopTableBody');
+      const mobContainer = document.getElementById('ledgerMobileCardsContainer');
+
+      if (!items || items.length === 0) {
+        const emptyMsg = `
+          <div class="p-8 text-center text-slate-400 text-xs">
+            <i class="fa-solid fa-receipt text-2xl text-slate-300 mb-2 block"></i>
+            No matching transactions found in this view.
+          </div>
+        `;
+        if (tbody) {
+          tbody.innerHTML = `<tr><td colspan="7">${emptyMsg}</td></tr>`;
+        }
+        if (mobContainer) {
+          mobContainer.innerHTML = emptyMsg;
+        }
+        return;
+      }
+
+      // 1. Desktop Table Rows
+      if (tbody) {
+        tbody.innerHTML = items.map(r => {
+          const price = Number(r.lockedPriceETB || 0).toFixed(2);
+          const contact = r.phone || r.patientUserId || 'N/A';
+          const createdStr = formatLedgerDateTime(r.createdAt);
+
+          let statusBadge = '';
+          let outcomeStr = '';
+
+          if (r.status === 'FULFILLED') {
+            statusBadge = `<span class="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-black bg-emerald-100 text-emerald-800 border border-emerald-200"><i class="fa-solid fa-circle-check"></i> Fulfilled</span>`;
+            outcomeStr = `<span class="text-emerald-700 font-semibold">Sold at ${formatLedgerTime(r.fulfilledAt || r.createdAt)}</span>`;
+          } else if (r.status === 'ACTIVE') {
+            const isAck = r.pharmacistAcknowledged;
+            statusBadge = `<span class="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-black bg-amber-100 text-amber-800 border border-amber-300"><i class="fa-solid fa-lock"></i> Active Hold</span>`;
+            outcomeStr = `<span class="text-amber-800 font-semibold">${isAck ? '🟢 Physically held' : '🟡 Awaiting shelf check'} (Valid until ${formatLedgerTime(r.expiresAt)})</span>`;
+          } else if (r.status === 'CANCELLED') {
+            statusBadge = `<span class="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-black bg-rose-100 text-rose-800 border border-rose-200"><i class="fa-solid fa-ban"></i> Out of Stock</span>`;
+            outcomeStr = `<span class="text-rose-700 font-medium">${escapeLedgerHtml(r.reason || 'Counter out of stock')}</span>`;
+          } else if (r.status === 'EXPIRED') {
+            statusBadge = `<span class="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-black bg-slate-100 text-slate-700 border border-slate-200"><i class="fa-solid fa-clock"></i> Expired</span>`;
+            outcomeStr = `<span class="text-slate-500 font-medium">Uncollected (60m window passed)</span>`;
+          } else {
+            statusBadge = `<span class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-slate-100 text-slate-700">${escapeLedgerHtml(r.status)}</span>`;
+            outcomeStr = `<span class="text-slate-500">-</span>`;
+          }
+
+          return `
+            <tr class="hover:bg-slate-50/70 transition">
+              <td class="p-3">
+                <span class="font-mono text-xs font-black text-slate-900 bg-slate-100 px-2 py-0.5 rounded-lg border border-slate-200">#${escapeLedgerHtml(r.reservationCode)}</span>
+              </td>
+              <td class="p-3">
+                <div class="font-bold text-slate-900 text-xs">${escapeLedgerHtml(r.medicineName)}</div>
+              </td>
+              <td class="p-3 font-extrabold text-emerald-800 text-xs">
+                ${price} ETB
+              </td>
+              <td class="p-3 font-mono text-[11px] text-slate-600">
+                ${escapeLedgerHtml(contact)}
+              </td>
+              <td class="p-3">
+                ${statusBadge}
+              </td>
+              <td class="p-3 text-[11px] text-slate-500">
+                ${createdStr}
+              </td>
+              <td class="p-3 text-xs">
+                ${outcomeStr}
+              </td>
+            </tr>
+          `;
+        }).join('');
+      }
+
+      // 2. Mobile Cards
+      if (mobContainer) {
+        mobContainer.innerHTML = items.map(r => {
+          const price = Number(r.lockedPriceETB || 0).toFixed(2);
+          const contact = r.phone || r.patientUserId || 'N/A';
+          const createdStr = formatLedgerDateTime(r.createdAt);
+
+          let statusBadge = '';
+          let outcomeStr = '';
+          let cardBg = 'bg-white border-slate-200';
+
+          if (r.status === 'FULFILLED') {
+            statusBadge = `<span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[9px] font-black bg-emerald-100 text-emerald-800"><i class="fa-solid fa-circle-check"></i> Fulfilled</span>`;
+            outcomeStr = `✅ Dispensed at ${formatLedgerTime(r.fulfilledAt || r.createdAt)}`;
+            cardBg = 'bg-emerald-50/20 border-emerald-200';
+          } else if (r.status === 'ACTIVE') {
+            statusBadge = `<span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[9px] font-black bg-amber-100 text-amber-900"><i class="fa-solid fa-lock"></i> Active</span>`;
+            outcomeStr = `🔒 Valid until ${formatLedgerTime(r.expiresAt)}`;
+            cardBg = 'bg-amber-50/40 border-amber-200';
+          } else if (r.status === 'CANCELLED') {
+            statusBadge = `<span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[9px] font-black bg-rose-100 text-rose-800"><i class="fa-solid fa-ban"></i> Out of Stock</span>`;
+            outcomeStr = `❌ ${escapeLedgerHtml(r.reason || 'Sold out')}`;
+            cardBg = 'bg-rose-50/20 border-rose-200';
+          } else if (r.status === 'EXPIRED') {
+            statusBadge = `<span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[9px] font-black bg-slate-100 text-slate-700"><i class="fa-solid fa-clock"></i> Expired</span>`;
+            outcomeStr = `⏱️ Window expired`;
+          }
+
+          return `
+            <div class="p-3.5 rounded-2xl border ${cardBg} shadow-xs space-y-2">
+              <div class="flex items-center justify-between">
+                <div class="flex items-center gap-1.5">
+                  <span class="font-mono text-xs font-black px-2 py-0.5 bg-slate-900 text-white rounded-lg">#${escapeLedgerHtml(r.reservationCode)}</span>
+                  ${statusBadge}
+                </div>
+                <strong class="font-black text-emerald-800 text-sm">${price} ETB</strong>
+              </div>
+              <div>
+                <h4 class="font-bold text-xs text-slate-900">${escapeLedgerHtml(r.medicineName)}</h4>
+                <div class="text-[11px] text-slate-500 flex items-center justify-between mt-1">
+                  <span><i class="fa-solid fa-phone text-[10px] text-slate-400 mr-1"></i>${escapeLedgerHtml(contact)}</span>
+                  <span>${createdStr}</span>
+                </div>
+              </div>
+              <div class="pt-1.5 border-t border-slate-100 text-[11px] font-medium text-slate-600">
+                ${outcomeStr}
+              </div>
+            </div>
+          `;
+        }).join('');
+      }
+    }
+
+    function exportCounterLedgerCsv() {
+      if (!counterLedgerCache || counterLedgerCache.length === 0) {
+        alert('No operational ledger records to export.');
+        return;
+      }
+
+      const headers = ['Voucher Code', 'Medicine Name', 'Price ETB', 'Patient Phone / Chat ID', 'Status', 'Created At', 'Fulfilled At', 'Outcome or Reason'];
+      const rows = counterLedgerCache.map(r => [
+        `"${r.reservationCode || ''}"`,
+        `"${(r.medicineName || '').replace(/"/g, '""')}"`,
+        (r.lockedPriceETB || 0).toFixed(2),
+        `"${(r.phone || r.patientUserId || '').replace(/"/g, '""')}"`,
+        `"${r.status || ''}"`,
+        `"${r.createdAt || ''}"`,
+        `"${r.fulfilledAt || ''}"`,
+        `"${(r.reason || (r.status === 'FULFILLED' ? 'Dispensed at counter' : r.status)).replace(/"/g, '""')}"`
+      ]);
+
+      const csvContent = '\uFEFF' + [headers.join(','), ...rows.map(row => row.join(','))].join('\r\n');
+      const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      const today = new Date().toISOString().split('T')[0];
+      const pharmName = (currentAuthSession?.pharmacy?.name || 'counter').replace(/\s+/g, '_').toLowerCase();
+      link.setAttribute('href', url);
+      link.setAttribute('download', `medfinder_sales_ledger_${pharmName}_${today}.csv`);
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      URL.revokeObjectURL(url);
     }
 
     // Helper functions

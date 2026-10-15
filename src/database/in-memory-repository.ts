@@ -120,6 +120,25 @@ export class InMemoryRepository implements IDatabaseRepository {
     return this.db.getActiveReservationsByPharmacy(pharmacyId);
   }
 
+  public async getPharmacyReservationHistory(
+    pharmacyId: string,
+    options?: { limit?: number; status?: string }
+  ): Promise<{
+    reservations: ReservationHold[];
+    metrics: {
+      totalReceived: number;
+      fulfilledCount: number;
+      fulfilledRevenueETB: number;
+      cancelledCount: number;
+      expiredCount: number;
+      activeCount: number;
+      conversionRate: number;
+      missedDemand: { medicineName: string; count: number; lostRevenueETB: number }[];
+    };
+  }> {
+    return this.db.getPharmacyReservationHistory(pharmacyId, options);
+  }
+
   public async confirmReservationHold(
     code: string
   ): Promise<{ success: boolean; message: string; reservation?: ReservationHold }> {

@@ -189,6 +189,9 @@ export interface ReservationHold {
   longitude?: number;
   subCity?: string;
   address?: string;
+  fulfilledAt?: string;
+  cancelledAt?: string;
+  reason?: string;
 }
 
 export interface PharmacyVerificationApplication {
@@ -627,7 +630,9 @@ export class InMemoryDatabase {
     const hold = this.getReservationHold(reservationCode);
     if (!hold) return { success: false, message: 'Reservation code not found' };
     hold.status = 'CANCELLED';
-    return { success: true, message: reason || 'Reservation cancelled by pharmacist (Out of stock / Sold out).', reservation: hold };
+    hold.reason = reason || 'Reservation cancelled by pharmacist (Out of stock / Sold out).';
+    hold.cancelledAt = new Date().toISOString();
+    return { success: true, message: hold.reason, reservation: hold };
   }
 
   public verifyAndFulfillReservation(reservationCode: string): { success: boolean; message: string; reservation?: ReservationHold } {
@@ -645,6 +650,7 @@ export class InMemoryDatabase {
     }
 
     hold.status = 'FULFILLED';
+    hold.fulfilledAt = new Date().toISOString();
 
     // Boost pharmacy trust score slightly on honest fulfillment
     const pharmacy = this.pharmacies.find((p) => p.id === hold.pharmacyId);
@@ -656,6 +662,94 @@ export class InMemoryDatabase {
       success: true,
       message: `Reservation #${cleanCode} verified successfully. Price locked at ${hold.lockedPriceETB} ETB.`,
       reservation: hold,
+    };
+  }
+
+  public getPharmacyReservationHistory(
+    pharmacyId: string,
+    options?: { limit?: number; status?: string }
+  ): {
+    reservations: ReservationHold[];
+    metrics: {
+      totalReceived: number;
+      fulfilledCount: number;
+      fulfilledRevenueETB: number;
+      cancelledCount: number;
+      expiredCount: number;
+      activeCount: number;
+      conversionRate: number;
+      missedDemand: { medicineName: string; count: number; lostRevenueETB: number }[];
+    };
+  } {
+    const allForPharmacy: ReservationHold[] = [];
+    const missedMap = new Map<string, { count: number; lostRevenueETB: number }>();
+    const now = new Date();
+
+    for (const r of this.reservations.values()) {
+      if (r.pharmacyId === pharmacyId) {
+        // Dynamically mark expired if active past expiresAt
+        if (r.status === 'ACTIVE' && now > new Date(r.expiresAt)) {
+          r.status = 'EXPIRED';
+        }
+        allForPharmacy.push(r);
+
+        if (r.status === 'CANCELLED') {
+          const prev = missedMap.get(r.medicineName) || { count: 0, lostRevenueETB: 0 };
+          prev.count += 1;
+          prev.lostRevenueETB += (r.lockedPriceETB || 0);
+          missedMap.set(r.medicineName, prev);
+        }
+      }
+    }
+
+    // Sort newest first
+    allForPharmacy.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+
+    let fulfilledCount = 0;
+    let fulfilledRevenueETB = 0;
+    let cancelledCount = 0;
+    let expiredCount = 0;
+    let activeCount = 0;
+
+    for (const r of allForPharmacy) {
+      if (r.status === 'FULFILLED') {
+        fulfilledCount++;
+        fulfilledRevenueETB += (r.lockedPriceETB || 0);
+      } else if (r.status === 'CANCELLED') {
+        cancelledCount++;
+      } else if (r.status === 'EXPIRED') {
+        expiredCount++;
+      } else if (r.status === 'ACTIVE') {
+        activeCount++;
+      }
+    }
+
+    const totalReceived = allForPharmacy.length;
+    const conversionRate = totalReceived > 0 ? Math.round((fulfilledCount / totalReceived) * 100) : 0;
+
+    const missedDemand = Array.from(missedMap.entries())
+      .map(([medicineName, val]) => ({ medicineName, count: val.count, lostRevenueETB: val.lostRevenueETB }))
+      .sort((a, b) => b.count - a.count);
+
+    let filtered = allForPharmacy;
+    if (options?.status && options.status !== 'ALL') {
+      filtered = filtered.filter(r => r.status === options.status);
+    }
+    const limit = options?.limit || 100;
+    filtered = filtered.slice(0, limit);
+
+    return {
+      reservations: filtered,
+      metrics: {
+        totalReceived,
+        fulfilledCount,
+        fulfilledRevenueETB,
+        cancelledCount,
+        expiredCount,
+        activeCount,
+        conversionRate,
+        missedDemand
+      }
     };
   }
 

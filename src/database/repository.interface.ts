@@ -84,6 +84,26 @@ export interface IDatabaseRepository {
   ): Promise<ReservationHold | null>;
 
   /**
+   * Retrieve operational reservation history & business metrics for a pharmacy counter
+   */
+  getPharmacyReservationHistory(
+    pharmacyId: string,
+    options?: { limit?: number; status?: string }
+  ): Promise<{
+    reservations: ReservationHold[];
+    metrics: {
+      totalReceived: number;
+      fulfilledCount: number;
+      fulfilledRevenueETB: number;
+      cancelledCount: number;
+      expiredCount: number;
+      activeCount: number;
+      conversionRate: number;
+      missedDemand: { medicineName: string; count: number; lostRevenueETB: number }[];
+    };
+  }>;
+
+  /**
    * Update pharmacy GPS location & sub-city
    */
   updatePharmacyLocation(
