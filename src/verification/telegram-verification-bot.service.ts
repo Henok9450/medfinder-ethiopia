@@ -2,7 +2,7 @@ import https from 'https';
 import fs from 'fs';
 import path from 'path';
 import crypto from 'crypto';
-import { InMemoryDatabase, TelegramBotSession, PharmacyVerificationApplication, Pharmacy, MASTER_MEDICINE_CATALOG, ReservationHold, WholesalePurchaseOrder } from '../database/in-memory-db';
+import { InMemoryDatabase, TelegramBotSession, PharmacyVerificationApplication, Pharmacy, MASTER_MEDICINE_CATALOG, ReservationHold, WholesalePurchaseOrder, evaluatePharmacyOperatingStatus } from '../database/in-memory-db';
 import { getDatabaseRepository, IDatabaseRepository } from '../database';
 import { BroadcastMatchingService } from '../matching/broadcast-matching.service';
 import { PrescriptionVisionService } from '../prescription/prescription-vision.service';
@@ -1016,8 +1016,13 @@ export class TelegramVerificationBotService {
       }
     }
 
-    // Sort: Verified first, then highest trustScore, then closest distance
+    // Sort: Open pharmacies first, then Verified, then highest trustScore, then closest distance
     matches.sort((a, b) => {
+      const opA = evaluatePharmacyOperatingStatus(a.pharmacy);
+      const opB = evaluatePharmacyOperatingStatus(b.pharmacy);
+      if (opA.isOpen !== opB.isOpen) {
+        return opA.isOpen ? -1 : 1;
+      }
       if (a.pharmacy.isVerified !== b.pharmacy.isVerified) {
         return a.pharmacy.isVerified ? -1 : 1;
       }
@@ -1072,64 +1077,102 @@ export class TelegramVerificationBotService {
     if (lang === 'am') {
       replyText = `🔍 **"${medicineName}" — የተገኙ ቅርብ ፋርማሲዎች**\n`;
       replyText += `📍 መነሻ አካባቢ፦ **${subCityName}**  |  🏥 የተገኙ ፋርማሲዎች፦ **${matches.length}**\n`;
-      replyText += `💡 *ከታች ያሉትን [🔒 ዋጋ አስይዝ] ቁልፎች በመጫን ዋጋውን ለ60 ደቂቃ በካውንተር ማስያዝ ይችላሉ።*\n`;
+      replyText += `💡 *ከታች ያሉትን [🔒 ዋጋ አስይዝ] ቁልፎች በመጫን ዋጋውን በካውንተር ማስያዝ ይችላሉ።*\n`;
       replyText += `━━━━━━━━━━━━━━━━━━━━━━━━━━\n`;
 
       topMatches.forEach((m, idx) => {
         const p = m.pharmacy;
+        const op = evaluatePharmacyOperatingStatus(p);
         const num = ['1️⃣', '2️⃣', '3️⃣', '4️⃣'][idx] || '🔹';
         const mapsUrl = `https://maps.google.com/?q=${p.latitude},${p.longitude}`;
         const drugSlug = encodeURIComponent(m.itemName.split(' ')[0]);
         const shortName = p.name.replace(/ Pharmacy.*$/i, '').trim().substring(0, 14);
 
         replyText += `${num} 🏥 **${p.name}**  ${p.isVerified ? '🛡️ `EFDA Verified`' : ''}\n`;
+        replyText += `   ⏱️ የስራ ሁኔታ፦ **${op.badgeText}**\n`;
         replyText += `   📍 **${p.subCity}** • 🚗 **${m.distanceKm} ኪ.ሜ** ርቀት  |  ⭐ የታማኝነት ነጥብ፦ **${p.trustScore}%**\n`;
         replyText += `   💰 የተረጋገጠ ዋጋ፦ **${m.priceETB} ETB** (በህግ የተቆለፈ)\n`;
         replyText += `   📞 ስልክ፦ \`${p.phone}\`  |  🗺️ [ካርታ እይ](${mapsUrl})\n`;
         replyText += `━━━━━━━━━━━━━━━━━━━━━━━━━━\n`;
 
-        inlineKeyboard.push([
-          {
-            text: `🔒 ${idx + 1}. ${shortName} (${m.priceETB} ETB) አስይዝ`,
-            callback_data: `hold_${p.id}_${drugSlug}`,
-          },
-          {
-            text: `🗺️ ${idx + 1}. ካርታ`,
-            url: mapsUrl,
-          },
-        ]);
+        if (op.canAcceptHold) {
+          const holdBtnText = op.maxHoldMinutes < 60
+            ? `🔒 ${idx + 1}. ${shortName} (${m.priceETB} ETB / ${op.maxHoldMinutes}ደቂቃ) አስይዝ`
+            : `🔒 ${idx + 1}. ${shortName} (${m.priceETB} ETB) አስይዝ`;
+
+          inlineKeyboard.push([
+            {
+              text: holdBtnText,
+              callback_data: `hold_${p.id}_${drugSlug}`,
+            },
+            {
+              text: `🗺️ ${idx + 1}. ካርታ`,
+              url: mapsUrl,
+            },
+          ]);
+        } else {
+          inlineKeyboard.push([
+            {
+              text: `🔴 ${idx + 1}. ${shortName} (አሁን ዝግ ነው)`,
+              callback_data: `closed_${p.id}`,
+            },
+            {
+              text: `🗺️ ${idx + 1}. ካርታ`,
+              url: mapsUrl,
+            },
+          ]);
+        }
       });
 
       replyText += `\n👇 **ለማስያዝ ከታች ያለውን [🔒 ዋጋ አስይዝ] ይጫኑ፦**`;
     } else {
       replyText = `🔍 **"${medicineName}" — Nearby Available Pharmacies**\n`;
       replyText += `📍 Location: **${subCityName}**  |  🏥 Pharmacies Found: **${matches.length}**\n`;
-      replyText += `💡 *Tap the [🔒 Lock Price] buttons below to reserve at the counter for 60 mins.*\n`;
+      replyText += `💡 *Tap the [🔒 Lock Price] buttons below to reserve at the counter.*\n`;
       replyText += `━━━━━━━━━━━━━━━━━━━━━━━━━━\n`;
 
       topMatches.forEach((m, idx) => {
         const p = m.pharmacy;
+        const op = evaluatePharmacyOperatingStatus(p);
         const num = ['1️⃣', '2️⃣', '3️⃣', '4️⃣'][idx] || '🔹';
         const mapsUrl = `https://maps.google.com/?q=${p.latitude},${p.longitude}`;
         const drugSlug = encodeURIComponent(m.itemName.split(' ')[0]);
         const shortName = p.name.replace(/ Pharmacy.*$/i, '').trim().substring(0, 14);
 
         replyText += `${num} 🏥 **${p.name}**  ${p.isVerified ? '🛡️ `EFDA Verified`' : ''}\n`;
+        replyText += `   ⏱️ Operating Hours: **${op.badgeText}**\n`;
         replyText += `   📍 **${p.subCity}** • 🚗 **${m.distanceKm} km** away  |  ⭐ Trust: **${p.trustScore}%**\n`;
         replyText += `   💰 Verified Price: **${m.priceETB} ETB** (Price-Locked)\n`;
         replyText += `   📞 Phone: \`${p.phone}\`  |  🗺️ [View Map](${mapsUrl})\n`;
         replyText += `━━━━━━━━━━━━━━━━━━━━━━━━━━\n`;
 
-        inlineKeyboard.push([
-          {
-            text: `🔒 ${idx + 1}. ${shortName} (${m.priceETB} ETB)`,
-            callback_data: `hold_${p.id}_${drugSlug}`,
-          },
-          {
-            text: `🗺️ ${idx + 1}. Map`,
-            url: mapsUrl,
-          },
-        ]);
+        if (op.canAcceptHold) {
+          const holdBtnText = op.maxHoldMinutes < 60
+            ? `🔒 ${idx + 1}. ${shortName} (${m.priceETB} ETB / ${op.maxHoldMinutes}m)`
+            : `🔒 ${idx + 1}. ${shortName} (${m.priceETB} ETB)`;
+
+          inlineKeyboard.push([
+            {
+              text: holdBtnText,
+              callback_data: `hold_${p.id}_${drugSlug}`,
+            },
+            {
+              text: `🗺️ ${idx + 1}. Map`,
+              url: mapsUrl,
+            },
+          ]);
+        } else {
+          inlineKeyboard.push([
+            {
+              text: `🔴 ${idx + 1}. ${shortName} (Closed Now)`,
+              callback_data: `closed_${p.id}`,
+            },
+            {
+              text: `🗺️ ${idx + 1}. Map`,
+              url: mapsUrl,
+            },
+          ]);
+        }
       });
 
       replyText += `\n👇 **Tap a button below to lock the counter price:**`;
@@ -2206,6 +2249,19 @@ Type **/status** at any time to monitor progress.
       };
     }
 
+    if (cleanText.startsWith('closed_')) {
+      const pharmId = cleanText.replace(/^closed_/, '').trim();
+      const ph = this.db.pharmacies.find((p) => p.id === pharmId);
+      const name = ph ? ph.name : 'ፋርማሲው';
+      const op = ph ? evaluatePharmacyOperatingStatus(ph) : null;
+      const statusText = op ? op.badgeText : 'ዝግ ነው (Closed)';
+      return {
+        chatId,
+        replyText: `🔴 **${name} በአሁኑ ሰዓት ዝግ ነው (${statusText})**\n━━━━━━━━━━━━━━━━━━━━━━━━━━\nይህ ፋርማሲ በስራ ሰዓት እረፍት ወይም በሌሊት ዝግ ስለሆነ በዚህ ሰዓት ማቆያ (Hold) አይቀበልም። እባክዎ ክፍት ከሆኑት ሌሎች ፋርማሲዎች አንዱን ይምረጡ።\n\nPharmacy is closed right now. Please select an open pharmacy to reserve your medicine.`,
+        quickReplies: ['/start', '💊 Insulin', '💊 Augmentin', '💊 Ventolin'],
+      };
+    }
+
     if (
       cleanText.startsWith('/hold') ||
       cleanText.startsWith('hold_') ||
@@ -2235,18 +2291,27 @@ Type **/status** at any time to monitor progress.
       const inv = pharmacy.inventory?.find((it) => it.name.toLowerCase().includes(drugName.toLowerCase()));
       const lockedPrice = inv?.priceETB || 320;
 
+      const opStatus = evaluatePharmacyOperatingStatus(pharmacy);
+      if (!opStatus.canAcceptHold) {
+        return {
+          chatId,
+          replyText: `🔴 **${pharmacy.name} በአሁኑ ሰዓት ዝግ ነው (${opStatus.badgeText})**\n━━━━━━━━━━━━━━━━━━━━━━━━━━\nይህ ፋርማሲ በዚህ ሰዓት የመድኃኒት ማቆያ (Hold) አይቀበልም። እባክዎ ክፍት ከሆኑት ሌሎች ፋርማሲዎች አንዱን ይምረጡ።\n\nPharmacy is currently closed and not accepting counter holds. Please choose an open pharmacy.`,
+          quickReplies: ['/start', '💊 Insulin', '💊 Augmentin', '💊 Ventolin'],
+        };
+      }
+
       const hold = (await this.repo.createReservationHold({
         patientUserId: chatId,
         pharmacyId: pharmacy.id,
         medicineName: drugName,
         lockedPriceETB: lockedPrice,
-        durationMinutes: 60,
+        durationMinutes: opStatus.maxHoldMinutes,
       })) || this.db.createReservationHold({
         patientUserId: chatId,
         pharmacyId: pharmacy.id,
         medicineName: drugName,
         lockedPriceETB: lockedPrice,
-        durationMinutes: 60,
+        durationMinutes: opStatus.maxHoldMinutes,
       });
 
       if (!hold) {

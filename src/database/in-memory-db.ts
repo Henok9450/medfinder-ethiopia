@@ -83,6 +83,154 @@ export interface Pharmacy {
     tier?: 'BASIC' | 'PRO' | 'ENTERPRISE';
     expiresAt?: string;
   };
+  openingTime?: string; // '08:00' (HH:mm in EAT)
+  closingTime?: string; // '21:30' (HH:mm in EAT)
+  is24Hours?: boolean; // Emergency 24/7 night duty service
+  isManuallyClosed?: boolean; // Manual 1-tap counter pause / off-duty toggle
+  lastHeartbeatAt?: string; // Real-time counter terminal telemetry
+}
+
+export interface PharmacyOperatingStatus {
+  isOpen: boolean;
+  statusLabel: 'OPEN' | 'CLOSED' | 'NIGHT_DUTY_24H' | 'ON_BREAK';
+  badgeText: string;
+  badgeColor: 'emerald' | 'rose' | 'amber' | 'indigo';
+  openingTime: string;
+  closingTime: string;
+  is24Hours: boolean;
+  isManuallyClosed: boolean;
+  minutesRemainingUntilClose: number | null;
+  opensAtMessage?: string;
+  closesAtMessage?: string;
+  canAcceptHold: boolean;
+  maxHoldMinutes: number;
+  reason?: string;
+}
+
+export function evaluatePharmacyOperatingStatus(pharmacy: Pharmacy, now = new Date()): PharmacyOperatingStatus {
+  const openingTime = pharmacy.openingTime || '08:00';
+  const closingTime = pharmacy.closingTime || '21:30';
+  const is24Hours = Boolean(pharmacy.is24Hours);
+  const isManuallyClosed = Boolean(pharmacy.isManuallyClosed);
+
+  if (pharmacy.isPermanentlyBanned) {
+    return {
+      isOpen: false,
+      statusLabel: 'CLOSED',
+      badgeText: 'Permanently Banned / የታገደ',
+      badgeColor: 'rose',
+      openingTime,
+      closingTime,
+      is24Hours: false,
+      isManuallyClosed: true,
+      minutesRemainingUntilClose: 0,
+      canAcceptHold: false,
+      maxHoldMinutes: 0,
+      reason: 'PERMANENTLY_BANNED',
+    };
+  }
+
+  if (isManuallyClosed) {
+    return {
+      isOpen: false,
+      statusLabel: 'ON_BREAK',
+      badgeText: 'Counter Closed (በጊዜያዊነት ዝግ ነው)',
+      badgeColor: 'amber',
+      openingTime,
+      closingTime,
+      is24Hours,
+      isManuallyClosed: true,
+      minutesRemainingUntilClose: 0,
+      opensAtMessage: 'Counter temporarily on pause / break.',
+      canAcceptHold: false,
+      maxHoldMinutes: 0,
+      reason: 'MANUALLY_CLOSED',
+    };
+  }
+
+  if (is24Hours) {
+    return {
+      isOpen: true,
+      statusLabel: 'NIGHT_DUTY_24H',
+      badgeText: '🌙 24/7 Night Duty (የሌሊት ፈረቃ)',
+      badgeColor: 'indigo',
+      openingTime: '00:00',
+      closingTime: '23:59',
+      is24Hours: true,
+      isManuallyClosed: false,
+      minutesRemainingUntilClose: null,
+      closesAtMessage: 'Open 24/7 Emergency Service',
+      canAcceptHold: true,
+      maxHoldMinutes: 60,
+    };
+  }
+
+  // Convert to East Africa Time (EAT = UTC+3)
+  const utcMs = now.getTime() + now.getTimezoneOffset() * 60000;
+  const eatDate = new Date(utcMs + 3 * 3600000);
+  const currentHours = eatDate.getHours();
+  const currentMinutes = eatDate.getMinutes();
+  const currentTotalMinutes = currentHours * 60 + currentMinutes;
+
+  const [openH, openM] = openingTime.split(':').map(Number);
+  const [closeH, closeM] = closingTime.split(':').map(Number);
+  const openTotalMinutes = (isNaN(openH) ? 8 : openH) * 60 + (isNaN(openM) ? 0 : openM);
+  const closeTotalMinutes = (isNaN(closeH) ? 21 : closeH) * 60 + (isNaN(closeM) ? 30 : closeM);
+
+  const isOvernight = closeTotalMinutes < openTotalMinutes;
+  const isOpen = isOvernight
+    ? (currentTotalMinutes >= openTotalMinutes || currentTotalMinutes < closeTotalMinutes)
+    : (currentTotalMinutes >= openTotalMinutes && currentTotalMinutes < closeTotalMinutes);
+
+  if (isOpen) {
+    let minutesRemaining: number;
+    if (isOvernight) {
+      if (currentTotalMinutes >= openTotalMinutes) {
+        minutesRemaining = (1440 - currentTotalMinutes) + closeTotalMinutes;
+      } else {
+        minutesRemaining = closeTotalMinutes - currentTotalMinutes;
+      }
+    } else {
+      minutesRemaining = closeTotalMinutes - currentTotalMinutes;
+    }
+
+    const maxHold = Math.min(60, Math.max(5, minutesRemaining));
+    const closeTimeStr = `${String(closeH).padStart(2, '0')}:${String(closeM).padStart(2, '0')}`;
+
+    return {
+      isOpen: true,
+      statusLabel: 'OPEN',
+      badgeText: minutesRemaining <= 30
+        ? `⚠️ Closes in ${minutesRemaining}m (${closeTimeStr})`
+        : `🟢 Open until ${closeTimeStr}`,
+      badgeColor: minutesRemaining <= 30 ? 'amber' : 'emerald',
+      openingTime,
+      closingTime,
+      is24Hours: false,
+      isManuallyClosed: false,
+      minutesRemainingUntilClose: minutesRemaining,
+      closesAtMessage: `Closes at ${closeTimeStr} EAT`,
+      canAcceptHold: true,
+      maxHoldMinutes: maxHold,
+    };
+  } else {
+    const openTimeStr = `${String(openH).padStart(2, '0')}:${String(openM).padStart(2, '0')}`;
+    return {
+      isOpen: false,
+      statusLabel: 'CLOSED',
+      badgeText: `🔴 Closed (Opens ${openTimeStr})`,
+      badgeColor: 'rose',
+      openingTime,
+      closingTime,
+      is24Hours: false,
+      isManuallyClosed: false,
+      minutesRemainingUntilClose: 0,
+      opensAtMessage: `Opens at ${openTimeStr} EAT`,
+      canAcceptHold: false,
+      maxHoldMinutes: 0,
+      reason: 'AFTER_HOURS',
+    };
+  }
 }
 
 export interface SearchAnalyticsEvent {
@@ -892,6 +1040,26 @@ export class InMemoryDatabase {
       if (data.subCity) app.subCity = data.subCity;
       app.gpsLocationVerified = true;
     }
+
+    return { success: true, pharmacy };
+  }
+
+  public updatePharmacyOperatingStatus(
+    pharmacyId: string,
+    status: {
+      isManuallyClosed?: boolean;
+      openingTime?: string;
+      closingTime?: string;
+      is24Hours?: boolean;
+    }
+  ): { success: boolean; pharmacy?: Pharmacy; error?: string } {
+    const pharmacy = this.pharmacies.find((p) => p.id === pharmacyId);
+    if (!pharmacy) return { success: false, error: 'Pharmacy not found' };
+
+    if (status.isManuallyClosed !== undefined) pharmacy.isManuallyClosed = Boolean(status.isManuallyClosed);
+    if (status.openingTime !== undefined) pharmacy.openingTime = String(status.openingTime);
+    if (status.closingTime !== undefined) pharmacy.closingTime = String(status.closingTime);
+    if (status.is24Hours !== undefined) pharmacy.is24Hours = Boolean(status.is24Hours);
 
     return { success: true, pharmacy };
   }

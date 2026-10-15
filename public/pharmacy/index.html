@@ -109,6 +109,12 @@
 
         <!-- Authenticated User Profile Dropdown / Logout -->
         <div id="authHeaderControls" class="hidden flex items-center space-x-1.5 sm:space-x-2">
+          <!-- 1-Tap Store Open/Close Toggle Pill -->
+          <button id="storeStatusToggleBtn" onclick="togglePharmacyStoreStatus()" title="Tap to Toggle Store Open / Closed Status" class="px-2.5 py-1 rounded-full text-[11px] font-black border transition flex items-center gap-1.5 shadow-xs bg-emerald-950/80 text-emerald-300 border-emerald-500/50 hover:bg-emerald-900 active:scale-95">
+            <span id="storeStatusDot" class="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
+            <span id="storeStatusText">Open (ክፍት)</span>
+          </button>
+
           <div class="text-right hidden md:block">
             <span id="headerPharmName" class="text-xs font-bold text-white block">Pharmacy Partner</span>
             <span id="headerSubCity" class="text-[10px] text-emerald-400">Addis Ababa</span>
@@ -295,6 +301,12 @@
               <span>📍 <span id="dashSubCity">Addis Ababa</span></span>
               <span>•</span>
               <span id="pharmGpsCoordBadge" class="font-mono text-[10px] sm:text-xs text-emerald-800 bg-emerald-50 px-2 py-0.5 rounded-md border border-emerald-200">GPS: Checking...</span>
+              <span>•</span>
+              <button onclick="openOperatingHoursModal()" id="dashHoursBtn" title="Click to edit operating hours & 24/7 duty" class="font-bold text-[10px] sm:text-xs text-indigo-800 bg-indigo-50 hover:bg-indigo-100 active:scale-95 px-2 py-0.5 rounded-md border border-indigo-200 transition flex items-center gap-1">
+                <i class="fa-solid fa-clock text-[10px]"></i>
+                <span id="dashHoursText">⏰ 08:00 - 21:30</span>
+                <i class="fa-solid fa-pen text-[8px] text-indigo-500 ml-0.5"></i>
+              </button>
               <span class="hidden sm:inline">•</span>
               <span class="text-[10px] sm:text-xs">License: <strong id="dashLicenseTxt" class="font-mono text-slate-700">EFDA-AA-2025</strong></span>
               <span class="hidden sm:inline">•</span>
@@ -1081,6 +1093,67 @@
   </div>
 
   <!-- ============================================================== -->
+  <!-- MODAL: PHARMACY OPERATING HOURS & 24/7 NIGHT DUTY               -->
+  <!-- ============================================================== -->
+  <div id="operatingHoursModal" class="hidden fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-xs p-4">
+    <div class="bg-white rounded-3xl max-w-md w-full p-6 shadow-2xl border border-slate-200 space-y-4 animate-in fade-in zoom-in-95">
+      <div class="flex items-center justify-between border-b border-slate-100 pb-3">
+        <div class="flex items-center gap-2">
+          <i class="fa-solid fa-clock text-indigo-600 text-lg"></i>
+          <div>
+            <h3 class="font-extrabold text-slate-900 text-sm">Pharmacy Counter Operating Hours</h3>
+            <p class="text-[11px] text-slate-500">Prevent customer holds when your counter is closed</p>
+          </div>
+        </div>
+        <button onclick="closeModal('operatingHoursModal')" class="text-slate-400 hover:text-slate-700 text-base">
+          <i class="fa-solid fa-xmark"></i>
+        </button>
+      </div>
+
+      <form onsubmit="saveOperatingHours(event)" class="space-y-4">
+        <!-- 24/7 Emergency Night Duty Checkbox -->
+        <div class="p-3 bg-indigo-50 border border-indigo-200 rounded-2xl flex items-start gap-3">
+          <input type="checkbox" id="modalIs24Hours" onchange="toggleHoursInputsDisabled()" class="mt-0.5 h-4 w-4 text-indigo-600 rounded border-indigo-300 focus:ring-indigo-500">
+          <div>
+            <label for="modalIs24Hours" class="font-bold text-xs text-indigo-950 block cursor-pointer">🌙 24/7 Emergency Night Duty Pharmacy (የሌሊት ፈረቃ)</label>
+            <p class="text-[11px] text-indigo-700">Check this if your pharmacy operates around the clock for late-night emergency patients.</p>
+          </div>
+        </div>
+
+        <div id="standardHoursContainer" class="grid grid-cols-2 gap-3">
+          <div>
+            <label class="block text-xs font-semibold text-slate-700 mb-1">Opening Time (EAT)</label>
+            <input type="time" id="modalOpeningTime" value="08:00" class="w-full text-xs px-3 py-2 rounded-xl border border-slate-300 focus:ring-2 focus:ring-indigo-500 outline-none">
+          </div>
+          <div>
+            <label class="block text-xs font-semibold text-slate-700 mb-1">Closing Time (EAT)</label>
+            <input type="time" id="modalClosingTime" value="21:30" class="w-full text-xs px-3 py-2 rounded-xl border border-slate-300 focus:ring-2 focus:ring-indigo-500 outline-none">
+          </div>
+        </div>
+
+        <!-- 1-Tap Manual Break Switch -->
+        <div class="p-3 bg-slate-50 border border-slate-200 rounded-2xl flex items-start gap-3">
+          <input type="checkbox" id="modalIsManuallyClosed" class="mt-0.5 h-4 w-4 text-rose-600 rounded border-slate-300 focus:ring-rose-500">
+          <div>
+            <label for="modalIsManuallyClosed" class="font-bold text-xs text-slate-800 block cursor-pointer">🔴 Temporarily Mark Closed / Off-Duty (ዝግ አድርግ)</label>
+            <p class="text-[11px] text-slate-500">Pause customer 60-minute holds during lunch breaks, power outages, or inventory audits.</p>
+          </div>
+        </div>
+
+        <div class="flex items-center gap-2 pt-2">
+          <button type="button" onclick="closeModal('operatingHoursModal')" class="flex-1 py-2.5 text-xs font-semibold text-slate-600 bg-slate-100 hover:bg-slate-200 rounded-xl transition">
+            Cancel
+          </button>
+          <button type="submit" id="saveHoursBtn" class="flex-1 py-2.5 text-xs font-bold text-white bg-slate-900 hover:bg-black rounded-xl transition shadow-sm flex items-center justify-center gap-1.5">
+            <i class="fa-solid fa-check"></i>
+            <span>Save Hours</span>
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- ============================================================== -->
   <!-- MODAL 2: ADD SINGLE MEDICINE                                   -->
   <!-- ============================================================== -->
   <div id="singleAddModal" class="hidden fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-end sm:items-center justify-center p-0 sm:p-4">
@@ -1689,9 +1762,177 @@
       }
 
       loadPharmacyInventory();
+      loadPharmacyOperatingStatus();
       startCounterReservationsPolling();
       loadCounterReservationHistory();
       requestScreenWakeLock();
+    }
+
+    // --- PHARMACY OPERATING STATUS & 1-TAP OPEN/CLOSE CONTROLLER ---
+    let currentOperatingStatus = null;
+
+    async function loadPharmacyOperatingStatus() {
+      const pharmacyId = currentAuthSession?.account?.pharmacyId || currentAuthSession?.pharmacy?.id;
+      if (!pharmacyId) return;
+
+      try {
+        const res = await fetch(`/api/pharmacy/${pharmacyId}/operating-status`);
+        const data = await res.json();
+        if (data.success && data.operatingStatus) {
+          currentOperatingStatus = data.operatingStatus;
+          updateOperatingStatusUI(data.operatingStatus, data.pharmacy);
+        }
+      } catch (err) {
+        console.warn('[OperatingStatus] Failed to load status:', err);
+      }
+    }
+
+    function updateOperatingStatusUI(status, pharmacy) {
+      if (!status) return;
+      const toggleBtn = document.getElementById('storeStatusToggleBtn');
+      const dot = document.getElementById('storeStatusDot');
+      const text = document.getElementById('storeStatusText');
+      const hoursText = document.getElementById('dashHoursText');
+
+      if (toggleBtn && dot && text) {
+        if (status.isOpen) {
+          toggleBtn.className = 'px-2.5 py-1 rounded-full text-[11px] font-black border transition flex items-center gap-1.5 shadow-xs bg-emerald-950/80 text-emerald-300 border-emerald-500/50 hover:bg-emerald-900 active:scale-95 cursor-pointer';
+          dot.className = 'w-2 h-2 rounded-full bg-emerald-400 animate-pulse';
+          text.innerText = pharmacy?.is24Hours ? '24/7 Night Duty (የሌሊት ፈረቃ)' : 'Open (ክፍት)';
+          toggleBtn.title = 'Tap to temporarily close / pause counter holds';
+        } else {
+          toggleBtn.className = 'px-2.5 py-1 rounded-full text-[11px] font-black border transition flex items-center gap-1.5 shadow-xs bg-rose-950/80 text-rose-300 border-rose-500/50 hover:bg-rose-900 active:scale-95 cursor-pointer';
+          dot.className = 'w-2 h-2 rounded-full bg-rose-400';
+          text.innerText = status.reason === 'MANUALLY_CLOSED' ? 'Closed: Break / Off (ዝግ ነው)' : 'Closed (ዝግ ነው)';
+          toggleBtn.title = 'Tap to resume open store status';
+        }
+      }
+
+      if (hoursText) {
+        if (pharmacy?.is24Hours) {
+          hoursText.innerText = '🌙 24/7 Night Duty';
+        } else {
+          const openT = pharmacy?.openingTime || '08:00';
+          const closeT = pharmacy?.closingTime || '21:30';
+          hoursText.innerText = `⏰ ${openT} - ${closeT}` + (status.reason === 'MANUALLY_CLOSED' ? ' (Paused)' : '');
+        }
+      }
+    }
+
+    async function togglePharmacyStoreStatus() {
+      const pharmacyId = currentAuthSession?.account?.pharmacyId || currentAuthSession?.pharmacy?.id;
+      if (!pharmacyId) return;
+
+      const currentlyOpen = currentOperatingStatus ? currentOperatingStatus.isOpen : true;
+      const willManuallyClose = currentlyOpen;
+
+      if (willManuallyClose) {
+        const confirmed = confirm('Pause counter medicine reservations? (e.g. for lunch break, inventory audit, or power outage)\n\nPatients searching on MedFinder will see your pharmacy marked Closed and cannot hold items until you tap to reopen.');
+        if (!confirmed) return;
+      }
+
+      try {
+        const res = await fetch(`/api/pharmacy/${pharmacyId}/operating-status`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ isManuallyClosed: willManuallyClose })
+        });
+        const data = await res.json();
+        if (data.success) {
+          currentOperatingStatus = data.operatingStatus;
+          updateOperatingStatusUI(data.operatingStatus, data.pharmacy);
+          if (window.Telegram?.WebApp?.HapticFeedback) {
+            try { window.Telegram.WebApp.HapticFeedback.notificationOccurred(willManuallyClose ? 'warning' : 'success'); } catch (_) {}
+          }
+        } else {
+          alert('Failed to update store status: ' + (data.error || 'Server error'));
+        }
+      } catch (err) {
+        alert('Server error: ' + err.message);
+      }
+    }
+
+    function openOperatingHoursModal() {
+      const is24Hours = currentOperatingStatus?.pharmacy?.is24Hours ?? false;
+      const openingTime = currentOperatingStatus?.pharmacy?.openingTime || '08:00';
+      const closingTime = currentOperatingStatus?.pharmacy?.closingTime || '21:30';
+      const isManuallyClosed = currentOperatingStatus?.pharmacy?.isManuallyClosed ?? false;
+
+      const chk24 = document.getElementById('modalIs24Hours');
+      const inOpen = document.getElementById('modalOpeningTime');
+      const inClose = document.getElementById('modalClosingTime');
+      const chkManual = document.getElementById('modalIsManuallyClosed');
+
+      if (chk24) chk24.checked = !!is24Hours;
+      if (inOpen) inOpen.value = openingTime;
+      if (inClose) inClose.value = closingTime;
+      if (chkManual) chkManual.checked = !!isManuallyClosed;
+
+      toggleHoursInputsDisabled();
+      openModal('operatingHoursModal');
+    }
+
+    function toggleHoursInputsDisabled() {
+      const chk24 = document.getElementById('modalIs24Hours');
+      const container = document.getElementById('standardHoursContainer');
+      const inOpen = document.getElementById('modalOpeningTime');
+      const inClose = document.getElementById('modalClosingTime');
+
+      const is24 = chk24 && chk24.checked;
+      if (container) {
+        if (is24) {
+          container.classList.add('opacity-40', 'pointer-events-none');
+        } else {
+          container.classList.remove('opacity-40', 'pointer-events-none');
+        }
+      }
+      if (inOpen) inOpen.disabled = is24;
+      if (inClose) inClose.disabled = is24;
+    }
+
+    async function saveOperatingHours(e) {
+      if (e && e.preventDefault) e.preventDefault();
+      const pharmacyId = currentAuthSession?.account?.pharmacyId || currentAuthSession?.pharmacy?.id;
+      if (!pharmacyId) return;
+
+      const is24Hours = document.getElementById('modalIs24Hours').checked;
+      const openingTime = document.getElementById('modalOpeningTime').value;
+      const closingTime = document.getElementById('modalClosingTime').value;
+      const isManuallyClosed = document.getElementById('modalIsManuallyClosed').checked;
+
+      const btn = document.getElementById('saveHoursBtn');
+      if (btn) {
+        btn.disabled = true;
+        btn.innerHTML = `<i class="fa-solid fa-spinner fa-spin"></i><span>Saving...</span>`;
+      }
+
+      try {
+        const res = await fetch(`/api/pharmacy/${pharmacyId}/operating-status`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            is24Hours,
+            openingTime,
+            closingTime,
+            isManuallyClosed
+          })
+        });
+        const data = await res.json();
+        if (data.success) {
+          currentOperatingStatus = data.operatingStatus;
+          updateOperatingStatusUI(data.operatingStatus, data.pharmacy);
+          closeModal('operatingHoursModal');
+        } else {
+          alert('Could not save hours: ' + (data.error || 'Server error'));
+        }
+      } catch (err) {
+        alert('Server error saving hours: ' + err.message);
+      } finally {
+        if (btn) {
+          btn.disabled = false;
+          btn.innerHTML = `<i class="fa-solid fa-check"></i><span>Save Hours</span>`;
+        }
+      }
     }
 
     // --- PHARMACY COUNTER GPS HANDLERS ---

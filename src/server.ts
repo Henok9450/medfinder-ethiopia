@@ -8,7 +8,7 @@ import { MonetizationService } from './monetization/monetization.service';
 import { BroadcastMatchingService } from './matching/broadcast-matching.service';
 import { TemplateService } from './localization/template.service';
 import { AdminConfigController } from './admin/admin-config.controller';
-import { InMemoryDatabase, MASTER_MEDICINE_CATALOG, AdminRole, AdminPrivileges } from './database/in-memory-db';
+import { InMemoryDatabase, MASTER_MEDICINE_CATALOG, AdminRole, AdminPrivileges, evaluatePharmacyOperatingStatus } from './database/in-memory-db';
 import { TelegramVerificationBotService } from './verification/telegram-verification-bot.service';
 import { getDatabaseRepository, initDatabase, closePostgresPool, isPostgresConnected, getDbPool } from './database';
 import { PrescriptionVisionService } from './prescription/prescription-vision.service';
@@ -274,6 +274,12 @@ app.post('/api/search', async (req: Request, res: Response) => {
   // 3. Matched count descending
   // 4. Trust score descending
   candidatePharmacies.sort((a, b) => {
+    // 0. OPEN & 24/7 pharmacies rank ahead of CLOSED pharmacies!
+    const aOp = evaluatePharmacyOperatingStatus(a.pharmacy);
+    const bOp = evaluatePharmacyOperatingStatus(b.pharmacy);
+    if (aOp.isOpen !== bOp.isOpen) {
+      return aOp.isOpen ? -1 : 1;
+    }
     if (isSubCityExplicit && a.isDirectSubCityMatch !== b.isDirectSubCityMatch) {
       return a.isDirectSubCityMatch ? -1 : 1;
     }
@@ -303,6 +309,7 @@ app.post('/api/search', async (req: Request, res: Response) => {
       searchedMedicines: rawItemList,
       pharmacies: candidatePharmacies.map((m) => {
         const primaryMatched = m.matchedItems[0];
+        const opStatus = evaluatePharmacyOperatingStatus(m.pharmacy);
         return {
           id: m.pharmacy.id,
           name: m.pharmacy.name,
@@ -315,6 +322,7 @@ app.post('/api/search', async (req: Request, res: Response) => {
           tinNumber: m.pharmacy.tinNumber,
           trustScore: m.pharmacy.trustScore,
           strikeCount: m.pharmacy.strikeCount,
+          operatingStatus: opStatus,
           matchedDrugName: rawItemList.length > 1
             ? `${m.matchedItems.map(i => i.matchedName).join(' + ')}`
             : (primaryMatched?.matchedName || primaryMedicineName),
@@ -749,22 +757,41 @@ app.post('/api/reservation/create', async (req: Request, res: Response) => {
     return res.status(400).json({ success: false, error: 'Missing required reservation fields' });
   }
 
+  const pharmacy = await dbRepo.getPharmacyById(pharmacyId);
+  if (!pharmacy) {
+    return res.status(404).json({ success: false, error: 'Pharmacy not found' });
+  }
+
+  // 1. Evaluate real-time store operating hours & counter availability
+  const opStatus = evaluatePharmacyOperatingStatus(pharmacy);
+  if (!opStatus.canAcceptHold) {
+    return res.status(400).json({
+      success: false,
+      error: `This pharmacy is currently closed (${opStatus.badgeText}). Holds cannot be placed outside counter hours.`,
+      operatingStatus: opStatus,
+    });
+  }
+
+  // 2. Dynamic Closing-Time Truncation (e.g. if pharmacy closes in 20m, lock for 20m, not 60m!)
+  const durationMinutes = opStatus.maxHoldMinutes || 60;
+
   const hold = await dbRepo.createReservationHold({
     patientUserId,
     pharmacyId,
     medicineName,
     lockedPriceETB: Number(lockedPriceETB),
+    durationMinutes,
   });
 
   if (!hold) {
     return res.status(400).json({
       success: false,
-      error: 'Could not create reservation hold. Either the pharmacy is unrecognized/banned, or you have reached the maximum quota of 2 active reservations.',
+      error: 'Could not create reservation hold. You may have reached the maximum quota of 2 active reservations.',
+      operatingStatus: opStatus,
     });
   }
 
   // Push immediate real-time alert to the pharmacy's Telegram counter bot
-  const pharmacy = await dbRepo.getPharmacyById(pharmacyId);
   if (pharmacy?.telegramChatId) {
     const expTime = new Date(hold.expiresAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
     telegramBotService.notifyPharmacyReservationHold({
@@ -778,18 +805,17 @@ app.post('/api/reservation/create', async (req: Request, res: Response) => {
     }).catch((err: any) => console.warn('[Reservation] Telegram alert to pharmacy failed:', err.message));
   }
 
-  if (pharmacy) {
-    hold.latitude = pharmacy.latitude;
-    hold.longitude = pharmacy.longitude;
-    hold.subCity = hold.subCity || pharmacy.subCity;
-    hold.address = hold.address || pharmacy.address;
-  }
+  hold.latitude = pharmacy.latitude;
+  hold.longitude = pharmacy.longitude;
+  hold.subCity = hold.subCity || pharmacy.subCity;
+  hold.address = hold.address || pharmacy.address;
 
   res.json({
     success: true,
-    message: `Price locked at ${hold.lockedPriceETB} ETB for 60 minutes.`,
+    message: `Price locked at ${hold.lockedPriceETB} ETB for ${durationMinutes} minutes (${opStatus.badgeText}).`,
     reservation: hold,
-    pharmacy: pharmacy ? {
+    operatingStatus: opStatus,
+    pharmacy: {
       id: pharmacy.id,
       name: pharmacy.name,
       subCity: pharmacy.subCity,
@@ -797,7 +823,7 @@ app.post('/api/reservation/create', async (req: Request, res: Response) => {
       address: pharmacy.address,
       latitude: pharmacy.latitude,
       longitude: pharmacy.longitude,
-    } : undefined,
+    },
   });
 });
 
@@ -826,11 +852,73 @@ app.post('/api/reservation/verify', async (req: Request, res: Response) => {
 // 2B. Retrieve all active incoming reservations for a specific pharmacy counter
 app.get('/api/reservation/active/:pharmacyId', async (req: Request, res: Response) => {
   const pharmacyId = String(req.params.pharmacyId);
+  // Record live counter terminal heartbeat telemetry
+  const inMemPharm = db.pharmacies.find(p => p.id === pharmacyId);
+  if (inMemPharm) {
+    inMemPharm.lastHeartbeatAt = new Date().toISOString();
+  }
+
   const reservations = await dbRepo.getActiveReservationsByPharmacy(pharmacyId);
   res.json({
     success: true,
     count: reservations.length,
     reservations,
+  });
+});
+
+// 2B-Operating. Retrieve real-time operating status and hours for a pharmacy
+app.get('/api/pharmacy/:pharmacyId/operating-status', async (req: Request, res: Response) => {
+  const pharmacyId = String(req.params.pharmacyId);
+  const pharmacy = await dbRepo.getPharmacyById(pharmacyId);
+  if (!pharmacy) return res.status(404).json({ success: false, error: 'Pharmacy not found' });
+
+  const opStatus = evaluatePharmacyOperatingStatus(pharmacy);
+  res.json({
+    success: true,
+    pharmacyId,
+    pharmacyName: pharmacy.name,
+    operatingStatus: opStatus,
+    pharmacy: {
+      id: pharmacy.id,
+      name: pharmacy.name,
+      openingTime: pharmacy.openingTime || '08:00',
+      closingTime: pharmacy.closingTime || '21:30',
+      is24Hours: Boolean(pharmacy.is24Hours),
+      isManuallyClosed: Boolean(pharmacy.isManuallyClosed),
+      lastHeartbeatAt: pharmacy.lastHeartbeatAt,
+    },
+  });
+});
+
+// 2B-Operating-Update. Update operating hours, 24/7 duty status, or 1-tap counter open/close switch
+app.post('/api/pharmacy/:pharmacyId/operating-status', async (req: Request, res: Response) => {
+  const pharmacyId = String(req.params.pharmacyId);
+  const { isManuallyClosed, openingTime, closingTime, is24Hours } = req.body;
+
+  const result = await dbRepo.updatePharmacyOperatingStatus(pharmacyId, {
+    isManuallyClosed,
+    openingTime,
+    closingTime,
+    is24Hours,
+  });
+
+  if (!result.success || !result.pharmacy) {
+    return res.status(400).json({ success: false, error: result.error || 'Failed to update operating status' });
+  }
+
+  const opStatus = evaluatePharmacyOperatingStatus(result.pharmacy);
+  res.json({
+    success: true,
+    operatingStatus: opStatus,
+    pharmacy: {
+      id: result.pharmacy.id,
+      name: result.pharmacy.name,
+      openingTime: result.pharmacy.openingTime || '08:00',
+      closingTime: result.pharmacy.closingTime || '21:30',
+      is24Hours: Boolean(result.pharmacy.is24Hours),
+      isManuallyClosed: Boolean(result.pharmacy.isManuallyClosed),
+      lastHeartbeatAt: result.pharmacy.lastHeartbeatAt,
+    },
   });
 });
 

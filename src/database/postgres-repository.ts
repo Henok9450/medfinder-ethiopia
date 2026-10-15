@@ -46,6 +46,11 @@ export class PostgresRepository implements IDatabaseRepository {
       analyticsAccess: typeof (r.analyticsAccess || r.analytics_access) === 'string'
         ? JSON.parse(r.analyticsAccess || r.analytics_access)
         : (r.analyticsAccess || r.analytics_access || { enabled: false, tier: 'BASIC' }),
+      openingTime: r.openingTime || r.opening_time || '08:00',
+      closingTime: r.closingTime || r.closing_time || '21:30',
+      is24Hours: Boolean(r.is24Hours ?? r.is_24_hours),
+      isManuallyClosed: Boolean(r.isManuallyClosed ?? r.is_manually_closed),
+      lastHeartbeatAt: r.lastHeartbeatAt || r.last_heartbeat_at || undefined,
       distanceKm: r.distanceKm !== undefined ? parseFloat(r.distanceKm) : undefined,
     };
   }
@@ -596,6 +601,47 @@ export class PostgresRepository implements IDatabaseRepository {
     if (res.rows.length === 0) return { success: false, error: 'Pharmacy not found' };
 
     return { success: true, pharmacy: this.mapPharmacyRow(res.rows[0]) };
+  }
+
+  public async updatePharmacyOperatingStatus(
+    pharmacyId: string,
+    status: {
+      isManuallyClosed?: boolean;
+      openingTime?: string;
+      closingTime?: string;
+      is24Hours?: boolean;
+    }
+  ): Promise<{ success: boolean; pharmacy?: Pharmacy; error?: string }> {
+    const inMemRes = InMemoryDatabase.getInstance().updatePharmacyOperatingStatus(pharmacyId, status);
+    const pool = getDbPool();
+    if (!pool) return inMemRes;
+
+    try {
+      const existing = await this.getPharmacyById(pharmacyId);
+      if (!existing) return { success: false, error: 'Pharmacy not found' };
+
+      const isManuallyClosed = status.isManuallyClosed !== undefined ? status.isManuallyClosed : existing.isManuallyClosed;
+      const openingTime = status.openingTime !== undefined ? status.openingTime : (existing.openingTime || '08:00');
+      const closingTime = status.closingTime !== undefined ? status.closingTime : (existing.closingTime || '21:30');
+      const is24Hours = status.is24Hours !== undefined ? status.is24Hours : existing.is24Hours;
+
+      await pool.query(
+        `UPDATE pharmacies
+         SET 
+           is_manually_closed = COALESCE($1, is_manually_closed),
+           opening_time = COALESCE($2, opening_time),
+           closing_time = COALESCE($3, closing_time),
+           is_24_hours = COALESCE($4, is_24_hours),
+           updated_at = NOW()
+         WHERE id = $5`,
+        [isManuallyClosed, openingTime, closingTime, is24Hours, pharmacyId]
+      ).catch(() => {});
+
+      const updated = await this.getPharmacyById(pharmacyId);
+      return { success: true, pharmacy: updated || inMemRes.pharmacy };
+    } catch (_) {
+      return inMemRes;
+    }
   }
 
   public async submitVerificationApplication(

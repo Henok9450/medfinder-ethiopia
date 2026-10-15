@@ -115,6 +115,19 @@ export interface IDatabaseRepository {
   ): Promise<{ success: boolean; pharmacy?: Pharmacy; error?: string }>;
 
   /**
+   * Update pharmacy operating hours, 24/7 duty status, or manual open/close switch
+   */
+  updatePharmacyOperatingStatus(
+    pharmacyId: string,
+    status: {
+      isManuallyClosed?: boolean;
+      openingTime?: string;
+      closingTime?: string;
+      is24Hours?: boolean;
+    }
+  ): Promise<{ success: boolean; pharmacy?: Pharmacy; error?: string }>;
+
+  /**
    * Submit an EFDA pharmacy verification application
    */
   submitVerificationApplication(

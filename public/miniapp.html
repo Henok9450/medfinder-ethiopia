@@ -752,15 +752,32 @@
     // 6. Render Pharmacy Availability Cards
     function renderPharmacyCards(pharmacies) {
       const container = document.getElementById('pharmacyList');
-      container.innerHTML = pharmacies.map((p, idx) => `
-        <div class="bg-white p-3.5 rounded-2xl border border-slate-200/90 hover:border-emerald-400 transition shadow-xs space-y-2.5">
+      container.innerHTML = pharmacies.map((p, idx) => {
+        const op = p.operatingStatus;
+        const isClosed = op && !op.isOpen;
+        let opBadge = '';
+        if (op) {
+          if (op.is24Hours) {
+            opBadge = `<span class="text-[9px] bg-indigo-50 text-indigo-800 font-extrabold px-1.5 py-0.2 rounded-md flex items-center gap-0.5"><i class="fa-solid fa-moon text-[8px] text-indigo-600"></i> 24/7 Night Duty</span>`;
+          } else if (op.isOpen) {
+            opBadge = `<span class="text-[9px] bg-emerald-50 text-emerald-800 font-bold px-1.5 py-0.2 rounded-md flex items-center gap-0.5"><i class="fa-solid fa-clock text-[8px] text-emerald-600"></i> ${escapeHtml(op.badgeText)}</span>`;
+          } else {
+            opBadge = `<span class="text-[9px] bg-rose-50 text-rose-800 font-bold px-1.5 py-0.2 rounded-md flex items-center gap-0.5"><i class="fa-solid fa-door-closed text-[8px] text-rose-600"></i> ${escapeHtml(op.badgeText)}</span>`;
+          }
+        }
+
+        const holdLabel = op && op.maxHoldMinutes < 60 ? `Lock (${op.maxHoldMinutes}m)` : 'Lock Price (60 Mins)';
+
+        return `
+        <div class="p-3.5 rounded-2xl border ${isClosed ? 'border-slate-200 opacity-90 bg-slate-50/70' : 'bg-white border-slate-200/90'} hover:border-emerald-400 transition shadow-xs space-y-2.5">
           <div class="flex items-start justify-between gap-2">
             <div class="space-y-0.5">
               <div class="flex items-center gap-1.5 flex-wrap">
-                <h4 class="font-bold text-xs text-slate-900">${p.name}</h4>
+                <h4 class="font-bold text-xs text-slate-900">${escapeHtml(p.name)}</h4>
                 <span class="text-[9px] bg-emerald-100 text-emerald-800 font-extrabold px-1.5 py-0.2 rounded-md flex items-center gap-0.5">
                   <i class="fa-solid fa-shield-halved text-[8px]"></i> EFDA Verified
                 </span>
+                ${opBadge}
                 <span class="text-[9px] bg-amber-50 text-amber-700 font-bold px-1.5 py-0.2 rounded border border-amber-200">
                   ★ ${p.trustScore}% Trust
                 </span>
@@ -774,16 +791,25 @@
             <!-- Price Column -->
             <div class="text-right flex-shrink-0">
               <div class="text-sm font-extrabold text-slate-900">${p.priceETB} ETB</div>
-              <span class="text-[9px] bg-emerald-50 text-emerald-700 font-bold px-1.5 py-0.5 rounded block">🟢 In Stock Today</span>
+              <span class="text-[9px] ${isClosed ? 'bg-rose-50 text-rose-700' : 'bg-emerald-50 text-emerald-700'} font-bold px-1.5 py-0.5 rounded block">
+                ${isClosed ? '🔴 Closed Now' : '🟢 In Stock Today'}
+              </span>
             </div>
           </div>
 
           <!-- Bottom Action Buttons -->
           <div class="pt-2 border-t border-slate-100 flex items-center justify-between gap-1.5">
+            ${isClosed ? `
+            <button disabled title="${op?.badgeText || 'Pharmacy Closed'}" class="flex-1 bg-slate-200 text-slate-500 cursor-not-allowed text-[11px] font-bold py-1.5 px-2.5 rounded-xl flex items-center justify-center gap-1">
+              <i class="fa-solid fa-lock text-[9px]"></i>
+              <span>Closed (ዝግ ነው)</span>
+            </button>
+            ` : `
             <button onclick="openReservationModal(${idx})" class="flex-1 bg-slate-900 hover:bg-black active:scale-95 text-white text-[11px] font-bold py-1.5 px-2.5 rounded-xl transition flex items-center justify-center gap-1 shadow-2xs">
               <i class="fa-solid fa-lock text-[9px] text-emerald-400"></i>
-              <span>Lock Price (60 Mins)</span>
+              <span>${holdLabel}</span>
             </button>
+            `}
             <a href="tel:${p.phone}" class="bg-slate-100 hover:bg-slate-200 text-slate-700 text-[11px] font-semibold py-1.5 px-2.5 rounded-xl transition flex items-center justify-center gap-1">
               <i class="fa-solid fa-phone text-[9px] text-emerald-600"></i>
               <span>Call</span>
@@ -794,7 +820,8 @@
             </a>
           </div>
         </div>
-      `).join('');
+        `;
+      }).join('');
     }
 
     // 7. Open 60-Minute Price Lock Reservation Modal (Real Backend Hold)

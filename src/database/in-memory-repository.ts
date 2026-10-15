@@ -167,6 +167,18 @@ export class InMemoryRepository implements IDatabaseRepository {
     });
   }
 
+  public async updatePharmacyOperatingStatus(
+    pharmacyId: string,
+    status: {
+      isManuallyClosed?: boolean;
+      openingTime?: string;
+      closingTime?: string;
+      is24Hours?: boolean;
+    }
+  ): Promise<{ success: boolean; pharmacy?: Pharmacy; error?: string }> {
+    return this.db.updatePharmacyOperatingStatus(pharmacyId, status);
+  }
+
   public async submitVerificationApplication(
     data: Omit<PharmacyVerificationApplication, 'id' | 'status' | 'submittedAt'>
   ): Promise<PharmacyVerificationApplication> {
