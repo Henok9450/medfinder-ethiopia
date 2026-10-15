@@ -889,7 +889,9 @@ export class TelegramVerificationBotService {
           const btn: { text: string; request_location?: boolean } = { text: r };
           if (
             r.includes('Share Current GPS') ||
+            r.includes('Share Pharmacy GPS') ||
             r.includes('ቦታዬን በጂፒኤስ ላክ') ||
+            r.includes('የፋርማሲዬን ጂፒኤስ ላክ') ||
             r.includes('Share GPS') ||
             r.includes('የኔን ጂፒኤስ ላክ')
           ) {
@@ -3144,19 +3146,14 @@ Type **/status** at any time to monitor progress.
         session.step = 'LOCATION_GPS';
 
         const prompt = session.language === 'am'
-          ? `📍 **ደረጃ 2 ከ 7፦ የፋርማሲውን ትክክለኛ አድራሻ (Location) ያጋሩ**\n━━━━━━━━━━━━━━━━━━━━━━━━━━\n⚠️ **አድራሻን በእጅ መጻፍ አያስፈልግም!** ከሚከተሉት አንዱን ያድርጉ፦\n\n1️⃣ ከታች ያለውን **"📍 Share Current GPS Location"** የሚለውን ቁልፍ ይጫኑ\n2️⃣ ወይም የፋርማሲዎን **Google Maps ሊንክ** ወይንም **ኮፒ የተደረገ አድራሻ** እዚህ ፔስት (Paste) ያድርጉ:`
-          : `📍 **Step 2 of 7: Pharmacy Physical Location & GPS**\n━━━━━━━━━━━━━━━━━━━━━━━━━━\n⚠️ **Notice:** Manual typing is not required. Please choose one:\n\n1️⃣ Tap **"📍 Share Current GPS Location"** below\n2️⃣ Or **Copy & Paste your Google Maps link** or address here:`;
+          ? `📍 **ደረጃ 2 ከ 7፦ የፋርማሲውን ትክክለኛ አድራሻ (Location) ያጋሩ**\n━━━━━━━━━━━━━━━━━━━━━━━━━━\n1️⃣ ከታች ያለውን **"📍 Share Pharmacy GPS / የፋርማሲዬን ጂፒኤስ ላክ"** የሚለውን ቁልፍ በመጫን ትክክለኛውን ቦታ ይላኩ።\n\n💡 **በአካል በፋርማሲው ውስጥ ካልሆኑ ወይንም በኮምፒውተር እየተጠቀሙ ከሆነ፦**\nበGoogle Maps ላይ የፋርማሲዎን ቦታ ፈልገው የቦታውን ሊንክ (Share link) ኮፒ በማድረግ እዚህ ፔስት (Paste) ያድርጉ ወይንም ክፍለ ከተማዎን ይጻፉ (ምሳሌ፦ *Bole, CMC, Megenagna*)።`
+          : `📍 **Step 2 of 7: Pharmacy Physical Location & GPS**\n━━━━━━━━━━━━━━━━━━━━━━━━━━\n1️⃣ Tap **"📍 Share Pharmacy GPS / የፋርማሲዬን ጂፒኤስ ላክ"** below to send your exact counter coordinates.\n\n💡 **If you are away from the pharmacy or using Telegram Desktop:**\nOpen Google Maps, find your pharmacy pin, tap "Share", and paste the link here (e.g. *https://maps.app.goo.gl/...*), or type your sub-city/area (e.g. *Bole, CMC, Megenagna*).`;
 
         return {
           chatId,
           replyText: prompt,
           quickReplies: [
-            '📍 Share Current GPS Location / ቦታዬን በጂፒኤስ ላክ',
-            'Paste: https://maps.google.com/?q=9.0015,38.7845 (Bole)',
-            'Paste: https://maps.google.com/?q=9.0105,38.7455 (Kirkos / Mexico)',
-            'Paste: https://maps.google.com/?q=9.0201,38.8021 (Yeka / Megenagna)',
-            'Paste: https://maps.google.com/?q=9.0345,38.7512 (Arada / Piazza)',
-            'Paste: https://maps.google.com/?q=8.9567,38.7612 (Nifas Silk / Saris)',
+            '📍 Share Pharmacy GPS / የፋርማሲዬን ጂፒኤስ ላክ',
           ],
           sessionStep: 'LOCATION_GPS',
         };
