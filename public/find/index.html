@@ -120,7 +120,7 @@
       <div class="space-y-2.5">
         <div class="flex items-center gap-2">
           <div class="relative flex-1 flex items-center min-w-0">
-            <i class="fa-solid fa-magnifying-glass absolute left-3.5 text-slate-400 text-sm"></i>
+            <i id="searchBarIcon" class="fa-solid fa-magnifying-glass absolute left-3.5 text-slate-400 text-sm"></i>
             <input 
               type="text" 
               id="medicineInput"
@@ -240,6 +240,42 @@
             </div>
             <p class="text-[10px] text-slate-400 pl-1">💡 Focus specifically on pharmacies inside the selected sub-city.</p>
           </div>
+        </div>
+      </div>
+
+      <!-- RECENT PATIENT MEDICINE HISTORY (Local-First 1M+ Scale Architecture) -->
+      <div id="recentHistorySection" class="hidden space-y-1.5 pt-2 border-t border-white/10">
+        <div class="flex items-center justify-between text-[11px]">
+          <span class="text-slate-300 font-semibold flex items-center gap-1.5">
+            <i class="fa-solid fa-clock-rotate-left text-emerald-400 text-[10px]"></i>
+            <span id="historyHeaderTitle">Recent Searches & Refills</span>
+          </span>
+          <div class="flex items-center gap-2">
+            <!-- Incognito / Private Mode Toggle -->
+            <button 
+              type="button" 
+              onclick="togglePrivateSearchMode()" 
+              id="privateSearchToggleBtn"
+              class="px-2 py-0.5 rounded-lg text-[10px] font-medium transition flex items-center gap-1 bg-white/10 text-slate-300 hover:text-white"
+              title="Toggle Incognito Mode (Searches won't be saved)"
+            >
+              <i id="privateSearchIcon" class="fa-solid fa-user-shield text-[9px]"></i>
+              <span id="privateSearchLabel">Private Mode</span>
+            </button>
+            <button 
+              type="button" 
+              onclick="clearSearchHistory()" 
+              id="clearHistoryBtn"
+              class="text-[10px] text-slate-400 hover:text-rose-300 transition flex items-center gap-0.5"
+              title="Clear all recent search history"
+            >
+              <i class="fa-solid fa-trash-can text-[9px]"></i>
+              <span>Clear</span>
+            </button>
+          </div>
+        </div>
+        <div id="recentHistoryChips" class="flex items-center gap-1.5 text-[11px] overflow-x-auto hide-scrollbar pb-0.5">
+          <!-- Dynamically populated from localStorage -->
         </div>
       </div>
 
@@ -878,6 +914,164 @@
       if (input) executeMedicineSearch();
     }
 
+    // --- LOCAL-FIRST RECENT SEARCH & REFILL HISTORY (Zero DB Burden @ 1M+ Scale) ---
+    let isPrivateSearchActive = false;
+
+    function initSearchHistory() {
+      try {
+        isPrivateSearchActive = localStorage.getItem('medfinder_private_mode') === 'true';
+        updatePrivateModeUI();
+        renderSearchHistory();
+      } catch (e) {
+        console.warn('[History] Init error:', e);
+      }
+    }
+
+    function togglePrivateSearchMode() {
+      isPrivateSearchActive = !isPrivateSearchActive;
+      try {
+        localStorage.setItem('medfinder_private_mode', isPrivateSearchActive ? 'true' : 'false');
+      } catch (_) {}
+      updatePrivateModeUI();
+      renderSearchHistory();
+    }
+
+    function updatePrivateModeUI() {
+      const btn = document.getElementById('privateSearchToggleBtn');
+      const label = document.getElementById('privateSearchLabel');
+      const icon = document.getElementById('privateSearchIcon');
+      const input = document.getElementById('medicineInput');
+      const barIcon = document.getElementById('searchBarIcon');
+
+      if (isPrivateSearchActive) {
+        if (btn) btn.className = 'px-2 py-0.5 rounded-lg text-[10px] font-bold transition flex items-center gap-1 bg-purple-900/80 text-purple-200 border border-purple-400/50 shadow-inner';
+        if (label) label.innerText = '🕶️ Private ON';
+        if (icon) icon.className = 'fa-solid fa-user-secret text-[9px] text-purple-300';
+        if (barIcon) barIcon.className = 'fa-solid fa-user-secret absolute left-3.5 text-purple-300 text-sm';
+        if (input) input.placeholder = '🕶️ Incognito: Searching privately...';
+      } else {
+        if (btn) btn.className = 'px-2 py-0.5 rounded-lg text-[10px] font-medium transition flex items-center gap-1 bg-white/10 text-slate-300 hover:text-white';
+        if (label) label.innerText = 'Private Mode';
+        if (icon) icon.className = 'fa-solid fa-user-shield text-[9px]';
+        if (barIcon) barIcon.className = 'fa-solid fa-magnifying-glass absolute left-3.5 text-slate-400 text-sm';
+        if (input) input.placeholder = 'Medicine name (e.g. Augmentin)...';
+      }
+    }
+
+    function saveToSearchHistory(term) {
+      if (!term || isPrivateSearchActive) return;
+      const cleanTerm = term.trim();
+      if (!cleanTerm || cleanTerm.length < 2) return;
+
+      try {
+        let history = JSON.parse(localStorage.getItem('medfinder_search_history') || '[]');
+        // Remove duplicate if already present
+        history = history.filter(item => item.toLowerCase() !== cleanTerm.toLowerCase());
+        // Insert at beginning (FIFO top 6)
+        history.unshift(cleanTerm);
+        if (history.length > 6) history = history.slice(0, 6);
+        localStorage.setItem('medfinder_search_history', JSON.stringify(history));
+        renderSearchHistory();
+      } catch (e) {
+        console.warn('[History] Save failed:', e);
+      }
+    }
+
+    function removeSingleSearchHistory(e, termToRemove) {
+      if (e) {
+        e.stopPropagation();
+        e.preventDefault();
+      }
+      try {
+        let history = JSON.parse(localStorage.getItem('medfinder_search_history') || '[]');
+        history = history.filter(item => item.toLowerCase() !== termToRemove.toLowerCase());
+        localStorage.setItem('medfinder_search_history', JSON.stringify(history));
+        renderSearchHistory();
+      } catch (_) {}
+    }
+
+    function clearSearchHistory() {
+      try {
+        localStorage.removeItem('medfinder_search_history');
+        localStorage.removeItem('medfinder_last_fulfilled');
+        renderSearchHistory();
+      } catch (_) {}
+    }
+
+    function renderSearchHistory() {
+      const container = document.getElementById('recentHistoryChips');
+      const section = document.getElementById('recentHistorySection');
+      if (!container || !section) return;
+
+      if (isPrivateSearchActive) {
+        container.innerHTML = `
+          <div class="text-[10px] text-purple-200/90 py-1 flex items-center gap-1.5 italic">
+            <i class="fa-solid fa-shield-halved text-purple-300"></i>
+            <span>Private search active. Medicines searched now will NOT be recorded on your device.</span>
+          </div>
+        `;
+        section.classList.remove('hidden');
+        return;
+      }
+
+      let history = [];
+      let lastFulfilled = null;
+      try {
+        history = JSON.parse(localStorage.getItem('medfinder_search_history') || '[]');
+        const storedFulfilled = localStorage.getItem('medfinder_last_fulfilled');
+        if (storedFulfilled) lastFulfilled = JSON.parse(storedFulfilled);
+      } catch (_) {}
+
+      if (history.length === 0 && !lastFulfilled) {
+        section.classList.add('hidden');
+        return;
+      }
+
+      section.classList.remove('hidden');
+      let html = '';
+
+      // Chronic refill badge if patient has a fulfilled voucher
+      if (lastFulfilled && lastFulfilled.medicineName) {
+        const medName = lastFulfilled.medicineName;
+        html += `
+          <button 
+            type="button" 
+            onclick="quickSearch('${escapeHtml(medName)}')"
+            class="group px-2.5 py-1 rounded-lg bg-emerald-500/20 hover:bg-emerald-500 text-emerald-200 hover:text-slate-950 border border-emerald-400/40 text-[11px] font-bold whitespace-nowrap active:scale-95 transition flex items-center gap-1 shrink-0 shadow-xs"
+            title="1-Tap Refill: Previously dispensed at ${escapeHtml(lastFulfilled.pharmacyName || 'pharmacy')}"
+          >
+            <i class="fa-solid fa-repeat text-emerald-300 group-hover:text-slate-950 text-[10px]"></i>
+            <span>🔄 Refill: ${escapeHtml(medName)}</span>
+          </button>
+        `;
+      }
+
+      // Recent search chips with 1-tap delete '✕'
+      history.forEach(item => {
+        html += `
+          <div class="inline-flex items-center rounded-lg bg-white/10 hover:bg-white/20 text-slate-200 text-[11px] font-medium border border-white/10 whitespace-nowrap transition shrink-0">
+            <button 
+              type="button" 
+              onclick="quickSearch('${escapeHtml(item)}')"
+              class="pl-2.5 pr-1.5 py-1 hover:text-white"
+            >
+              ${escapeHtml(item)}
+            </button>
+            <button 
+              type="button" 
+              onclick="removeSingleSearchHistory(event, '${escapeHtml(item)}')" 
+              class="pr-2 pl-0.5 py-1 text-slate-400 hover:text-rose-300 active:scale-90 transition text-[10px]"
+              title="Remove from history"
+            >
+              ✕
+            </button>
+          </div>
+        `;
+      });
+
+      container.innerHTML = html;
+    }
+
     function quickSearch(drugName) {
       activeFindPrescriptionBasket = null;
       document.getElementById('medicineInput').value = drugName;
@@ -897,6 +1091,7 @@
         document.getElementById('medicineInput').focus();
         return;
       }
+      saveToSearchHistory(medicineName);
 
       const isNearMe = currentSearchParadigm === 'NEAR_ME';
       let userLat = userLiveLat;
@@ -1394,6 +1589,7 @@
           price: r.lockedPriceETB,
           dispensedAt: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
         }));
+        renderSearchHistory();
       } catch (_) {}
 
       currentReservationCode = null;
@@ -1963,6 +2159,9 @@
     // Auto-search if opened from Telegram, landing page, or deep-link with ?q=Medicine&mode=near_me
     window.addEventListener('DOMContentLoaded', () => {
       try {
+        // Initialize client-side recent search & chronic refill history
+        initSearchHistory();
+
         // Restore or verify saved voucher status on load
         checkSavedReservationState();
 

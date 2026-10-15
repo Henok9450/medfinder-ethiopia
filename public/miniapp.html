@@ -104,7 +104,7 @@
         <!-- SEARCH INPUT + AI RX CAMERA -->
         <div class="flex flex-col gap-2">
           <div class="relative flex items-center">
-            <i class="fa-solid fa-magnifying-glass absolute left-3.5 text-slate-400 text-sm"></i>
+            <i id="miniSearchBarIcon" class="fa-solid fa-magnifying-glass absolute left-3.5 text-slate-400 text-sm"></i>
             <input 
               type="text" 
               id="searchInput"
@@ -134,6 +134,39 @@
               <i class="fa-solid fa-camera text-emerald-400"></i>
               <span>📸 Scan Prescription / Box (AI)</span>
             </button>
+          </div>
+        </div>
+
+        <!-- RECENT PATIENT MEDICINE HISTORY & REFILL (Local-First 1M+ Scale) -->
+        <div id="miniRecentHistorySection" class="hidden space-y-1.5 pt-1.5 border-t border-white/10">
+          <div class="flex items-center justify-between text-[10px]">
+            <span class="text-emerald-300 font-bold flex items-center gap-1">
+              <i class="fa-solid fa-clock-rotate-left text-[9px]"></i>
+              <span>Recent & Refills (በቅርብ የተፈለጉ):</span>
+            </span>
+            <div class="flex items-center gap-2">
+              <button 
+                type="button" 
+                onclick="toggleMiniPrivateSearchMode()" 
+                id="miniPrivateToggleBtn" 
+                class="px-1.5 py-0.5 rounded text-[10px] font-semibold bg-white/10 text-slate-300 hover:text-white flex items-center gap-1 transition"
+                title="Toggle Private Search (Searches not saved)"
+              >
+                <i id="miniPrivateIcon" class="fa-solid fa-user-shield text-[9px]"></i>
+                <span id="miniPrivateLabel">Private</span>
+              </button>
+              <button 
+                type="button" 
+                onclick="clearMiniSearchHistory()" 
+                class="text-slate-400 hover:text-rose-300 text-[10px] transition"
+                title="Clear all recent history"
+              >
+                <span>Clear</span>
+              </button>
+            </div>
+          </div>
+          <div id="miniRecentHistoryChips" class="flex items-center space-x-1.5 overflow-x-auto hide-scrollbar pt-0.5">
+            <!-- Dynamically populated from localStorage -->
           </div>
         </div>
 
@@ -359,6 +392,8 @@
 
     // 1. Initialize Telegram Mini App
     document.addEventListener('DOMContentLoaded', () => {
+      initMiniSearchHistory();
+
       if (tg) {
         tg.ready();
         tg.expand();
@@ -372,8 +407,15 @@
         }
       }
 
+      // Restore user's most recent searched medicine if available, otherwise default to Insulin
+      let bootSearch = 'Insulin';
+      try {
+        const history = JSON.parse(localStorage.getItem('medfinder_mini_history') || '[]');
+        if (history && history.length > 0) bootSearch = history[0];
+      } catch (_) {}
+
       // Initial search on boot
-      executeSearch('Insulin');
+      executeSearch(bootSearch);
     });
 
     // 2. Set Sub-City & update coordinates
@@ -487,6 +529,160 @@
       document.getElementById('gpsGuideModal').classList.add('hidden');
     }
 
+    // --- LOCAL-FIRST RECENT SEARCH & REFILL HISTORY (Zero DB Burden @ 1M+ Scale) ---
+    let isMiniPrivateSearchActive = false;
+
+    function initMiniSearchHistory() {
+      try {
+        isMiniPrivateSearchActive = localStorage.getItem('medfinder_mini_private_mode') === 'true';
+        updateMiniPrivateModeUI();
+        renderMiniSearchHistory();
+      } catch (e) {
+        console.warn('[MiniHistory] Init error:', e);
+      }
+    }
+
+    function toggleMiniPrivateSearchMode() {
+      isMiniPrivateSearchActive = !isMiniPrivateSearchActive;
+      try {
+        localStorage.setItem('medfinder_mini_private_mode', isMiniPrivateSearchActive ? 'true' : 'false');
+      } catch (_) {}
+      updateMiniPrivateModeUI();
+      renderMiniSearchHistory();
+    }
+
+    function updateMiniPrivateModeUI() {
+      const btn = document.getElementById('miniPrivateToggleBtn');
+      const label = document.getElementById('miniPrivateLabel');
+      const icon = document.getElementById('miniPrivateIcon');
+      const input = document.getElementById('searchInput');
+      const barIcon = document.getElementById('miniSearchBarIcon');
+
+      if (isMiniPrivateSearchActive) {
+        if (btn) btn.className = 'px-1.5 py-0.5 rounded text-[10px] font-bold bg-purple-900/80 text-purple-200 border border-purple-400/50 flex items-center gap-1 shadow-inner';
+        if (label) label.innerText = '🕶️ Private ON';
+        if (icon) icon.className = 'fa-solid fa-user-secret text-[9px] text-purple-300';
+        if (barIcon) barIcon.className = 'fa-solid fa-user-secret absolute left-3.5 text-purple-300 text-sm';
+        if (input) input.placeholder = '🕶️ Private Search (No history saved)...';
+      } else {
+        if (btn) btn.className = 'px-1.5 py-0.5 rounded text-[10px] font-semibold bg-white/10 text-slate-300 hover:text-white flex items-center gap-1';
+        if (label) label.innerText = 'Private';
+        if (icon) icon.className = 'fa-solid fa-user-shield text-[9px]';
+        if (barIcon) barIcon.className = 'fa-solid fa-magnifying-glass absolute left-3.5 text-slate-400 text-sm';
+        if (input) input.placeholder = 'Insulin, Augmentin, Ventolin...';
+      }
+    }
+
+    function saveMiniSearchHistory(term) {
+      if (!term || isMiniPrivateSearchActive) return;
+      const cleanTerm = term.trim();
+      if (!cleanTerm || cleanTerm.length < 2) return;
+
+      try {
+        let history = JSON.parse(localStorage.getItem('medfinder_mini_history') || '[]');
+        history = history.filter(item => item.toLowerCase() !== cleanTerm.toLowerCase());
+        history.unshift(cleanTerm);
+        if (history.length > 6) history = history.slice(0, 6);
+        localStorage.setItem('medfinder_mini_history', JSON.stringify(history));
+        renderMiniSearchHistory();
+      } catch (e) {
+        console.warn('[MiniHistory] Save failed:', e);
+      }
+    }
+
+    function removeSingleMiniSearch(e, termToRemove) {
+      if (e) {
+        e.stopPropagation();
+        e.preventDefault();
+      }
+      try {
+        let history = JSON.parse(localStorage.getItem('medfinder_mini_history') || '[]');
+        history = history.filter(item => item.toLowerCase() !== termToRemove.toLowerCase());
+        localStorage.setItem('medfinder_mini_history', JSON.stringify(history));
+        renderMiniSearchHistory();
+      } catch (_) {}
+    }
+
+    function clearMiniSearchHistory() {
+      try {
+        localStorage.removeItem('medfinder_mini_history');
+        localStorage.removeItem('medfinder_mini_last_fulfilled');
+        renderMiniSearchHistory();
+      } catch (_) {}
+    }
+
+    function renderMiniSearchHistory() {
+      const container = document.getElementById('miniRecentHistoryChips');
+      const section = document.getElementById('miniRecentHistorySection');
+      if (!container || !section) return;
+
+      if (isMiniPrivateSearchActive) {
+        container.innerHTML = `
+          <div class="text-[10px] text-purple-200/90 py-0.5 flex items-center gap-1 italic">
+            <i class="fa-solid fa-shield-halved text-purple-300 text-[9px]"></i>
+            <span>Private mode active. Searches are not saved to history.</span>
+          </div>
+        `;
+        section.classList.remove('hidden');
+        return;
+      }
+
+      let history = [];
+      let lastFulfilled = null;
+      try {
+        history = JSON.parse(localStorage.getItem('medfinder_mini_history') || '[]');
+        const stored = localStorage.getItem('medfinder_mini_last_fulfilled') || localStorage.getItem('medfinder_last_fulfilled');
+        if (stored) lastFulfilled = JSON.parse(stored);
+      } catch (_) {}
+
+      if (history.length === 0 && !lastFulfilled) {
+        section.classList.add('hidden');
+        return;
+      }
+
+      section.classList.remove('hidden');
+      let html = '';
+
+      if (lastFulfilled && lastFulfilled.medicineName) {
+        const medName = lastFulfilled.medicineName;
+        html += `
+          <button 
+            type="button" 
+            onclick="quickSearch('${escapeHtml(medName)}')"
+            class="px-2.5 py-1 rounded-full bg-emerald-500/20 hover:bg-emerald-500 text-emerald-200 hover:text-slate-950 border border-emerald-400/40 text-[11px] font-bold whitespace-nowrap active:scale-95 transition flex items-center gap-1 shrink-0"
+            title="1-Tap Refill"
+          >
+            <i class="fa-solid fa-repeat text-emerald-300 text-[9px]"></i>
+            <span>Refill ${escapeHtml(medName)}</span>
+          </button>
+        `;
+      }
+
+      history.forEach(item => {
+        html += `
+          <div class="inline-flex items-center rounded-full bg-white/10 hover:bg-white/20 text-slate-200 text-[11px] font-medium border border-white/10 whitespace-nowrap transition shrink-0">
+            <button 
+              type="button" 
+              onclick="quickSearch('${escapeHtml(item)}')"
+              class="pl-2.5 pr-1 py-1 hover:text-white"
+            >
+              ${escapeHtml(item)}
+            </button>
+            <button 
+              type="button" 
+              onclick="removeSingleMiniSearch(event, '${escapeHtml(item)}')" 
+              class="pr-2 pl-0.5 py-1 text-slate-400 hover:text-rose-300 active:scale-90 transition text-[9px]"
+              title="Remove"
+            >
+              ✕
+            </button>
+          </div>
+        `;
+      });
+
+      container.innerHTML = html;
+    }
+
     // 4. Quick Search Chip Click
     function quickSearch(term) {
       document.getElementById('searchInput').value = term;
@@ -499,6 +695,7 @@
 
       const term = overrideTerm || document.getElementById('searchInput').value.trim() || 'Insulin';
       currentSearchTerm = term;
+      saveMiniSearchHistory(term);
 
       const listContainer = document.getElementById('pharmacyList');
       listContainer.innerHTML = `
@@ -831,6 +1028,16 @@
               setTimeout(() => {
                 speakMiniAppVoice('Medicine dispensed successfully! Thank you for using MedFinder.');
               }, 400);
+              try {
+                localStorage.setItem('medfinder_mini_last_fulfilled', JSON.stringify({
+                  code: activeHold?.rawCode || r.reservationCode,
+                  medicineName: activeHold?.medicine || r.medicineName,
+                  pharmacyName: activeHold?.pharmacy || '',
+                  price: activeHold?.price || r.lockedPriceETB,
+                  dispensedAt: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+                }));
+                renderMiniSearchHistory();
+              } catch (_) {}
               if (statusEl) statusEl.innerText = '✅ Dispensed & Completed at Counter!';
               if (miniPollInterval) { clearInterval(miniPollInterval); miniPollInterval = null; }
               if (holdTimerInterval) { clearInterval(holdTimerInterval); holdTimerInterval = null; }
