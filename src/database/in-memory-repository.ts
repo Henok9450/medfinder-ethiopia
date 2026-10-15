@@ -10,6 +10,7 @@ import {
   Wholesaler,
   WholesaleListing,
   WholesalePurchaseOrder,
+  PatientAuthSession,
 } from './in-memory-db';
 import { UserSubscription } from '../monetization/subscription.types';
 import { MedicalFuzzyMatcher } from '../matching/medical-fuzzy-matcher';
@@ -19,6 +20,18 @@ export class InMemoryRepository implements IDatabaseRepository {
 
   constructor() {
     this.db = InMemoryDatabase.getInstance();
+  }
+
+  public async createPatientAuthSession(): Promise<PatientAuthSession> {
+    return this.db.createPatientAuthSession();
+  }
+
+  public async getPatientAuthSession(token: string): Promise<PatientAuthSession | null> {
+    return this.db.getPatientAuthSession(token) || null;
+  }
+
+  public async verifyPatientAuthSession(token: string, phone: string, telegramUserId?: string, telegramUsername?: string): Promise<boolean> {
+    return this.db.verifyPatientAuthSession(token, phone, telegramUserId, telegramUsername);
   }
 
   private calculateDistanceKm(lat1: number, lon1: number, lat2: number, lon2: number): number {

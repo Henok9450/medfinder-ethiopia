@@ -319,6 +319,10 @@ export class TelegramVerificationBotService {
     };
   }
 
+  public getPatientBotUsername(): string {
+    return this.patientBot.botInfo?.username || process.env.TELEGRAM_PATIENT_BOT_USERNAME || 'MedFinder_ET_bot';
+  }
+
   /**
    * Connect or update a bot token for Pharmacy or Patient bot
    */
@@ -1648,6 +1652,32 @@ ${patientPhone ? `📱 Verified Phone: \`${patientPhone}\`\n` : ''}━━━━�
     // 0A. Handle Telegram 1-Tap SIM Phone Verification (request_contact)
     if (contact && contact.phone_number) {
       session.verifiedPhoneNumber = contact.phone_number.trim();
+
+      // Check if patient was verifying for MedFinder Web App session!
+      if (session.pendingAuthToken) {
+        const token = session.pendingAuthToken;
+        session.pendingAuthToken = undefined;
+        session.step = 'PATIENT_SEARCH';
+        await this.repo.verifyPatientAuthSession(token, session.verifiedPhoneNumber, chatId, username);
+        const webUrl = this.getPatientPwaUrl();
+        return {
+          chatId,
+          replyText: `🎉 **ስልክዎ በተሳካ ሁኔታ ተረጋግጧል! (Phone Verified!)**
+**Carrier Identity Confirmed for MedFinder Web App**
+━━━━━━━━━━━━━━━━━━━━━━━━━━
+📱 የተረጋገጠ ስልክ፦ \`${session.verifiedPhoneNumber}\`
+🌐 እባክዎ አሁን ወደ ከፈቱት ብሮውዘር ይመለሱ። የመድኃኒት ማቆያዎ በቅጽበት ተረጋግጦ ይፈጠራል!
+
+Return to your browser — your 60-minute price-lock voucher is being finalized automatically.`,
+          quickReplies: ['/start', '💊 Insulin', '💊 Augmentin'],
+          inlineKeyboard: [
+            [{ text: '🌐 ወደ ብሮውዘር ተመለስ (Back to Web App)', url: webUrl }],
+            [{ text: '💊 አዲስ ፍለጋ በቦት (New Search)', callback_data: '/start' }],
+          ],
+          sessionStep: 'PATIENT_SEARCH',
+        };
+      }
+
       // Auto-fulfill pending hold if patient was waiting on phone verification
       if (session.pendingHoldPharmacyId && session.pendingHoldDrug) {
         const pId = session.pendingHoldPharmacyId;
@@ -1670,6 +1700,44 @@ ${patientPhone ? `📱 Verified Phone: \`${patientPhone}\`\n` : ''}━━━━�
         quickReplies: ['/start', '💊 Insulin', '💊 Augmentin', '💊 Ventolin'],
         sessionStep: 'PATIENT_SEARCH',
       };
+    }
+
+    // 0A-2. Handle Web App 1-Tap SIM Auth Deep-Link (/start auth_XXXX)
+    const authMatch = cleanText.match(/^\/start\s+auth[_-]([A-Za-z0-9_-]+)/i);
+    if (authMatch) {
+      session.mode = 'PATIENT';
+      const authToken = 'AUTH_' + authMatch[1].replace(/^auth[_-]/i, '').toUpperCase();
+      if (session.verifiedPhoneNumber) {
+        await this.repo.verifyPatientAuthSession(authToken, session.verifiedPhoneNumber, chatId, username);
+        const webUrl = this.getPatientPwaUrl();
+        return {
+          chatId,
+          replyText: `🎉 **ስልክዎ አስቀድሞ የተረጋገጠ ነው (${session.verifiedPhoneNumber})!**
+**Instant Web Verification Approved!**
+━━━━━━━━━━━━━━━━━━━━━━━━━━
+📱 የተረጋገጠ ስልክ፦ \`${session.verifiedPhoneNumber}\`
+🌐 እባክዎ አሁን ወደ ከፈቱት ብሮውዘር ይመለሱ። የመድኃኒት ማቆያዎ በቅጽበት ተረጋግጦ ይፈጠራል!
+
+Return to your browser — your medicine hold is being confirmed automatically.`,
+          quickReplies: ['/start', '💊 Insulin', '💊 Augmentin'],
+          inlineKeyboard: [
+            [{ text: '🌐 ወደ ብሮውዘር ተመለስ (Back to Web App)', url: webUrl }],
+          ],
+          sessionStep: 'PATIENT_SEARCH',
+        };
+      } else {
+        session.pendingAuthToken = authToken;
+        return {
+          chatId,
+          replyText: `📱 **ስልክዎን በ 1-ጠቅታ ያረጋግጡ (Verify Phone for MedFinder Web App)**
+━━━━━━━━━━━━━━━━━━━━━━━━━━
+በMedFinder ድረ-ገጽ ላይ የመድኃኒት ዋጋን ለ60 ደቂቃ በካውንተር ለማስያዝ እና ማጭበርበርን ለመከላከል የተረጋገጠ ስልክ ያስፈልጋል።
+
+ከታች ያለውን **[📱 ስልክ ቁጥሬን ላክ (Share My Phone)]** ቁልፍ በመጫን በ1-ጠቅታ ያረጋግጡ (Ethio Telecom / Safaricom)፦`,
+          quickReplies: ['📱 ስልክ ቁጥሬን ላክ (Share My Phone)', '❌ ሰርዝ / Cancel'],
+          sessionStep: 'PATIENT_HOLD_PHONE_VERIFY',
+        };
+      }
     }
 
     // 0B. Cancellation of pending phone verification

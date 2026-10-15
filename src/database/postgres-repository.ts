@@ -12,11 +12,24 @@ import {
   Wholesaler,
   WholesaleListing,
   WholesalePurchaseOrder,
+  PatientAuthSession,
 } from './in-memory-db';
 import { UserSubscription } from '../monetization/subscription.types';
 import { MedicalFuzzyMatcher } from '../matching/medical-fuzzy-matcher';
 
 export class PostgresRepository implements IDatabaseRepository {
+  public async createPatientAuthSession(): Promise<PatientAuthSession> {
+    return InMemoryDatabase.getInstance().createPatientAuthSession();
+  }
+
+  public async getPatientAuthSession(token: string): Promise<PatientAuthSession | null> {
+    return InMemoryDatabase.getInstance().getPatientAuthSession(token) || null;
+  }
+
+  public async verifyPatientAuthSession(token: string, phone: string, telegramUserId?: string, telegramUsername?: string): Promise<boolean> {
+    return InMemoryDatabase.getInstance().verifyPatientAuthSession(token, phone, telegramUserId, telegramUsername);
+  }
+
   private hashPassword(password: string): string {
     return InMemoryDatabase.hashPassword(password);
   }

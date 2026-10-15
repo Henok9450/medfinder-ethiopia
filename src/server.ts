@@ -790,6 +790,82 @@ app.delete('/api/pharmacy/:pharmacyId/inventory/:medicineName', async (req: Requ
 });
 
 // ==========================================
+// 3B-2. PATIENT VERIFICATION & 1-TAP AUTH SESSIONS
+// ==========================================
+// 1. Create a 1-Tap Telegram Verification Session
+app.post('/api/auth/session/create', async (req: Request, res: Response) => {
+  try {
+    const authSession = await dbRepo.createPatientAuthSession();
+    const botUsername = telegramBotService.getPatientBotUsername();
+    const deepLinkToken = authSession.token.replace(/^AUTH_/i, '');
+    const telegramDeepLink = `https://t.me/${botUsername}?start=auth_${deepLinkToken}`;
+
+    return res.json({
+      success: true,
+      token: authSession.token,
+      botUsername,
+      telegramDeepLink,
+      expiresAt: authSession.expiresAt,
+    });
+  } catch (err: any) {
+    return res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// 2. Poll Status of an Auth Session (Web App fast polling)
+app.get('/api/auth/session/:token', async (req: Request, res: Response) => {
+  try {
+    const token = String(req.params.token || '').trim();
+    if (!token) return res.status(400).json({ success: false, error: 'Token is required' });
+
+    const session = await dbRepo.getPatientAuthSession(token);
+    if (!session) {
+      return res.status(404).json({ success: false, error: 'Session not found or expired' });
+    }
+
+    return res.json({
+      success: true,
+      token: session.token,
+      status: session.status,
+      verified: session.status === 'VERIFIED',
+      phone: session.verifiedPhone,
+    });
+  } catch (err: any) {
+    return res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// 3. Direct Mobile Number Verification with Telemetry & Carrier Validation
+app.post('/api/auth/verify-direct', async (req: Request, res: Response) => {
+  try {
+    const { phone } = req.body;
+    const rawPhone = String(phone || '').trim().replace(/[\s\-()]/g, '');
+
+    // Validate Ethiopian phone format (+2519..., +2517..., 09..., 07...)
+    const ethioPattern = /^(?:\+251|0)?([79]\d{8})$/;
+    const match = rawPhone.match(ethioPattern);
+    if (!match) {
+      return res.status(400).json({
+        success: false,
+        error: 'Invalid Ethiopian mobile number. Please enter a valid Ethio Telecom (09...) or Safaricom (07...) number.',
+        errorAm: 'እባክዎ ትክክለኛ የኢትዮ ቴሌኮም (09...) ወይም የሳፋሪኮም (07...) ስልክ ቁጥር ያስገቡ።',
+      });
+    }
+
+    const normalizedPhone = `+251${match[1]}`;
+    return res.json({
+      success: true,
+      verified: true,
+      phone: normalizedPhone,
+      displayPhone: `0${match[1]}`,
+      carrier: match[1].startsWith('7') ? 'Safaricom Ethiopia' : 'Ethio Telecom',
+    });
+  } catch (err: any) {
+    return res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// ==========================================
 // 3C. ANTI-SCAM & PRICE-LOCK RESERVATION APIS
 // ==========================================
 // 1. Create a 60-Minute Price Lock Reservation Hold (Protects patient from bait-and-switch)

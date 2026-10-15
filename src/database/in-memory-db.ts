@@ -388,8 +388,20 @@ export interface TelegramBotSession {
   verifiedPhoneNumber?: string;
   pendingHoldPharmacyId?: string;
   pendingHoldDrug?: string;
+  pendingAuthToken?: string;
   data: Partial<PharmacyVerificationApplication>;
   language: 'am' | 'en';
+}
+
+export interface PatientAuthSession {
+  token: string;
+  createdAt: string;
+  expiresAt: string;
+  status: 'PENDING' | 'VERIFIED' | 'EXPIRED';
+  verifiedPhone?: string;
+  telegramUserId?: string;
+  telegramUsername?: string;
+  verifiedAt?: string;
 }
 
 export interface PharmacyViolationReport {
@@ -460,6 +472,7 @@ export class InMemoryDatabase {
   public wholesalers: Wholesaler[] = [];
   public wholesaleListings: WholesaleListing[] = [];
   public wholesalePurchaseOrders: WholesalePurchaseOrder[] = [];
+  public patientAuthSessions: Map<string, PatientAuthSession> = new Map();
 
   private constructor() {
     this.seedPharmacies();
@@ -1135,6 +1148,41 @@ export class InMemoryDatabase {
       return true;
     }
     return false;
+  }
+
+  public createPatientAuthSession(): PatientAuthSession {
+    const rawToken = 'AUTH_' + Math.random().toString(36).substring(2, 8).toUpperCase();
+    const now = new Date();
+    const session: PatientAuthSession = {
+      token: rawToken,
+      createdAt: now.toISOString(),
+      expiresAt: new Date(now.getTime() + 10 * 60 * 1000).toISOString(),
+      status: 'PENDING',
+    };
+    this.patientAuthSessions.set(rawToken, session);
+    return session;
+  }
+
+  public getPatientAuthSession(token: string): PatientAuthSession | undefined {
+    const cleanToken = token.trim().toUpperCase();
+    const s = this.patientAuthSessions.get(cleanToken);
+    if (!s) return undefined;
+    if (s.status === 'PENDING' && new Date() > new Date(s.expiresAt)) {
+      s.status = 'EXPIRED';
+    }
+    return s;
+  }
+
+  public verifyPatientAuthSession(token: string, phone: string, telegramUserId?: string, telegramUsername?: string): boolean {
+    const cleanToken = token.trim().toUpperCase();
+    const s = this.getPatientAuthSession(cleanToken);
+    if (!s || s.status === 'EXPIRED') return false;
+    s.status = 'VERIFIED';
+    s.verifiedPhone = phone.trim();
+    s.telegramUserId = telegramUserId;
+    s.telegramUsername = telegramUsername;
+    s.verifiedAt = new Date().toISOString();
+    return true;
   }
 
   public updatePharmacyLocation(pharmacyId: string, data: { latitude: number; longitude: number; subCity?: string; addressDetails?: string }): { success: boolean; pharmacy?: Pharmacy; error?: string } {

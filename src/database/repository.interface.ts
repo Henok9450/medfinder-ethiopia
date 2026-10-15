@@ -8,10 +8,25 @@ import {
   Wholesaler,
   WholesaleListing,
   WholesalePurchaseOrder,
+  PatientAuthSession,
 } from './in-memory-db';
 import { UserSubscription } from '../monetization/subscription.types';
 
 export interface IDatabaseRepository {
+  /**
+   * Create an ephemeral 1-tap Telegram/web authentication session
+   */
+  createPatientAuthSession(): Promise<PatientAuthSession>;
+
+  /**
+   * Get auth session by token
+   */
+  getPatientAuthSession(token: string): Promise<PatientAuthSession | null>;
+
+  /**
+   * Verify an auth session with verified phone number
+   */
+  verifyPatientAuthSession(token: string, phone: string, telegramUserId?: string, telegramUsername?: string): Promise<boolean>;
   /**
    * Geospatial search for pharmacies within a radius with matching medicine stock
    */

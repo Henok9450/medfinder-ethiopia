@@ -463,6 +463,13 @@
           <span class="text-slate-500">Counter Phone:</span>
           <a id="voucherPhoneLink" href="tel:" class="font-mono text-emerald-700 font-bold hover:underline">+251...</a>
         </div>
+        <div class="flex justify-between items-center pt-1.5 border-t border-slate-200/70 text-[11px]">
+          <span class="text-slate-500">Verified Patient:</span>
+          <div class="flex items-center gap-1.5">
+            <span id="voucherPatientPhoneDisplay" class="font-mono text-slate-800 font-bold">+251...</span>
+            <button onclick="changePatientPhone()" class="text-[10px] text-sky-600 hover:text-sky-800 underline font-semibold">(Change)</button>
+          </div>
+        </div>
       </div>
 
       <!-- TURN-BY-TURN NAVIGATION BUTTON -->
@@ -491,6 +498,148 @@
           Minimize / Keep Voucher Active
         </button>
       </div>
+    </div>
+  </div>
+
+  <!-- PATIENT IDENTITY & CARRIER VERIFICATION MODAL -->
+  <div id="patientVerificationModal" class="hidden fixed inset-0 z-50 bg-black/70 backdrop-blur-sm flex items-end sm:items-center justify-center p-0 sm:p-4 animate-in fade-in duration-200">
+    <div class="bg-white rounded-t-3xl sm:rounded-3xl max-w-sm w-full p-5 sm:p-6 shadow-2xl border border-slate-100 text-center space-y-4 max-h-[92vh] overflow-y-auto safe-area-bottom">
+      <div class="w-10 h-1 bg-slate-300 rounded-full mx-auto -mt-1 sm:hidden"></div>
+
+      <!-- HEADER -->
+      <div class="relative">
+        <button onclick="closePatientVerificationModal()" class="absolute -top-1 -right-1 text-slate-400 hover:text-slate-700 w-8 h-8 rounded-full flex items-center justify-center transition">
+          <i class="fa-solid fa-xmark text-base"></i>
+        </button>
+        <div class="w-14 h-14 bg-gradient-to-tr from-sky-500 to-emerald-500 text-white rounded-2xl mx-auto flex items-center justify-center text-2xl shadow-lg shadow-emerald-500/20">
+          <i class="fa-solid fa-shield-halved"></i>
+        </div>
+        <div class="mt-2.5">
+          <span class="text-[10px] font-bold uppercase tracking-wider text-sky-700 bg-sky-50 px-2.5 py-0.5 rounded-full border border-sky-200">
+            Anti-Hoarding Safeguard
+          </span>
+          <h3 class="text-base sm:text-lg font-black text-slate-900 mt-1">Verify to Lock Medicine</h3>
+          <p class="text-xs text-slate-500 mt-0.5">የመድኃኒት ዋጋን በካውንተር ለማስያዝ ስልክዎን ያረጋግጡ። 100% ነፃ ነው።</p>
+        </div>
+      </div>
+
+      <!-- MEDICINE HOLD PREVIEW CHIP -->
+      <div class="bg-emerald-50/70 border border-emerald-200/80 rounded-2xl p-3 text-left flex items-center justify-between text-xs">
+        <div class="min-w-0 pr-2">
+          <span class="text-[10px] text-emerald-800 font-semibold block uppercase">Reserving:</span>
+          <strong id="authModalMedName" class="text-slate-900 font-bold block truncate">Insulin</strong>
+          <span id="authModalPharmName" class="text-[11px] text-slate-600 truncate block">Dagim Pharmacy</span>
+        </div>
+        <div class="text-right shrink-0">
+          <span class="text-[10px] text-slate-500 block">Locked Price</span>
+          <span id="authModalPrice" class="font-mono font-black text-emerald-700 text-sm">380 ETB</span>
+        </div>
+      </div>
+
+      <!-- INITIAL SELECTION / TELEGRAM STATE -->
+      <div id="authChoiceContainer" class="space-y-3.5">
+        <!-- 1. TELEGRAM 1-TAP VERIFICATION (PRIMARY RECOMMENDED) -->
+        <div class="p-3.5 rounded-2xl bg-gradient-to-br from-sky-50 via-white to-sky-50/50 border border-sky-200 text-left space-y-2.5 relative overflow-hidden shadow-xs">
+          <div class="flex items-center justify-between">
+            <span class="text-[10px] font-extrabold uppercase tracking-wider bg-sky-600 text-white px-2 py-0.5 rounded-md shadow-xs">
+              ⚡ Recommended (የሚመከር)
+            </span>
+            <span class="text-[10px] text-sky-700 font-bold flex items-center gap-1">
+              <i class="fa-solid fa-bolt text-amber-500"></i> No OTP typing
+            </span>
+          </div>
+          <div class="space-y-0.5">
+            <h4 class="text-xs font-black text-slate-900 flex items-center gap-1.5">
+              <i class="fa-brands fa-telegram text-sky-500 text-base"></i>
+              <span>1-Tap Telegram SIM Auth</span>
+            </h4>
+            <p class="text-[11px] text-slate-600 leading-snug">
+              በቴሌግራም በ1-ጠቅታ የኢትዮ ቴሌኮም ወይም ሳፋሪኮም ሲም ካርድዎን ያረጋግጡ። ኮድ መጻፍ አያስፈልግም።
+            </p>
+          </div>
+          <button id="authTelegramBtn" onclick="startTelegramAuthFlow()" class="w-full bg-[#229ED9] hover:bg-[#1E88E5] active:scale-98 text-white font-bold text-xs py-3 px-4 rounded-xl shadow-md shadow-sky-500/20 flex items-center justify-center gap-2 transition cursor-pointer">
+            <i class="fa-brands fa-telegram text-lg"></i>
+            <span>1-Tap Verify with Telegram (በቴሌግራም አረጋግጥ)</span>
+          </button>
+        </div>
+
+        <!-- DIVIDER -->
+        <div class="flex items-center gap-3 text-slate-400 text-[11px]">
+          <div class="h-px bg-slate-200 flex-1"></div>
+          <span class="font-semibold uppercase tracking-wider text-[10px] text-slate-400">or Direct Mobile Input</span>
+          <div class="h-px bg-slate-200 flex-1"></div>
+        </div>
+
+        <!-- 2. DIRECT PHONE ENTRY (FALLBACK) -->
+        <div class="space-y-2 text-left">
+          <label for="authDirectPhoneInput" class="text-[11px] font-bold text-slate-700 block">
+            የኢትዮጵያ ስልክ ቁጥርዎን ያስገቡ (Mobile Number):
+          </label>
+          <div class="relative">
+            <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-slate-400">
+              <i class="fa-solid fa-phone text-xs"></i>
+            </div>
+            <input
+              id="authDirectPhoneInput"
+              type="tel"
+              inputmode="numeric"
+              placeholder="09... or 07... (e.g. 0911223344)"
+              maxlength="13"
+              oninput="handleDirectPhoneInput(this.value)"
+              class="w-full pl-9 pr-3 py-2.5 text-xs bg-slate-50 border border-slate-300 rounded-xl focus:bg-white focus:outline-none focus:ring-2 focus:ring-emerald-500 font-mono font-medium text-slate-900 transition"
+            />
+          </div>
+
+          <!-- CARRIER BADGE & HINT -->
+          <div id="authCarrierBadgeContainer" class="min-h-[22px] flex items-center justify-between text-[11px]">
+            <span id="authCarrierBadge" class="hidden font-bold px-2 py-0.5 rounded-md text-[10px]">
+              Ethio Telecom
+            </span>
+            <span id="authCarrierHint" class="text-slate-500 text-[10px]">
+              Fairness Policy: 1 active hold per phone
+            </span>
+          </div>
+
+          <button id="authDirectSubmitBtn" onclick="submitDirectPhoneVerification()" class="w-full bg-slate-900 hover:bg-black active:scale-98 text-white font-bold text-xs py-3 rounded-xl transition shadow flex items-center justify-center gap-2 cursor-pointer">
+            <i class="fa-solid fa-lock text-xs text-emerald-400"></i>
+            <span>Continue & Lock Medicine (መድኃኒቱን አሲዝ)</span>
+          </button>
+        </div>
+      </div>
+
+      <!-- WAITING FOR TELEGRAM STEP (Shown while polling) -->
+      <div id="authWaitingContainer" class="hidden space-y-4 py-2">
+        <div class="w-16 h-16 bg-sky-100 text-sky-600 rounded-2xl mx-auto flex items-center justify-center text-3xl shadow-inner animate-pulse">
+          <i class="fa-brands fa-telegram"></i>
+        </div>
+        <div class="space-y-1">
+          <h4 class="text-sm font-black text-slate-900">Waiting for Telegram Verification...</h4>
+          <p class="text-xs text-slate-600 leading-relaxed">
+            በከፈቱት ቴሌግራም ላይ <strong>[📱 ስልክ ቁጥሬን ላክ]</strong> የሚለውን ይጫኑ። ይህ ገጽ በራሱ ተረጋግጦ ይቀጥላል!
+          </p>
+        </div>
+
+        <!-- Animated Progress / Status -->
+        <div class="p-3 bg-sky-50 border border-sky-200 rounded-2xl flex items-center justify-center gap-2 text-xs text-sky-800 font-semibold">
+          <i class="fa-solid fa-spinner fa-spin text-sky-600"></i>
+          <span>Listening for verification signal...</span>
+        </div>
+
+        <div class="space-y-2 pt-1">
+          <a id="authReopenTelegramLink" href="#" target="_blank" class="w-full bg-[#229ED9] hover:bg-[#1E88E5] text-white font-bold text-xs py-2.5 rounded-xl shadow transition flex items-center justify-center gap-2">
+            <i class="fa-solid fa-arrow-up-right-from-square"></i>
+            <span>Re-open Telegram Bot (ቴሌግራም ክፈት)</span>
+          </a>
+          <button onclick="cancelTelegramPolling()" class="w-full bg-slate-100 hover:bg-slate-200 text-slate-700 font-semibold text-xs py-2 rounded-xl transition">
+            Use Phone Number Instead (በስልክ ቀጥል)
+          </button>
+        </div>
+      </div>
+
+      <!-- PRIVACY & COMPLIANCE FOOTER -->
+      <p class="text-[10px] text-slate-400 leading-tight">
+        🔒 MedFinder Ethiopia follows EFDA & FDRE Consumer Protection guidelines. Your number is only shared with the dispensing pharmacist to prevent phantom hoarding.
+      </p>
     </div>
   </div>
 
@@ -1407,22 +1556,270 @@
       }
     }
 
+    // --- PATIENT AUTHENTICATION & IDENTITY BRIDGE (Telegram 1-Tap SIM & Verified Mobile) ---
+    let pendingHoldParams = null;
+    let telegramPollingTimer = null;
+    let activeAuthToken = null;
+
+    function openPatientVerificationModal(params) {
+      pendingHoldParams = params;
+      const medNameEl = document.getElementById('authModalMedName');
+      const pharmNameEl = document.getElementById('authModalPharmName');
+      const priceEl = document.getElementById('authModalPrice');
+      if (medNameEl) medNameEl.innerText = params.medicineName || 'Medicine';
+      if (pharmNameEl) pharmNameEl.innerText = params.pharmacyName || 'Pharmacy';
+      if (priceEl) priceEl.innerText = `${params.lockedPriceETB || 0} ETB`;
+
+      // Reset to choice view
+      const choiceContainer = document.getElementById('authChoiceContainer');
+      const waitingContainer = document.getElementById('authWaitingContainer');
+      if (choiceContainer) choiceContainer.classList.remove('hidden');
+      if (waitingContainer) waitingContainer.classList.add('hidden');
+
+      const existingPhone = localStorage.getItem('medfinder_patient_phone') || '';
+      const input = document.getElementById('authDirectPhoneInput');
+      if (input) {
+        input.value = existingPhone.replace(/^\+251/, '0');
+        handleDirectPhoneInput(input.value);
+      }
+
+      const modal = document.getElementById('patientVerificationModal');
+      if (modal) modal.classList.remove('hidden');
+    }
+
+    function closePatientVerificationModal() {
+      if (telegramPollingTimer) {
+        clearInterval(telegramPollingTimer);
+        telegramPollingTimer = null;
+      }
+      activeAuthToken = null;
+      const modal = document.getElementById('patientVerificationModal');
+      if (modal) modal.classList.add('hidden');
+    }
+
+    function changePatientPhone() {
+      if (confirm('Do you want to reset your verified phone number to verify with a different number?\nየተረጋገጠውን ስልክ ቁጥር በመቀየር በአዲስ ማረጋገጥ ይፈልጋሉ?')) {
+        localStorage.removeItem('medfinder_patient_phone');
+        localStorage.removeItem('medfinder_patient_verified');
+        const modal = document.getElementById('reservationModal');
+        if (modal) modal.classList.add('hidden');
+        alert('Phone verification reset. You can now verify a new phone number.');
+      }
+    }
+
+    async function startTelegramAuthFlow() {
+      const btn = document.getElementById('authTelegramBtn');
+      const originalHtml = btn ? btn.innerHTML : '';
+      if (btn) {
+        btn.disabled = true;
+        btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> <span>Connecting to Bot...</span>';
+      }
+
+      try {
+        const res = await fetch('/api/auth/session/create', { method: 'POST' });
+        const data = await res.json();
+
+        if (btn) {
+          btn.disabled = false;
+          btn.innerHTML = originalHtml;
+        }
+
+        if (!data.success || !data.token) {
+          alert('Could not start Telegram verification session: ' + (data.error || 'Unknown error'));
+          return;
+        }
+
+        activeAuthToken = data.token;
+        const reopenLink = document.getElementById('authReopenTelegramLink');
+        if (reopenLink) reopenLink.href = data.telegramDeepLink;
+
+        // Switch modal to waiting state
+        const choiceContainer = document.getElementById('authChoiceContainer');
+        const waitingContainer = document.getElementById('authWaitingContainer');
+        if (choiceContainer) choiceContainer.classList.add('hidden');
+        if (waitingContainer) waitingContainer.classList.remove('hidden');
+
+        // Open Telegram bot link
+        if (window.Telegram?.WebApp?.openTelegramLink) {
+          window.Telegram.WebApp.openTelegramLink(data.telegramDeepLink);
+        } else {
+          window.open(data.telegramDeepLink, '_blank');
+        }
+
+        // Fast poll every 1.5 seconds
+        if (telegramPollingTimer) clearInterval(telegramPollingTimer);
+        const startTime = Date.now();
+        telegramPollingTimer = setInterval(async () => {
+          // Timeout after 8 minutes
+          if (Date.now() - startTime > 8 * 60 * 1000) {
+            cancelTelegramPolling();
+            alert('Verification session timed out. Please try again.');
+            return;
+          }
+
+          try {
+            const checkRes = await fetch(`/api/auth/session/${activeAuthToken}`);
+            const checkData = await checkRes.json();
+            if (checkData.success && checkData.verified && checkData.phone) {
+              clearInterval(telegramPollingTimer);
+              telegramPollingTimer = null;
+
+              // Save verified state
+              localStorage.setItem('medfinder_patient_phone', checkData.phone);
+              localStorage.setItem('medfinder_patient_verified', 'true');
+
+              if (window.Telegram?.WebApp?.HapticFeedback) {
+                window.Telegram.WebApp.HapticFeedback.notificationOccurred('success');
+              }
+
+              // Close verification modal
+              const modal = document.getElementById('patientVerificationModal');
+              if (modal) modal.classList.add('hidden');
+
+              // Proceed with hold creation
+              if (pendingHoldParams) {
+                const p = pendingHoldParams;
+                pendingHoldParams = null;
+                createPriceLockHold(p.pharmacyId, p.pharmacyName, p.medicineName, p.lockedPriceETB, p.phone, p.lat, p.lng, p.subCity);
+              }
+            }
+          } catch (pollErr) {
+            console.warn('[TelegramAuth] Polling error:', pollErr);
+          }
+        }, 1500);
+
+      } catch (err) {
+        if (btn) {
+          btn.disabled = false;
+          btn.innerHTML = originalHtml;
+        }
+        console.error('[startTelegramAuthFlow] Error:', err);
+        alert('Failed to connect to verification server: ' + err.message);
+      }
+    }
+
+    function cancelTelegramPolling() {
+      if (telegramPollingTimer) {
+        clearInterval(telegramPollingTimer);
+        telegramPollingTimer = null;
+      }
+      activeAuthToken = null;
+      const waitingContainer = document.getElementById('authWaitingContainer');
+      const choiceContainer = document.getElementById('authChoiceContainer');
+      if (waitingContainer) waitingContainer.classList.add('hidden');
+      if (choiceContainer) choiceContainer.classList.remove('hidden');
+    }
+
+    function handleDirectPhoneInput(val) {
+      const clean = String(val || '').trim().replace(/[\s\-()]/g, '');
+      const badge = document.getElementById('authCarrierBadge');
+      const hint = document.getElementById('authCarrierHint');
+      if (!badge) return;
+
+      if (clean.startsWith('09') || clean.startsWith('+2519') || (clean.startsWith('9') && clean.length > 1)) {
+        badge.className = 'font-bold px-2 py-0.5 rounded-md text-[10px] bg-yellow-100 text-yellow-800 border border-yellow-300 flex items-center gap-1';
+        badge.innerHTML = '🇪🇹 Ethio Telecom';
+        badge.classList.remove('hidden');
+        if (hint) hint.innerText = clean.length >= 10 ? '✅ Valid Ethio Telecom number' : 'Enter 10 digits (e.g. 0911...)';
+      } else if (clean.startsWith('07') || clean.startsWith('+2517') || (clean.startsWith('7') && clean.length > 1)) {
+        badge.className = 'font-bold px-2 py-0.5 rounded-md text-[10px] bg-emerald-100 text-emerald-800 border border-emerald-300 flex items-center gap-1';
+        badge.innerHTML = '🟢 Safaricom Ethiopia';
+        badge.classList.remove('hidden');
+        if (hint) hint.innerText = clean.length >= 10 ? '✅ Valid Safaricom number' : 'Enter 10 digits (e.g. 0712...)';
+      } else if (clean.length > 2) {
+        badge.className = 'font-bold px-2 py-0.5 rounded-md text-[10px] bg-rose-100 text-rose-800 border border-rose-300';
+        badge.innerText = '⚠️ Must start with 09 or 07';
+        badge.classList.remove('hidden');
+        if (hint) hint.innerText = 'Addis Ababa SIM carriers only';
+      } else {
+        badge.classList.add('hidden');
+        if (hint) hint.innerText = 'Fairness Policy: 1 active hold per phone';
+      }
+    }
+
+    async function submitDirectPhoneVerification() {
+      const input = document.getElementById('authDirectPhoneInput');
+      const raw = (input ? input.value : '').trim();
+      if (!raw) {
+        alert('እባክዎ ስልክ ቁጥርዎን ያስገቡ / Please enter your phone number.');
+        return;
+      }
+
+      const btn = document.getElementById('authDirectSubmitBtn');
+      const originalHtml = btn ? btn.innerHTML : '';
+      if (btn) {
+        btn.disabled = true;
+        btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> <span>Verifying...</span>';
+      }
+
+      try {
+        const res = await fetch('/api/auth/verify-direct', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ phone: raw }),
+        });
+
+        const data = await res.json();
+        if (btn) {
+          btn.disabled = false;
+          btn.innerHTML = originalHtml;
+        }
+
+        if (!data.success || !data.verified) {
+          alert('⚠️ ' + (data.errorAm || data.error || 'Invalid phone number format.'));
+          return;
+        }
+
+        // Successfully verified direct phone
+        localStorage.setItem('medfinder_patient_phone', data.phone);
+        localStorage.setItem('medfinder_patient_verified', 'true');
+
+        if (window.Telegram?.WebApp?.HapticFeedback) {
+          window.Telegram.WebApp.HapticFeedback.notificationOccurred('success');
+        }
+
+        // Close modal
+        const modal = document.getElementById('patientVerificationModal');
+        if (modal) modal.classList.add('hidden');
+
+        // Proceed with reservation hold
+        if (pendingHoldParams) {
+          const p = pendingHoldParams;
+          pendingHoldParams = null;
+          createPriceLockHold(p.pharmacyId, p.pharmacyName, p.medicineName, p.lockedPriceETB, p.phone, p.lat, p.lng, p.subCity);
+        }
+      } catch (err) {
+        if (btn) {
+          btn.disabled = false;
+          btn.innerHTML = originalHtml;
+        }
+        alert('Verification connection error: ' + err.message);
+      }
+    }
+
     // 6. Anti-Gouging 60-Minute Price Lock Reservation
     async function createPriceLockHold(pharmacyId, pharmacyName, medicineName, lockedPriceETB, phone, lat = null, lng = null, subCity = '') {
       try {
         updateVoucherDirections(lat, lng, pharmacyName, subCity);
 
         let patientPhone = localStorage.getItem('medfinder_patient_phone');
-        if (!patientPhone) {
-          const prompted = prompt('📱 Please enter your phone number to lock this medicine (e.g. 0911223344):\nስልክ ቁጥርዎን ያስገቡ፦');
-          if (!prompted || !prompted.trim()) {
-            return;
-          }
-          patientPhone = prompted.trim();
-          localStorage.setItem('medfinder_patient_phone', patientPhone);
+        let isVerified = localStorage.getItem('medfinder_patient_verified') === 'true';
+
+        if (!patientPhone || !isVerified) {
+          openPatientVerificationModal({
+            pharmacyId,
+            pharmacyName,
+            medicineName,
+            lockedPriceETB,
+            phone,
+            lat,
+            lng,
+            subCity
+          });
+          return;
         }
 
-        const patientUserId = 'patient_' + Math.floor(100000 + Math.random() * 900000);
+        const patientUserId = 'patient_' + (patientPhone.replace(/\D/g, '').slice(-8) || Math.floor(100000 + Math.random() * 900000));
         const res = await fetch('/api/reservation/create', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -1457,6 +1854,11 @@
           return;
         }
 
+        if (!data.success) {
+          alert('⚠️ ' + (data.errorAm || data.error || 'Failed to create reservation hold.'));
+          return;
+        }
+
         if (data.success && data.reservation) {
           const r = data.reservation;
           const ph = data.pharmacy || {};
@@ -1469,6 +1871,9 @@
             r.pharmacyName || pharmacyName,
             r.subCity || ph.subCity || subCity
           );
+
+          const patPhoneEl = document.getElementById('voucherPatientPhoneDisplay');
+          if (patPhoneEl) patPhoneEl.innerText = patientPhone;
 
           // Reset modal UI to pending state
           document.getElementById('voucherModalIcon').className = 'w-14 h-14 bg-gradient-to-tr from-emerald-600 to-teal-500 text-white rounded-2xl mx-auto flex items-center justify-center text-2xl shadow-lg shadow-emerald-600/30 transition-all';
