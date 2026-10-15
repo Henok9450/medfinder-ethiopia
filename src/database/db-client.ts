@@ -79,10 +79,14 @@ export async function runMigrations(): Promise<{ success: boolean; message: stri
     await p.query(sql);
     console.log('[PostgreSQL] ✅ PostGIS extensions and tables created successfully!');
 
-    // Ensure reservation acknowledgment columns exist
+    // Ensure reservation columns exist
     await p.query(`
       ALTER TABLE reservations ADD COLUMN IF NOT EXISTS pharmacist_acknowledged BOOLEAN DEFAULT FALSE;
       ALTER TABLE reservations ADD COLUMN IF NOT EXISTS acknowledged_at TIMESTAMPTZ;
+      ALTER TABLE reservations ADD COLUMN IF NOT EXISTS patient_phone TEXT;
+      ALTER TABLE reservations ADD COLUMN IF NOT EXISTS cancelled_at TIMESTAMPTZ;
+      ALTER TABLE reservations ADD COLUMN IF NOT EXISTS cancelled_by TEXT;
+      ALTER TABLE reservations ADD COLUMN IF NOT EXISTS reason TEXT;
     `);
 
     // Ensure passwordless portal columns exist on pharmacy_verification_applications

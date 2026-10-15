@@ -1435,7 +1435,13 @@
           })
         });
 
-        const data = await res.json();
+        let data;
+        const textResponse = await res.text();
+        try {
+          data = JSON.parse(textResponse);
+        } catch (_) {
+          throw new Error(textResponse && textResponse.length < 150 ? textResponse : `Server returned status ${res.status}`);
+        }
 
         if (data.code === 'ACTIVE_HOLD_EXISTS' && data.activeHold) {
           const act = data.activeHold;
@@ -1594,7 +1600,13 @@
           })
         });
 
-        const data = await res.json();
+        let data;
+        const textResponse = await res.text();
+        try {
+          data = JSON.parse(textResponse);
+        } catch (_) {
+          throw new Error(textResponse && textResponse.length < 150 ? textResponse : `Server returned status ${res.status}`);
+        }
         if (data.success) {
           alert(`✅ Reservation #${codeToCancel} has been cancelled and released.`);
           closeReservationModal();

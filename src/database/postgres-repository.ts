@@ -208,20 +208,30 @@ export class PostgresRepository implements IDatabaseRepository {
     const pool = getDbPool();
     if (!pool) return null;
 
-    const res = await pool.query(
-      `SELECT r.*, p.latitude, p.longitude, p.sub_city, p.address
-       FROM reservations r
-       JOIN pharmacies p ON r.pharmacy_id = p.id
-       WHERE (r.patient_user_id = $1 OR ($2 <> '' AND r.phone = $2))
-         AND r.status = 'ACTIVE'
-         AND r.expires_at > NOW()
-       ORDER BY r.created_at DESC
-       LIMIT 1`,
-      [patientUserId, patientPhone || '']
-    );
+    try {
+      const res = await pool.query(
+        `SELECT 
+          r.*,
+          p.sub_city AS "subCity",
+          p.address,
+          ST_Y(p.location::geometry) AS latitude,
+          ST_X(p.location::geometry) AS longitude
+         FROM reservations r
+         LEFT JOIN pharmacies p ON r.pharmacy_id = p.id
+         WHERE (r.patient_user_id = $1 OR ($2 <> '' AND (r.phone = $2)))
+           AND r.status = 'ACTIVE'
+           AND r.expires_at > NOW()
+         ORDER BY r.created_at DESC
+         LIMIT 1`,
+        [patientUserId, patientPhone || '']
+      );
 
-    if (res.rows.length === 0) return null;
-    return this.mapReservationRow(res.rows[0]);
+      if (res.rows.length === 0) return null;
+      return this.mapReservationRow(res.rows[0]);
+    } catch (err: any) {
+      console.warn('[PostgresRepository] getActiveHoldForPatient error:', err.message);
+      return null;
+    }
   }
 
   public async checkPatientHoldEligibility(patientUserId: string, patientPhone?: string): Promise<{
@@ -248,45 +258,49 @@ export class PostgresRepository implements IDatabaseRepository {
       return { eligible: true, message: 'Eligible to place medicine hold', messageAm: 'ማቆያ ለማስያዝ ብቁ ናቸው' };
     }
 
-    // Check no-shows in the last 7 days
-    const strikeRes = await pool.query(
-      `SELECT status, expires_at
-       FROM reservations
-       WHERE (patient_user_id = $1 OR ($2 <> '' AND phone = $2))
-         AND created_at > NOW() - INTERVAL '7 days'
-       ORDER BY expires_at DESC`,
-      [patientUserId, patientPhone || '']
-    );
+    try {
+      // Check no-shows in the last 7 days
+      const strikeRes = await pool.query(
+        `SELECT status, expires_at
+         FROM reservations
+         WHERE (patient_user_id = $1 OR ($2 <> '' AND phone = $2))
+           AND created_at > NOW() - INTERVAL '7 days'
+         ORDER BY expires_at DESC`,
+        [patientUserId, patientPhone || '']
+      );
 
-    let expiredStrikes = 0;
-    let fulfilledCount = 0;
-    let latestExpiredAt: Date | null = null;
-    const now = new Date();
+      let expiredStrikes = 0;
+      let fulfilledCount = 0;
+      let latestExpiredAt: Date | null = null;
+      const now = new Date();
 
-    for (const row of strikeRes.rows) {
-      if (row.status === 'FULFILLED') {
-        fulfilledCount++;
-      } else if (row.status === 'EXPIRED' || (row.status === 'ACTIVE' && now > new Date(row.expires_at))) {
-        expiredStrikes++;
-        const expDate = new Date(row.expires_at);
-        if (!latestExpiredAt || expDate > latestExpiredAt) {
-          latestExpiredAt = expDate;
+      for (const row of strikeRes.rows) {
+        if (row.status === 'FULFILLED') {
+          fulfilledCount++;
+        } else if (row.status === 'EXPIRED' || (row.status === 'ACTIVE' && now > new Date(row.expires_at))) {
+          expiredStrikes++;
+          const expDate = new Date(row.expires_at);
+          if (!latestExpiredAt || expDate > latestExpiredAt) {
+            latestExpiredAt = expDate;
+          }
         }
       }
-    }
 
-    if (expiredStrikes >= 3 && fulfilledCount === 0 && latestExpiredAt) {
-      const cooldownEnd = new Date(latestExpiredAt.getTime() + 24 * 60 * 60 * 1000);
-      if (now < cooldownEnd) {
-        const remainingHours = Math.max(1, Math.ceil((cooldownEnd.getTime() - now.getTime()) / (60 * 60 * 1000)));
-        return {
-          eligible: false,
-          reason: 'NO_SHOW_PENALTY',
-          cooldownUntil: cooldownEnd.toISOString(),
-          message: `Hold privilege paused for ${remainingHours}h due to 3 consecutive uncollected reservations. Please purchase directly at the counter.`,
-          messageAm: `በተከታታይ 3 ጊዜ ማቆያዎችን ባለመውሰድዎ ምክንያት ለ${remainingHours} ሰዓት አዲስ ማቆያ መያዝ አይችሉም። እባክዎ በቀጥታ ፋርማሲው ድረስ ሄደው ይግዙ።`,
-        };
+      if (expiredStrikes >= 3 && fulfilledCount === 0 && latestExpiredAt) {
+        const cooldownEnd = new Date(latestExpiredAt.getTime() + 24 * 60 * 60 * 1000);
+        if (now < cooldownEnd) {
+          const remainingHours = Math.max(1, Math.ceil((cooldownEnd.getTime() - now.getTime()) / (60 * 60 * 1000)));
+          return {
+            eligible: false,
+            reason: 'NO_SHOW_PENALTY',
+            cooldownUntil: cooldownEnd.toISOString(),
+            message: `Hold privilege paused for ${remainingHours}h due to 3 consecutive uncollected reservations. Please purchase directly at the counter.`,
+            messageAm: `በተከታታይ 3 ጊዜ ማቆያዎችን ባለመውሰድዎ ምክንያት ለ${remainingHours} ሰዓት አዲስ ማቆያ መያዝ አይችሉም። እባክዎ በቀጥታ ፋርማሲው ድረስ ሄደው ይግዙ።`,
+          };
+        }
       }
+    } catch (err: any) {
+      console.warn('[PostgresRepository] strike query error:', err.message);
     }
 
     return {
@@ -313,14 +327,23 @@ export class PostgresRepository implements IDatabaseRepository {
     }
 
     const cancelReason = params.reason || (params.cancelledBy === 'PATIENT' ? 'Cancelled by patient' : 'Cancelled by pharmacy');
-    await pool.query(
-      `UPDATE reservations
-       SET status = 'CANCELLED',
-           cancelled_at = NOW(),
-           reason = $1
-       WHERE reservation_code = $2`,
-      [cancelReason, cleanCode]
-    );
+    try {
+      await pool.query(
+        `UPDATE reservations
+         SET status = 'CANCELLED',
+             cancelled_at = NOW(),
+             reason = $1
+         WHERE reservation_code = $2`,
+        [cancelReason, cleanCode]
+      );
+    } catch (_err) {
+      await pool.query(
+        `UPDATE reservations
+         SET status = 'CANCELLED'
+         WHERE reservation_code = $1`,
+        [cleanCode]
+      );
+    }
 
     hold.status = 'CANCELLED';
     hold.cancelledBy = params.cancelledBy;

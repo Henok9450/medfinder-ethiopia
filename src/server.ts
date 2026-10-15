@@ -794,106 +794,115 @@ app.delete('/api/pharmacy/:pharmacyId/inventory/:medicineName', async (req: Requ
 // ==========================================
 // 1. Create a 60-Minute Price Lock Reservation Hold (Protects patient from bait-and-switch)
 app.post('/api/reservation/create', async (req: Request, res: Response) => {
-  const { patientUserId, pharmacyId, medicineName, lockedPriceETB, phone, patientPhone } = req.body;
-  if (!patientUserId || !pharmacyId || !medicineName || lockedPriceETB === undefined) {
-    return res.status(400).json({ success: false, error: 'Missing required reservation fields' });
-  }
+  try {
+    const { patientUserId, pharmacyId, medicineName, lockedPriceETB, phone, patientPhone } = req.body;
+    if (!patientUserId || !pharmacyId || !medicineName || lockedPriceETB === undefined) {
+      return res.status(400).json({ success: false, error: 'Missing required reservation fields' });
+    }
 
-  const clientIp = getClientIp(req);
-  const effectivePhone = String(patientPhone || phone || '').trim();
+    const clientIp = getClientIp(req);
+    const effectivePhone = String(patientPhone || phone || '').trim();
 
-  // 1. Rate Limiting Protection on Hold Creation
-  const holdRateCheck = rateLimiter.checkHoldRateLimit(`${clientIp}_${patientUserId}`);
-  if (!holdRateCheck.allowed) {
-    return res.status(429).json({
-      success: false,
-      error: 'Too many reservation hold attempts. Please wait a few minutes before trying again.',
-      retryAfterSeconds: holdRateCheck.resetInSeconds,
+    // 1. Rate Limiting Protection on Hold Creation
+    const holdRateCheck = rateLimiter.checkHoldRateLimit(`${clientIp}_${patientUserId}`);
+    if (!holdRateCheck.allowed) {
+      return res.status(429).json({
+        success: false,
+        error: 'Too many reservation hold attempts. Please wait a few minutes before trying again.',
+        retryAfterSeconds: holdRateCheck.resetInSeconds,
+      });
+    }
+
+    // 2. Hold Fairness Safeguard: Max 1 active hold & 3-strike no-show penalty check
+    const eligibility = await dbRepo.checkPatientHoldEligibility(patientUserId, effectivePhone);
+    if (!eligibility.eligible) {
+      return res.status(400).json({
+        success: false,
+        error: eligibility.message,
+        errorAm: eligibility.messageAm,
+        reason: eligibility.reason,
+        activeHold: eligibility.activeHold,
+        cooldownUntil: eligibility.cooldownUntil,
+      });
+    }
+
+    const pharmacy = await dbRepo.getPharmacyById(pharmacyId);
+    if (!pharmacy) {
+      return res.status(404).json({ success: false, error: 'Pharmacy not found' });
+    }
+
+    // 3. Evaluate real-time store operating hours & counter availability
+    const opStatus = evaluatePharmacyOperatingStatus(pharmacy);
+    if (!opStatus.canAcceptHold) {
+      return res.status(400).json({
+        success: false,
+        error: `This pharmacy is currently closed (${opStatus.badgeText}). Holds cannot be placed outside counter hours.`,
+        operatingStatus: opStatus,
+      });
+    }
+
+    // 4. Dynamic Closing-Time Truncation (e.g. if pharmacy closes in 20m, lock for 20m, not 60m!)
+    const durationMinutes = opStatus.maxHoldMinutes || 60;
+
+    const hold = await dbRepo.createReservationHold({
+      patientUserId,
+      pharmacyId,
+      medicineName,
+      lockedPriceETB: Number(lockedPriceETB),
+      durationMinutes,
+      patientPhone: effectivePhone,
     });
-  }
 
-  // 2. Hold Fairness Safeguard: Max 1 active hold & 3-strike no-show penalty check
-  const eligibility = await dbRepo.checkPatientHoldEligibility(patientUserId, effectivePhone);
-  if (!eligibility.eligible) {
-    return res.status(400).json({
-      success: false,
-      error: eligibility.message,
-      errorAm: eligibility.messageAm,
-      reason: eligibility.reason,
-      activeHold: eligibility.activeHold,
-      cooldownUntil: eligibility.cooldownUntil,
-    });
-  }
+    if (!hold) {
+      return res.status(400).json({
+        success: false,
+        error: 'Could not create reservation hold. You already have an active reservation.',
+        operatingStatus: opStatus,
+      });
+    }
 
-  const pharmacy = await dbRepo.getPharmacyById(pharmacyId);
-  if (!pharmacy) {
-    return res.status(404).json({ success: false, error: 'Pharmacy not found' });
-  }
+    // Push immediate real-time alert to the pharmacy's Telegram counter bot
+    if (pharmacy?.telegramChatId) {
+      const expTime = new Date(hold.expiresAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+      telegramBotService.notifyPharmacyReservationHold({
+        pharmacyChatId: pharmacy.telegramChatId,
+        pharmacyName: pharmacy.name,
+        drugName: medicineName,
+        priceETB: hold.lockedPriceETB,
+        reservationCode: hold.reservationCode,
+        expiresAt: expTime,
+        patientChatId: patientUserId,
+        patientPhone: effectivePhone,
+      }).catch((err: any) => console.warn('[Reservation] Telegram alert to pharmacy failed:', err.message));
+    }
 
-  // 3. Evaluate real-time store operating hours & counter availability
-  const opStatus = evaluatePharmacyOperatingStatus(pharmacy);
-  if (!opStatus.canAcceptHold) {
-    return res.status(400).json({
-      success: false,
-      error: `This pharmacy is currently closed (${opStatus.badgeText}). Holds cannot be placed outside counter hours.`,
+    hold.latitude = pharmacy.latitude;
+    hold.longitude = pharmacy.longitude;
+    hold.subCity = hold.subCity || pharmacy.subCity;
+    hold.address = hold.address || pharmacy.address;
+
+    return res.json({
+      success: true,
+      message: `Price locked at ${hold.lockedPriceETB} ETB for ${durationMinutes} minutes (${opStatus.badgeText}).`,
+      reservation: hold,
       operatingStatus: opStatus,
+      pharmacy: {
+        id: pharmacy.id,
+        name: pharmacy.name,
+        subCity: pharmacy.subCity,
+        phone: pharmacy.phone,
+        address: pharmacy.address,
+        latitude: pharmacy.latitude,
+        longitude: pharmacy.longitude,
+      },
     });
-  }
-
-  // 4. Dynamic Closing-Time Truncation (e.g. if pharmacy closes in 20m, lock for 20m, not 60m!)
-  const durationMinutes = opStatus.maxHoldMinutes || 60;
-
-  const hold = await dbRepo.createReservationHold({
-    patientUserId,
-    pharmacyId,
-    medicineName,
-    lockedPriceETB: Number(lockedPriceETB),
-    durationMinutes,
-    patientPhone: effectivePhone,
-  });
-
-  if (!hold) {
-    return res.status(400).json({
+  } catch (err: any) {
+    console.error('[ReservationCreate] Error handling reservation hold:', err);
+    return res.status(500).json({
       success: false,
-      error: 'Could not create reservation hold. You already have an active reservation.',
-      operatingStatus: opStatus,
+      error: err.message || 'Could not create reservation hold due to an unexpected error.',
     });
   }
-
-  // Push immediate real-time alert to the pharmacy's Telegram counter bot
-  if (pharmacy?.telegramChatId) {
-    const expTime = new Date(hold.expiresAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-    telegramBotService.notifyPharmacyReservationHold({
-      pharmacyChatId: pharmacy.telegramChatId,
-      pharmacyName: pharmacy.name,
-      drugName: medicineName,
-      priceETB: hold.lockedPriceETB,
-      reservationCode: hold.reservationCode,
-      expiresAt: expTime,
-      patientChatId: patientUserId,
-    }).catch((err: any) => console.warn('[Reservation] Telegram alert to pharmacy failed:', err.message));
-  }
-
-  hold.latitude = pharmacy.latitude;
-  hold.longitude = pharmacy.longitude;
-  hold.subCity = hold.subCity || pharmacy.subCity;
-  hold.address = hold.address || pharmacy.address;
-
-  res.json({
-    success: true,
-    message: `Price locked at ${hold.lockedPriceETB} ETB for ${durationMinutes} minutes (${opStatus.badgeText}).`,
-    reservation: hold,
-    operatingStatus: opStatus,
-    pharmacy: {
-      id: pharmacy.id,
-      name: pharmacy.name,
-      subCity: pharmacy.subCity,
-      phone: pharmacy.phone,
-      address: pharmacy.address,
-      latitude: pharmacy.latitude,
-      longitude: pharmacy.longitude,
-    },
-  });
 });
 
 // 1B. Cancel active reservation hold (by patient or pharmacist)
