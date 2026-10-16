@@ -9,6 +9,7 @@ import {
   WholesaleListing,
   WholesalePurchaseOrder,
   PatientAuthSession,
+  PatientDevice,
 } from './in-memory-db';
 import { UserSubscription } from '../monetization/subscription.types';
 
@@ -16,7 +17,7 @@ export interface IDatabaseRepository {
   /**
    * Create an ephemeral 1-tap Telegram/web authentication session
    */
-  createPatientAuthSession(): Promise<PatientAuthSession>;
+  createPatientAuthSession(deviceId?: string): Promise<PatientAuthSession>;
 
   /**
    * Get auth session by token
@@ -27,6 +28,26 @@ export interface IDatabaseRepository {
    * Verify an auth session with verified phone number
    */
   verifyPatientAuthSession(token: string, phone: string, telegramUserId?: string, telegramUsername?: string): Promise<boolean>;
+
+  /**
+   * Register or update a trusted device bound to a verified phone number
+   */
+  registerTrustedDevice(deviceId: string, phone: string, telegramUserId?: string, telegramUsername?: string, carrier?: string): Promise<PatientDevice>;
+
+  /**
+   * Get a trusted device by device ID
+   */
+  getTrustedDevice(deviceId: string): Promise<PatientDevice | null>;
+
+  /**
+   * Get all trusted devices registered under a phone number
+   */
+  getDevicesForPhone(phone: string): Promise<PatientDevice[]>;
+
+  /**
+   * Find verified phone by Telegram user ID across trusted devices
+   */
+  getPhoneByTelegramUserId(telegramUserId: string): Promise<string | null>;
   /**
    * Geospatial search for pharmacies within a radius with matching medicine stock
    */

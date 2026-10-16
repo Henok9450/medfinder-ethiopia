@@ -149,6 +149,20 @@ export async function runMigrations(): Promise<{ success: boolean; message: stri
 
       CREATE INDEX IF NOT EXISTS idx_search_analytics_created ON search_analytics_events (created_at DESC);
       CREATE INDEX IF NOT EXISTS idx_search_analytics_drug_subcity ON search_analytics_events (normalized_drug, sub_city);
+
+      CREATE TABLE IF NOT EXISTS patient_devices (
+        device_id TEXT PRIMARY KEY,
+        verified_phone TEXT NOT NULL,
+        telegram_user_id TEXT,
+        telegram_username TEXT,
+        carrier TEXT,
+        is_trusted BOOLEAN DEFAULT TRUE,
+        trusted_at TIMESTAMPTZ DEFAULT NOW(),
+        last_seen_at TIMESTAMPTZ DEFAULT NOW()
+      );
+
+      CREATE INDEX IF NOT EXISTS idx_patient_devices_phone ON patient_devices (verified_phone);
+      CREATE INDEX IF NOT EXISTS idx_patient_devices_telegram ON patient_devices (telegram_user_id);
     `);
 
     // Backfill any approved applications missing passwordless portal access keys

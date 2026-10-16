@@ -11,6 +11,7 @@ import {
   WholesaleListing,
   WholesalePurchaseOrder,
   PatientAuthSession,
+  PatientDevice,
 } from './in-memory-db';
 import { UserSubscription } from '../monetization/subscription.types';
 import { MedicalFuzzyMatcher } from '../matching/medical-fuzzy-matcher';
@@ -22,8 +23,8 @@ export class InMemoryRepository implements IDatabaseRepository {
     this.db = InMemoryDatabase.getInstance();
   }
 
-  public async createPatientAuthSession(): Promise<PatientAuthSession> {
-    return this.db.createPatientAuthSession();
+  public async createPatientAuthSession(deviceId?: string): Promise<PatientAuthSession> {
+    return this.db.createPatientAuthSession(deviceId);
   }
 
   public async getPatientAuthSession(token: string): Promise<PatientAuthSession | null> {
@@ -32,6 +33,22 @@ export class InMemoryRepository implements IDatabaseRepository {
 
   public async verifyPatientAuthSession(token: string, phone: string, telegramUserId?: string, telegramUsername?: string): Promise<boolean> {
     return this.db.verifyPatientAuthSession(token, phone, telegramUserId, telegramUsername);
+  }
+
+  public async registerTrustedDevice(deviceId: string, phone: string, telegramUserId?: string, telegramUsername?: string, carrier?: string): Promise<PatientDevice> {
+    return this.db.registerTrustedDevice(deviceId, phone, telegramUserId, telegramUsername, carrier);
+  }
+
+  public async getTrustedDevice(deviceId: string): Promise<PatientDevice | null> {
+    return this.db.getTrustedDevice(deviceId) || null;
+  }
+
+  public async getDevicesForPhone(phone: string): Promise<PatientDevice[]> {
+    return this.db.getDevicesForPhone(phone);
+  }
+
+  public async getPhoneByTelegramUserId(telegramUserId: string): Promise<string | null> {
+    return this.db.getPhoneByTelegramUserId(telegramUserId) || null;
   }
 
   private calculateDistanceKm(lat1: number, lon1: number, lat2: number, lon2: number): number {

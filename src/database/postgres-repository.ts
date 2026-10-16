@@ -13,13 +13,14 @@ import {
   WholesaleListing,
   WholesalePurchaseOrder,
   PatientAuthSession,
+  PatientDevice,
 } from './in-memory-db';
 import { UserSubscription } from '../monetization/subscription.types';
 import { MedicalFuzzyMatcher } from '../matching/medical-fuzzy-matcher';
 
 export class PostgresRepository implements IDatabaseRepository {
-  public async createPatientAuthSession(): Promise<PatientAuthSession> {
-    return InMemoryDatabase.getInstance().createPatientAuthSession();
+  public async createPatientAuthSession(deviceId?: string): Promise<PatientAuthSession> {
+    return InMemoryDatabase.getInstance().createPatientAuthSession(deviceId);
   }
 
   public async getPatientAuthSession(token: string): Promise<PatientAuthSession | null> {
@@ -27,7 +28,118 @@ export class PostgresRepository implements IDatabaseRepository {
   }
 
   public async verifyPatientAuthSession(token: string, phone: string, telegramUserId?: string, telegramUsername?: string): Promise<boolean> {
-    return InMemoryDatabase.getInstance().verifyPatientAuthSession(token, phone, telegramUserId, telegramUsername);
+    const verified = InMemoryDatabase.getInstance().verifyPatientAuthSession(token, phone, telegramUserId, telegramUsername);
+    if (verified) {
+      const s = InMemoryDatabase.getInstance().getPatientAuthSession(token);
+      if (s?.deviceId) {
+        const carrier = phone.replace(/\D/g, '').includes('2517') || phone.startsWith('07') ? 'Safaricom Ethiopia' : 'Ethio Telecom';
+        await this.registerTrustedDevice(s.deviceId, phone, telegramUserId, telegramUsername, carrier);
+      }
+    }
+    return verified;
+  }
+
+  public async registerTrustedDevice(deviceId: string, phone: string, telegramUserId?: string, telegramUsername?: string, carrier?: string): Promise<PatientDevice> {
+    const pool = getDbPool();
+    const cleanId = deviceId.trim();
+    const cleanPhone = phone.trim();
+    const resolvedCarrier = carrier || (cleanPhone.includes('2517') || cleanPhone.startsWith('07') ? 'Safaricom Ethiopia' : 'Ethio Telecom');
+
+    if (pool) {
+      try {
+        const res = await pool.query(
+          `INSERT INTO patient_devices (device_id, verified_phone, telegram_user_id, telegram_username, carrier, is_trusted, trusted_at, last_seen_at)
+           VALUES ($1, $2, $3, $4, $5, TRUE, NOW(), NOW())
+           ON CONFLICT (device_id) DO UPDATE 
+           SET verified_phone = EXCLUDED.verified_phone,
+               telegram_user_id = COALESCE(EXCLUDED.telegram_user_id, patient_devices.telegram_user_id),
+               telegram_username = COALESCE(EXCLUDED.telegram_username, patient_devices.telegram_username),
+               carrier = COALESCE(EXCLUDED.carrier, patient_devices.carrier),
+               is_trusted = TRUE,
+               last_seen_at = NOW()
+           RETURNING device_id AS "deviceId", verified_phone AS "verifiedPhone", telegram_user_id AS "telegramUserId", telegram_username AS "telegramUsername", carrier, is_trusted AS "isTrusted", trusted_at AS "trustedAt", last_seen_at AS "lastSeenAt"`,
+          [cleanId, cleanPhone, telegramUserId || null, telegramUsername || null, resolvedCarrier]
+        );
+        if (res.rows.length > 0) {
+          InMemoryDatabase.getInstance().registerTrustedDevice(cleanId, cleanPhone, telegramUserId, telegramUsername, resolvedCarrier);
+          return res.rows[0];
+        }
+      } catch (err: any) {
+        console.warn('[PostgreSQL] registerTrustedDevice fallback notice:', err.message);
+      }
+    }
+    return InMemoryDatabase.getInstance().registerTrustedDevice(cleanId, cleanPhone, telegramUserId, telegramUsername, resolvedCarrier);
+  }
+
+  public async getTrustedDevice(deviceId: string): Promise<PatientDevice | null> {
+    const pool = getDbPool();
+    const cleanId = deviceId.trim();
+
+    if (pool) {
+      try {
+        const res = await pool.query(
+          `SELECT device_id AS "deviceId", verified_phone AS "verifiedPhone", telegram_user_id AS "telegramUserId", telegram_username AS "telegramUsername", carrier, is_trusted AS "isTrusted", trusted_at AS "trustedAt", last_seen_at AS "lastSeenAt"
+           FROM patient_devices
+           WHERE device_id = $1 AND is_trusted = TRUE`,
+          [cleanId]
+        );
+        if (res.rows.length > 0) {
+          pool.query(`UPDATE patient_devices SET last_seen_at = NOW() WHERE device_id = $1`, [cleanId]).catch(() => {});
+          InMemoryDatabase.getInstance().registerTrustedDevice(
+            res.rows[0].deviceId,
+            res.rows[0].verifiedPhone,
+            res.rows[0].telegramUserId,
+            res.rows[0].telegramUsername,
+            res.rows[0].carrier
+          );
+          return res.rows[0];
+        }
+      } catch (err: any) {
+        console.warn('[PostgreSQL] getTrustedDevice notice:', err.message);
+      }
+    }
+    return InMemoryDatabase.getInstance().getTrustedDevice(cleanId) || null;
+  }
+
+  public async getDevicesForPhone(phone: string): Promise<PatientDevice[]> {
+    const pool = getDbPool();
+    const cleanPhone = phone.trim();
+
+    if (pool) {
+      try {
+        const res = await pool.query(
+          `SELECT device_id AS "deviceId", verified_phone AS "verifiedPhone", telegram_user_id AS "telegramUserId", telegram_username AS "telegramUsername", carrier, is_trusted AS "isTrusted", trusted_at AS "trustedAt", last_seen_at AS "lastSeenAt"
+           FROM patient_devices
+           WHERE verified_phone = $1 AND is_trusted = TRUE
+           ORDER BY last_seen_at DESC`,
+          [cleanPhone]
+        );
+        if (res.rows.length > 0) {
+          return res.rows;
+        }
+      } catch (err: any) {
+        console.warn('[PostgreSQL] getDevicesForPhone notice:', err.message);
+      }
+    }
+    return InMemoryDatabase.getInstance().getDevicesForPhone(cleanPhone);
+  }
+
+  public async getPhoneByTelegramUserId(telegramUserId: string): Promise<string | null> {
+    const pool = getDbPool();
+    if (pool) {
+      try {
+        const res = await pool.query(
+          `SELECT verified_phone FROM patient_devices WHERE telegram_user_id = $1 AND is_trusted = TRUE ORDER BY last_seen_at DESC LIMIT 1`,
+          [telegramUserId]
+        );
+        if (res.rows.length > 0) {
+          return res.rows[0].verified_phone;
+        }
+      } catch (err: any) {
+        console.warn('[PostgreSQL] getPhoneByTelegramUserId notice:', err.message);
+      }
+    }
+    return InMemoryDatabase.getInstance().getPhoneByTelegramUserId(telegramUserId) || null;
   }
 
   private hashPassword(password: string): string {

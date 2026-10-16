@@ -1601,10 +1601,44 @@
       if (modal) modal.classList.add('hidden');
     }
 
-    function changePatientPhone() {
+    function getOrCreateDeviceId() {
+      let devId = localStorage.getItem('medfinder_device_id');
+      if (!devId) {
+        devId = 'dev_' + (window.crypto && crypto.randomUUID ? crypto.randomUUID().replace(/-/g, '') : Math.random().toString(36).substring(2) + Date.now().toString(36));
+        localStorage.setItem('medfinder_device_id', devId);
+      }
+      return devId;
+    }
+
+    async function checkDeviceTrustStatus() {
+      try {
+        const deviceId = getOrCreateDeviceId();
+        const res = await fetch(`/api/patient/device-status?deviceId=${encodeURIComponent(deviceId)}`);
+        const data = await res.json();
+        if (data.success && data.isVerified && data.phone) {
+          localStorage.setItem('medfinder_patient_phone', data.phone);
+          localStorage.setItem('medfinder_patient_verified', 'true');
+          return data;
+        }
+      } catch (err) {
+        console.warn('[checkDeviceTrustStatus] Check notice:', err);
+      }
+      return null;
+    }
+
+    async function changePatientPhone() {
       if (confirm('Do you want to reset your verified phone number to verify with a different number?\nየተረጋገጠውን ስልክ ቁጥር በመቀየር በአዲስ ማረጋገጥ ይፈልጋሉ?')) {
+        const deviceId = localStorage.getItem('medfinder_device_id');
+        if (deviceId) {
+          fetch('/api/patient/device/reset', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ deviceId }),
+          }).catch(() => {});
+        }
         localStorage.removeItem('medfinder_patient_phone');
         localStorage.removeItem('medfinder_patient_verified');
+        localStorage.removeItem('medfinder_active_auth_token');
         const modal = document.getElementById('reservationModal');
         if (modal) modal.classList.add('hidden');
         alert('Phone verification reset. You can now verify a new phone number.');
@@ -1666,11 +1700,13 @@
       if (document.visibilityState === 'visible') {
         const token = activeAuthToken || localStorage.getItem('medfinder_active_auth_token');
         if (token) checkAuthSessionStatus(token);
+        checkDeviceTrustStatus();
       }
     });
     window.addEventListener('focus', () => {
       const token = activeAuthToken || localStorage.getItem('medfinder_active_auth_token');
       if (token) checkAuthSessionStatus(token);
+      checkDeviceTrustStatus();
     });
 
     async function startTelegramAuthFlow() {
@@ -1682,7 +1718,12 @@
       }
 
       try {
-        const res = await fetch('/api/auth/session/create', { method: 'POST' });
+        const deviceId = getOrCreateDeviceId();
+        const res = await fetch('/api/auth/session/create', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ deviceId }),
+        });
         const data = await res.json();
 
         if (btn) {
@@ -1797,10 +1838,11 @@
       }
 
       try {
+        const deviceId = getOrCreateDeviceId();
         const res = await fetch('/api/auth/verify-direct', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ phone: raw }),
+          body: JSON.stringify({ phone: raw, deviceId }),
         });
 
         const data = await res.json();
@@ -2720,6 +2762,9 @@
 
         // Restore or verify saved voucher status on load
         checkSavedReservationState();
+
+        // Check persistent device trust in database on boot
+        checkDeviceTrustStatus();
 
         // Check if patient was waiting for Telegram phone verification while tab was away
         const savedAuthToken = localStorage.getItem('medfinder_active_auth_token');

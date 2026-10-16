@@ -1751,18 +1751,20 @@ Return to your browser — your 60-minute price-lock voucher is being finalized 
       this.pendingAuthByChatId.set(String(chatId), authToken);
       session.pendingAuthToken = authToken;
 
-      if (session.verifiedPhoneNumber) {
-        await this.repo.verifyPatientAuthSession(authToken, session.verifiedPhoneNumber, chatId, username);
+      const existingPhone = session.verifiedPhoneNumber || await this.repo.getPhoneByTelegramUserId(String(chatId));
+      if (existingPhone) {
+        session.verifiedPhoneNumber = existingPhone;
+        await this.repo.verifyPatientAuthSession(authToken, existingPhone, chatId, username);
         const webUrl = this.getPatientPwaUrl();
         return {
           chatId,
-          replyText: `🎉 **ስልክዎ አስቀድሞ የተረጋገጠ ነው (${session.verifiedPhoneNumber})!**
-**Instant Web Verification Approved!**
+          replyText: `🎉 **እንኳን ደህና መጡ! ስልክዎ አስቀድሞ የተረጋገጠ ነው (${existingPhone})!**
+**Welcome Back! New Browser Verified Instantly!**
 ━━━━━━━━━━━━━━━━━━━━━━━━━━
-📱 የተረጋገጠ ስልክ፦ \`${session.verifiedPhoneNumber}\`
-🌐 እባክዎ አሁን ወደ ከፈቱት ብሮውዘር ይመለሱ። የመድኃኒት ማቆያዎ በቅጽበት ተረጋግጦ ይፈጠራል!
+📱 የተረጋገጠ ስልክ፦ \`${existingPhone}\`
+🌐 እባክዎ አሁን ወደ ከፈቱት ብሮውዘር ይመለሱ። አዲሱ ብሮውዘርዎ በቋሚነት ተረጋግጧል!
 
-Return to your browser — your medicine hold is being confirmed automatically.`,
+Return to your browser — this browser is now permanently linked and trusted for 1-click holds.`,
           quickReplies: ['/start', '💊 Insulin', '💊 Augmentin'],
           inlineKeyboard: [
             [{ text: '🌐 ወደ ብሮውዘር ተመለስ (Back to Web App)', url: webUrl }],

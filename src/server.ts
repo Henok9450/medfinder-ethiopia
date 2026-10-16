@@ -792,10 +792,65 @@ app.delete('/api/pharmacy/:pharmacyId/inventory/:medicineName', async (req: Requ
 // ==========================================
 // 3B-2. PATIENT VERIFICATION & 1-TAP AUTH SESSIONS
 // ==========================================
-// 1. Create a 1-Tap Telegram Verification Session
+// 0. Check Persistent Device Trust Status on Boot / Resume
+app.get('/api/patient/device-status', async (req: Request, res: Response) => {
+  try {
+    const deviceId = String(req.query.deviceId || '').trim();
+    if (!deviceId) {
+      return res.json({ success: true, isVerified: false });
+    }
+
+    const device = await dbRepo.getTrustedDevice(deviceId);
+    if (!device) {
+      return res.json({ success: true, isVerified: false });
+    }
+
+    // Check if patient has any active hold across their trusted devices
+    const activeHold = await dbRepo.getActiveHoldForPatient(deviceId, device.verifiedPhone);
+
+    return res.json({
+      success: true,
+      isVerified: true,
+      phone: device.verifiedPhone,
+      displayPhone: device.verifiedPhone.replace(/^\+251/, '0'),
+      carrier: device.carrier,
+      activeHold: activeHold ? {
+        reservationCode: activeHold.reservationCode,
+        medicineName: activeHold.medicineName,
+        pharmacyName: activeHold.pharmacyName,
+        lockedPriceETB: activeHold.lockedPriceETB,
+        expiresAt: activeHold.expiresAt,
+        status: activeHold.status,
+      } : null,
+    });
+  } catch (err: any) {
+    return res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// Reset device trust on demand (e.g. user taps (Change Number))
+app.post('/api/patient/device/reset', async (req: Request, res: Response) => {
+  try {
+    const deviceId = String(req.body.deviceId || '').trim();
+    if (deviceId) {
+      const pool = getDbPool();
+      if (pool) {
+        pool.query(`UPDATE patient_devices SET is_trusted = FALSE WHERE device_id = $1`, [deviceId]).catch(() => {});
+      }
+      const d = InMemoryDatabase.getInstance().patientDevices.get(deviceId);
+      if (d) d.isTrusted = false;
+    }
+    return res.json({ success: true, message: 'Device verification reset' });
+  } catch (err: any) {
+    return res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// 1. Create a 1-Tap Telegram Verification Session (with optional Device Binding)
 app.post('/api/auth/session/create', async (req: Request, res: Response) => {
   try {
-    const authSession = await dbRepo.createPatientAuthSession();
+    const deviceId = String(req.body.deviceId || req.query.deviceId || '').trim() || undefined;
+    const authSession = await dbRepo.createPatientAuthSession(deviceId);
     const botUsername = telegramBotService.getPatientBotUsername();
     const deepLinkToken = authSession.token.replace(/^AUTH_/i, '');
     const telegramDeepLink = `https://t.me/${botUsername}?start=auth_${deepLinkToken}`;
@@ -806,6 +861,7 @@ app.post('/api/auth/session/create', async (req: Request, res: Response) => {
       botUsername,
       telegramDeepLink,
       expiresAt: authSession.expiresAt,
+      deviceId: authSession.deviceId,
     });
   } catch (err: any) {
     return res.status(500).json({ success: false, error: err.message });
@@ -829,6 +885,7 @@ app.get('/api/auth/session/:token', async (req: Request, res: Response) => {
       status: session.status,
       verified: session.status === 'VERIFIED',
       phone: session.verifiedPhone,
+      deviceId: session.deviceId,
     });
   } catch (err: any) {
     return res.status(500).json({ success: false, error: err.message });
@@ -838,7 +895,7 @@ app.get('/api/auth/session/:token', async (req: Request, res: Response) => {
 // 3. Direct Mobile Number Verification with Telemetry & Carrier Validation
 app.post('/api/auth/verify-direct', async (req: Request, res: Response) => {
   try {
-    const { phone } = req.body;
+    const { phone, deviceId } = req.body;
     const rawPhone = String(phone || '').trim().replace(/[\s\-()]/g, '');
 
     // Validate Ethiopian phone format (+2519..., +2517..., 09..., 07...)
@@ -853,12 +910,20 @@ app.post('/api/auth/verify-direct', async (req: Request, res: Response) => {
     }
 
     const normalizedPhone = `+251${match[1]}`;
+    const carrier = match[1].startsWith('7') ? 'Safaricom Ethiopia' : 'Ethio Telecom';
+
+    // Permanently trust this device in PostgreSQL
+    if (deviceId && typeof deviceId === 'string' && deviceId.trim()) {
+      await dbRepo.registerTrustedDevice(deviceId.trim(), normalizedPhone, undefined, undefined, carrier);
+    }
+
     return res.json({
       success: true,
       verified: true,
       phone: normalizedPhone,
       displayPhone: `0${match[1]}`,
-      carrier: match[1].startsWith('7') ? 'Safaricom Ethiopia' : 'Ethio Telecom',
+      carrier,
+      deviceId: deviceId?.trim() || undefined,
     });
   } catch (err: any) {
     return res.status(500).json({ success: false, error: err.message });

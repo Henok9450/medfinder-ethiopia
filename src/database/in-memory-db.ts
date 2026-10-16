@@ -398,10 +398,22 @@ export interface PatientAuthSession {
   createdAt: string;
   expiresAt: string;
   status: 'PENDING' | 'VERIFIED' | 'EXPIRED';
+  deviceId?: string;
   verifiedPhone?: string;
   telegramUserId?: string;
   telegramUsername?: string;
   verifiedAt?: string;
+}
+
+export interface PatientDevice {
+  deviceId: string;
+  verifiedPhone: string;
+  telegramUserId?: string;
+  telegramUsername?: string;
+  carrier?: string;
+  isTrusted: boolean;
+  trustedAt: string;
+  lastSeenAt: string;
 }
 
 export interface PharmacyViolationReport {
@@ -473,6 +485,7 @@ export class InMemoryDatabase {
   public wholesaleListings: WholesaleListing[] = [];
   public wholesalePurchaseOrders: WholesalePurchaseOrder[] = [];
   public patientAuthSessions: Map<string, PatientAuthSession> = new Map();
+  public patientDevices: Map<string, PatientDevice> = new Map();
 
   private constructor() {
     this.seedPharmacies();
@@ -1150,7 +1163,7 @@ export class InMemoryDatabase {
     return false;
   }
 
-  public createPatientAuthSession(): PatientAuthSession {
+  public createPatientAuthSession(deviceId?: string): PatientAuthSession {
     const rawToken = 'AUTH_' + Math.random().toString(36).substring(2, 8).toUpperCase();
     const now = new Date();
     const session: PatientAuthSession = {
@@ -1158,6 +1171,7 @@ export class InMemoryDatabase {
       createdAt: now.toISOString(),
       expiresAt: new Date(now.getTime() + 10 * 60 * 1000).toISOString(),
       status: 'PENDING',
+      deviceId: deviceId?.trim() || undefined,
     };
     this.patientAuthSessions.set(rawToken, session);
     return session;
@@ -1187,7 +1201,64 @@ export class InMemoryDatabase {
     s.telegramUserId = telegramUserId;
     s.telegramUsername = telegramUsername;
     s.verifiedAt = new Date().toISOString();
+
+    // Automatically bind and trust the patient's device if deviceId was provided
+    if (s.deviceId) {
+      const carrier = phone.replace(/\D/g, '').includes('2517') || phone.startsWith('07') ? 'Safaricom Ethiopia' : 'Ethio Telecom';
+      this.registerTrustedDevice(s.deviceId, s.verifiedPhone, telegramUserId, telegramUsername, carrier);
+    }
     return true;
+  }
+
+  public registerTrustedDevice(deviceId: string, phone: string, telegramUserId?: string, telegramUsername?: string, carrier?: string): PatientDevice {
+    const now = new Date().toISOString();
+    const cleanId = deviceId.trim();
+    const cleanPhone = phone.trim();
+    const existing = this.patientDevices.get(cleanId);
+    const resolvedCarrier = carrier || (cleanPhone.includes('2517') || cleanPhone.startsWith('07') ? 'Safaricom Ethiopia' : 'Ethio Telecom');
+
+    const device: PatientDevice = {
+      deviceId: cleanId,
+      verifiedPhone: cleanPhone,
+      telegramUserId: telegramUserId || existing?.telegramUserId,
+      telegramUsername: telegramUsername || existing?.telegramUsername,
+      carrier: resolvedCarrier,
+      isTrusted: true,
+      trustedAt: existing?.trustedAt || now,
+      lastSeenAt: now,
+    };
+    this.patientDevices.set(cleanId, device);
+    return device;
+  }
+
+  public getTrustedDevice(deviceId: string): PatientDevice | undefined {
+    const cleanId = deviceId.trim();
+    const device = this.patientDevices.get(cleanId);
+    if (device && device.isTrusted) {
+      device.lastSeenAt = new Date().toISOString();
+      return device;
+    }
+    return undefined;
+  }
+
+  public getDevicesForPhone(phone: string): PatientDevice[] {
+    const cleanPhone = phone.trim();
+    const list: PatientDevice[] = [];
+    for (const d of this.patientDevices.values()) {
+      if (d.verifiedPhone === cleanPhone && d.isTrusted) {
+        list.push(d);
+      }
+    }
+    return list;
+  }
+
+  public getPhoneByTelegramUserId(telegramUserId: string): string | undefined {
+    for (const d of this.patientDevices.values()) {
+      if (d.telegramUserId === telegramUserId && d.isTrusted) {
+        return d.verifiedPhone;
+      }
+    }
+    return undefined;
   }
 
   public updatePharmacyLocation(pharmacyId: string, data: { latitude: number; longitude: number; subCity?: string; addressDetails?: string }): { success: boolean; pharmacy?: Pharmacy; error?: string } {
