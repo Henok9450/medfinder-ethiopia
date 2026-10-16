@@ -503,6 +503,9 @@
               </tbody>
             </table>
           </div>
+
+          <!-- INVENTORY PAGINATION CONTROLS -->
+          <div id="inventoryPaginationBar" class="hidden"></div>
         </div>
       </div>
 
@@ -706,6 +709,8 @@
             <div class="p-6 text-center text-slate-400 text-xs">Loading sales and hold history...</div>
           </div>
 
+          <!-- LEDGER PAGINATION CONTROLS -->
+          <div id="ledgerPaginationBar" class="hidden"></div>
         </div>
       </div>
 
@@ -916,6 +921,8 @@
               </table>
             </div>
 
+            <!-- DEMAND RADAR PAGINATION CONTROLS -->
+            <div id="pwaDemandPaginationBar" class="hidden"></div>
           </div>
         </div>
 
@@ -1030,6 +1037,9 @@
                 </tbody>
               </table>
             </div>
+
+            <!-- B2B ORDERS PAGINATION CONTROLS -->
+            <div id="b2bOrdersPaginationBar" class="hidden"></div>
           </div>
 
         </div>
@@ -2414,6 +2424,7 @@
           document.getElementById('pwaKpiCritical').innerText = `${teaser.filter(t => t.shortageLevel === 'CRITICAL').length} Items`;
           document.getElementById('pwaKpiSearches').innerText = '🔒 Locked';
           document.getElementById('pwaKpiOpportunity').innerText = '🔒 Locked';
+          renderPaginationBar({ containerId: 'pwaDemandPaginationBar', totalItems: 0 });
           return;
         }
 
@@ -2429,88 +2440,6 @@
         }
 
         const items = data.items || [];
-        if (items.length === 0) {
-          const emptyMsg = `No shortage spikes recorded for ${subCity} in the last 14 days. Demand telemetry logs automatically as patients search.`;
-          tbody.innerHTML = `<tr><td colspan="8" class="p-8 text-center text-slate-400 text-xs">${emptyMsg}</td></tr>`;
-          if (mobList) mobList.innerHTML = `<div class="p-8 text-center text-slate-400 text-xs">${emptyMsg}</div>`;
-          document.getElementById('pwaKpiCritical').innerText = '0 Items';
-          document.getElementById('pwaKpiSearches').innerText = '0 Inquiries';
-          document.getElementById('pwaKpiOpportunity').innerText = '0 ETB';
-          return;
-        }
-
-        tbody.innerHTML = items.map(item => {
-          let badgeColor = 'bg-slate-100 text-slate-700';
-          if (item.shortageLevel === 'CRITICAL') badgeColor = 'bg-rose-100 text-rose-800 font-bold';
-          else if (item.shortageLevel === 'HIGH') badgeColor = 'bg-amber-100 text-amber-800 font-bold';
-          else if (item.shortageLevel === 'MODERATE') badgeColor = 'bg-blue-100 text-blue-800 font-semibold';
-
-          return `
-            <tr class="hover:bg-slate-50 transition">
-              <td class="p-3.5 font-bold text-slate-900">${item.drugName}</td>
-              <td class="p-3.5 text-slate-500 font-medium">📍 ${item.subCity}</td>
-              <td class="p-3.5">
-                <span class="font-extrabold text-indigo-950">${item.searchCount}</span>
-                <span class="text-[10px] text-slate-400 block">patient searches</span>
-              </td>
-              <td class="p-3.5 font-semibold ${item.stockingPharmaciesCount === 0 ? 'text-rose-600 font-bold' : 'text-slate-700'}">
-                ${item.stockingPharmaciesCount === 0 ? '⚠️ 0 Pharmacies (Acute Deficit)' : `${item.stockingPharmaciesCount} stocking`}
-              </td>
-              <td class="p-3.5 font-mono font-bold text-slate-800">${item.unmetDemandRatio}x</td>
-              <td class="p-3.5">
-                <span class="${badgeColor} px-2 py-0.5 rounded text-[10px] inline-flex items-center gap-1">
-                  ${item.shortageLevel === 'CRITICAL' ? '● CRITICAL' : item.shortageLevel === 'HIGH' ? '▲ HIGH GAP' : item.shortageLevel}
-                </span>
-              </td>
-              <td class="p-3.5 font-bold text-emerald-700">
-                ${(item.estimatedMissedSalesETB || 0).toLocaleString()} ETB
-              </td>
-              <td class="p-3.5 text-right">
-                <button onclick="quickAddPwaShortage('${item.drugName}')" class="text-xs bg-emerald-600 hover:bg-emerald-700 text-white font-bold px-3 py-1.5 rounded-xl transition shadow-xs flex items-center gap-1 ml-auto">
-                  <i class="fa-solid fa-plus text-[10px]"></i>
-                  <span>Add to Shelf</span>
-                </button>
-              </td>
-            </tr>
-          `;
-        }).join('');
-
-        if (mobList) {
-          mobList.innerHTML = items.map(item => {
-            let badgeColor = 'bg-slate-100 text-slate-700';
-            if (item.shortageLevel === 'CRITICAL') badgeColor = 'bg-rose-100 text-rose-800 font-bold';
-            else if (item.shortageLevel === 'HIGH') badgeColor = 'bg-amber-100 text-amber-800 font-bold';
-            else if (item.shortageLevel === 'MODERATE') badgeColor = 'bg-blue-100 text-blue-800 font-semibold';
-
-            return `
-              <div class="p-4 space-y-2.5">
-                <div class="flex items-start justify-between gap-2">
-                  <div>
-                    <div class="flex items-center gap-1.5 flex-wrap">
-                      <h4 class="font-extrabold text-xs text-slate-900">${item.drugName}</h4>
-                      <span class="${badgeColor} px-2 py-0.5 rounded text-[9px]">${item.shortageLevel}</span>
-                    </div>
-                    <p class="text-[11px] text-slate-500 mt-0.5">📍 ${item.subCity} • <strong>${item.searchCount} searches</strong></p>
-                  </div>
-                  <div class="text-right shrink-0">
-                    <div class="text-xs font-black text-emerald-700">${(item.estimatedMissedSalesETB || 0).toLocaleString()} ETB</div>
-                    <span class="text-[9px] text-slate-400">missed sales</span>
-                  </div>
-                </div>
-                <div class="flex items-center justify-between pt-1">
-                  <span class="text-[11px] ${item.stockingPharmaciesCount === 0 ? 'text-rose-600 font-bold' : 'text-slate-600'}">
-                    ${item.stockingPharmaciesCount === 0 ? '⚠️ 0 Pharmacies Stocking' : `${item.stockingPharmaciesCount} pharmacies stocking`}
-                  </span>
-                  <button onclick="quickAddPwaShortage('${item.drugName}')" class="text-xs bg-emerald-600 hover:bg-emerald-700 active:scale-95 text-white font-bold px-3 py-1.5 rounded-xl transition shadow-xs flex items-center gap-1">
-                    <i class="fa-solid fa-plus text-[10px]"></i>
-                    <span>Add to Shelf</span>
-                  </button>
-                </div>
-              </div>
-            `;
-          }).join('');
-        }
-
         const criticalCount = items.filter(i => i.shortageLevel === 'CRITICAL').length;
         const totalQueries = items.reduce((acc, c) => acc + (c.searchCount || 0), 0);
         const totalOpp = items.reduce((acc, c) => acc + (c.estimatedMissedSalesETB || 0), 0);
@@ -2519,10 +2448,139 @@
         document.getElementById('pwaKpiSearches').innerText = `${totalQueries} Inquiries`;
         document.getElementById('pwaKpiOpportunity').innerText = `${totalOpp.toLocaleString()} ETB`;
 
+        currentPwaDemandList = items;
+        pwaDemandCurrentPage = 1;
+        renderPwaDemandTable();
+
       } catch (err) {
         tbody.innerHTML = `<tr><td colspan="8" class="p-6 text-center text-rose-500">Failed to load demand radar: ${err.message}</td></tr>`;
         if (mobList) mobList.innerHTML = `<div class="p-6 text-center text-rose-500 text-xs">Failed to load demand radar: ${err.message}</div>`;
+        renderPaginationBar({ containerId: 'pwaDemandPaginationBar', totalItems: 0 });
       }
+    }
+
+    let pwaDemandCurrentPage = 1;
+    let pwaDemandPageSize = 15;
+    let currentPwaDemandList = [];
+
+    function renderPwaDemandTable(items) {
+      if (items) currentPwaDemandList = items;
+      const tbody = document.getElementById('pwaDemandTableTbody');
+      const mobList = document.getElementById('pwaDemandMobileList');
+      if (!tbody) return;
+
+      const totalItems = currentPwaDemandList.length;
+      if (totalItems === 0) {
+        const subCitySelect = document.getElementById('pwaDemandSubCitySelect');
+        const subCity = subCitySelect ? subCitySelect.value : 'Bole';
+        const emptyMsg = `No shortage spikes recorded for ${subCity} in the last 14 days. Demand telemetry logs automatically as patients search.`;
+        tbody.innerHTML = `<tr><td colspan="8" class="p-8 text-center text-slate-400 text-xs">${emptyMsg}</td></tr>`;
+        if (mobList) mobList.innerHTML = `<div class="p-8 text-center text-slate-400 text-xs">${emptyMsg}</div>`;
+        renderPaginationBar({ containerId: 'pwaDemandPaginationBar', totalItems: 0 });
+        return;
+      }
+
+      const totalPages = Math.max(1, Math.ceil(totalItems / pwaDemandPageSize));
+      if (pwaDemandCurrentPage > totalPages) pwaDemandCurrentPage = totalPages;
+      if (pwaDemandCurrentPage < 1) pwaDemandCurrentPage = 1;
+
+      const startIdx = (pwaDemandCurrentPage - 1) * pwaDemandPageSize;
+      const paginatedItems = currentPwaDemandList.slice(startIdx, startIdx + pwaDemandPageSize);
+
+      tbody.innerHTML = paginatedItems.map(item => {
+        let badgeColor = 'bg-slate-100 text-slate-700';
+        if (item.shortageLevel === 'CRITICAL') badgeColor = 'bg-rose-100 text-rose-800 font-bold';
+        else if (item.shortageLevel === 'HIGH') badgeColor = 'bg-amber-100 text-amber-800 font-bold';
+        else if (item.shortageLevel === 'MODERATE') badgeColor = 'bg-blue-100 text-blue-800 font-semibold';
+
+        return `
+          <tr class="hover:bg-slate-50 transition">
+            <td class="p-3.5 font-bold text-slate-900">${item.drugName}</td>
+            <td class="p-3.5 text-slate-500 font-medium">📍 ${item.subCity}</td>
+            <td class="p-3.5">
+              <span class="font-extrabold text-indigo-950">${item.searchCount}</span>
+              <span class="text-[10px] text-slate-400 block">patient searches</span>
+            </td>
+            <td class="p-3.5 font-semibold ${item.stockingPharmaciesCount === 0 ? 'text-rose-600 font-bold' : 'text-slate-700'}">
+              ${item.stockingPharmaciesCount === 0 ? '⚠️ 0 Pharmacies (Acute Deficit)' : `${item.stockingPharmaciesCount} stocking`}
+            </td>
+            <td class="p-3.5 font-mono font-bold text-slate-800">${item.unmetDemandRatio}x</td>
+            <td class="p-3.5">
+              <span class="${badgeColor} px-2 py-0.5 rounded text-[10px] inline-flex items-center gap-1">
+                ${item.shortageLevel === 'CRITICAL' ? '● CRITICAL' : item.shortageLevel === 'HIGH' ? '▲ HIGH GAP' : item.shortageLevel}
+              </span>
+            </td>
+            <td class="p-3.5 font-bold text-emerald-700">
+              ${(item.estimatedMissedSalesETB || 0).toLocaleString()} ETB
+            </td>
+            <td class="p-3.5 text-right">
+              <button onclick="quickAddPwaShortage('${item.drugName}')" class="text-xs bg-emerald-600 hover:bg-emerald-700 text-white font-bold px-3 py-1.5 rounded-xl transition shadow-xs flex items-center gap-1 ml-auto">
+                <i class="fa-solid fa-plus text-[10px]"></i>
+                <span>Add to Shelf</span>
+              </button>
+            </td>
+          </tr>
+        `;
+      }).join('');
+
+      if (mobList) {
+        mobList.innerHTML = paginatedItems.map(item => {
+          let badgeColor = 'bg-slate-100 text-slate-700';
+          if (item.shortageLevel === 'CRITICAL') badgeColor = 'bg-rose-100 text-rose-800 font-bold';
+          else if (item.shortageLevel === 'HIGH') badgeColor = 'bg-amber-100 text-amber-800 font-bold';
+          else if (item.shortageLevel === 'MODERATE') badgeColor = 'bg-blue-100 text-blue-800 font-semibold';
+
+          return `
+            <div class="p-4 space-y-2.5">
+              <div class="flex items-start justify-between gap-2">
+                <div>
+                  <div class="flex items-center gap-1.5 flex-wrap">
+                    <h4 class="font-extrabold text-xs text-slate-900">${item.drugName}</h4>
+                    <span class="${badgeColor} px-2 py-0.5 rounded text-[9px]">${item.shortageLevel}</span>
+                  </div>
+                  <p class="text-[11px] text-slate-500 mt-0.5">📍 ${item.subCity} • <strong>${item.searchCount} searches</strong></p>
+                </div>
+                <div class="text-right shrink-0">
+                  <div class="text-xs font-black text-emerald-700">${(item.estimatedMissedSalesETB || 0).toLocaleString()} ETB</div>
+                  <span class="text-[9px] text-slate-400">missed sales</span>
+                </div>
+              </div>
+              <div class="flex items-center justify-between pt-1">
+                <span class="text-[11px] ${item.stockingPharmaciesCount === 0 ? 'text-rose-600 font-bold' : 'text-slate-600'}">
+                  ${item.stockingPharmaciesCount === 0 ? '⚠️ 0 Pharmacies Stocking' : `${item.stockingPharmaciesCount} pharmacies stocking`}
+                </span>
+                <button onclick="quickAddPwaShortage('${item.drugName}')" class="text-xs bg-emerald-600 hover:bg-emerald-700 active:scale-95 text-white font-bold px-3 py-1.5 rounded-xl transition shadow-xs flex items-center gap-1">
+                  <i class="fa-solid fa-plus text-[10px]"></i>
+                  <span>Add to Shelf</span>
+                </button>
+              </div>
+            </div>
+          `;
+        }).join('');
+      }
+
+      renderPaginationBar({
+        containerId: 'pwaDemandPaginationBar',
+        totalItems,
+        currentPage: pwaDemandCurrentPage,
+        pageSize: pwaDemandPageSize,
+        onPageChange: 'setPwaDemandPage',
+        onPageSizeChange: 'setPwaDemandPageSize',
+        itemLabel: 'shortage alerts'
+      });
+    }
+
+    function setPwaDemandPage(page) {
+      pwaDemandCurrentPage = page;
+      renderPwaDemandTable();
+      const el = document.getElementById('pwaDemandTableTbody')?.closest('.overflow-x-auto');
+      if (el) el.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    }
+
+    function setPwaDemandPageSize(size) {
+      pwaDemandPageSize = parseInt(size, 10) || 15;
+      pwaDemandCurrentPage = 1;
+      renderPwaDemandTable();
     }
 
     function quickAddPwaShortage(drugName) {
@@ -2537,8 +2595,120 @@
       }, 150);
     }
 
+    // --- REUSABLE RESPONSIVE PAGINATION CONTROLLER ---
+    function renderPaginationBar({
+      containerId,
+      totalItems,
+      currentPage,
+      pageSize,
+      onPageChange,
+      onPageSizeChange,
+      itemLabel = 'records',
+      pageSizeOptions = [10, 15, 25, 50, 100],
+      containerClass = 'border-t border-slate-200/80 px-4 py-3 bg-slate-50/70 flex flex-col sm:flex-row items-center justify-between gap-3 text-xs text-slate-600'
+    }) {
+      const container = document.getElementById(containerId);
+      if (!container) return;
+
+      if (!totalItems || totalItems <= 0) {
+        container.innerHTML = '';
+        container.classList.add('hidden');
+        return;
+      }
+
+      container.classList.remove('hidden');
+
+      const totalPages = Math.max(1, Math.ceil(totalItems / pageSize));
+      const validPage = Math.max(1, Math.min(currentPage, totalPages));
+      const startIdx = (validPage - 1) * pageSize + 1;
+      const endIdx = Math.min(validPage * pageSize, totalItems);
+
+      // Build numbered buttons logic (compact with smart ellipses)
+      const pageNumbers = [];
+      if (totalPages <= 7) {
+        for (let i = 1; i <= totalPages; i++) pageNumbers.push(i);
+      } else {
+        pageNumbers.push(1);
+        if (validPage > 3) pageNumbers.push('...');
+        const start = Math.max(2, validPage - 1);
+        const end = Math.min(totalPages - 1, validPage + 1);
+        for (let i = start; i <= end; i++) {
+          if (!pageNumbers.includes(i)) pageNumbers.push(i);
+        }
+        if (validPage < totalPages - 2) pageNumbers.push('...');
+        if (!pageNumbers.includes(totalPages)) pageNumbers.push(totalPages);
+      }
+
+      const pageButtonsHtml = pageNumbers.map(p => {
+        if (p === '...') {
+          return `<span class="px-2 py-1 text-slate-400 select-none">…</span>`;
+        }
+        if (p === validPage) {
+          return `<button class="w-7 h-7 flex items-center justify-center rounded-lg bg-emerald-600 text-white font-bold text-xs shadow-xs pointer-events-none">${p}</button>`;
+        }
+        return `<button onclick="${onPageChange}(${p})" class="w-7 h-7 flex items-center justify-center rounded-lg bg-white border border-slate-200 hover:bg-slate-100 hover:text-slate-900 text-slate-700 font-semibold text-xs transition">${p}</button>`;
+      }).join('');
+
+      const sizeOptionsHtml = pageSizeOptions.map(opt => `
+        <option value="${opt}" ${opt === pageSize ? 'selected' : ''}>${opt} / page</option>
+      `).join('');
+
+      container.innerHTML = `
+        <div class="${containerClass}">
+          <div class="flex items-center gap-3 w-full sm:w-auto justify-between sm:justify-start">
+            <span class="text-slate-600">
+              Showing <span class="font-extrabold text-slate-900">${startIdx}</span> to <span class="font-extrabold text-slate-900">${endIdx}</span> of <span class="font-extrabold text-slate-900">${totalItems}</span> ${itemLabel}
+            </span>
+            <div class="flex items-center gap-1.5 text-slate-500">
+              <select onchange="${onPageSizeChange}(this.value)" class="bg-white border border-slate-300 text-slate-800 rounded-lg px-2 py-1 text-xs font-semibold focus:outline-none focus:ring-1 focus:ring-emerald-500 shadow-2xs cursor-pointer">
+                ${sizeOptionsHtml}
+              </select>
+            </div>
+          </div>
+
+          <div class="flex items-center gap-1.5 w-full sm:w-auto justify-between sm:justify-end">
+            <!-- First Page Button -->
+            <button onclick="${onPageChange}(1)" ${validPage === 1 ? 'disabled' : ''} class="px-2 py-1.5 rounded-lg border border-slate-200 bg-white hover:bg-slate-100 disabled:opacity-35 disabled:cursor-not-allowed transition text-slate-700 text-xs" title="First Page">
+              <i class="fa-solid fa-angles-left text-[10px]"></i>
+            </button>
+
+            <!-- Previous Page Button -->
+            <button onclick="${onPageChange}(${validPage - 1})" ${validPage === 1 ? 'disabled' : ''} class="px-2.5 py-1.5 rounded-lg border border-slate-200 bg-white hover:bg-slate-100 disabled:opacity-35 disabled:cursor-not-allowed transition text-slate-700 text-xs flex items-center gap-1 font-semibold" title="Previous Page">
+              <i class="fa-solid fa-chevron-left text-[10px]"></i>
+              <span class="hidden sm:inline">Prev</span>
+            </button>
+
+            <!-- Mobile Compact Page Indicator -->
+            <span class="sm:hidden px-3 py-1 font-bold text-slate-700 bg-white rounded-lg border border-slate-200 text-xs">
+              ${validPage} / ${totalPages}
+            </span>
+
+            <!-- Desktop Numbered Buttons -->
+            <div class="hidden sm:flex items-center gap-1">
+              ${pageButtonsHtml}
+            </div>
+
+            <!-- Next Page Button -->
+            <button onclick="${onPageChange}(${validPage + 1})" ${validPage === totalPages ? 'disabled' : ''} class="px-2.5 py-1.5 rounded-lg border border-slate-200 bg-white hover:bg-slate-100 disabled:opacity-35 disabled:cursor-not-allowed transition text-slate-700 text-xs flex items-center gap-1 font-semibold" title="Next Page">
+              <span class="hidden sm:inline">Next</span>
+              <i class="fa-solid fa-chevron-right text-[10px]"></i>
+            </button>
+
+            <!-- Last Page Button -->
+            <button onclick="${onPageChange}(${totalPages})" ${validPage === totalPages ? 'disabled' : ''} class="px-2 py-1.5 rounded-lg border border-slate-200 bg-white hover:bg-slate-100 disabled:opacity-35 disabled:cursor-not-allowed transition text-slate-700 text-xs" title="Last Page">
+              <i class="fa-solid fa-angles-right text-[10px]"></i>
+            </button>
+          </div>
+        </div>
+      `;
+    }
+
     // --- INVENTORY MANAGEMENT ---
-    async function loadPharmacyInventory() {
+    let inventoryCurrentPage = 1;
+    let inventoryPageSize = 15;
+    let currentInventoryFilterList = [];
+
+    async function loadPharmacyInventory(preservePage = false) {
       if (!currentAuthSession || !currentAuthSession.account) return;
       const pharmacyId = currentAuthSession.account.pharmacyId;
       const tbody = document.getElementById('inventoryTableBody');
@@ -2551,32 +2721,49 @@
         const data = await res.json();
         if (data.success && Array.isArray(data.inventory)) {
           currentPharmacyInventory = data.inventory;
+          currentInventoryFilterList = currentPharmacyInventory;
+          if (!preservePage) inventoryCurrentPage = 1;
           document.getElementById('dashShelfCount').innerText = `${currentPharmacyInventory.length} Items`;
           document.getElementById('shelfLedgerBadge').innerText = `${currentPharmacyInventory.length} Items`;
-          renderInventoryTable(currentPharmacyInventory);
+          renderInventoryTable();
         } else {
+          currentPharmacyInventory = [];
+          currentInventoryFilterList = [];
+          inventoryCurrentPage = 1;
           tbody.innerHTML = `<tr><td colspan="5" class="p-8 text-center text-slate-400">No items on shelf. Use buttons above to add medicines.</td></tr>`;
           if (mobList) mobList.innerHTML = `<div class="p-8 text-center text-slate-400 text-xs">No items on shelf. Use buttons above to add medicines.</div>`;
+          renderPaginationBar({ containerId: 'inventoryPaginationBar', totalItems: 0 });
         }
       } catch (err) {
         tbody.innerHTML = `<tr><td colspan="5" class="p-8 text-center text-rose-500">Failed to load inventory: ${err.message}</td></tr>`;
         if (mobList) mobList.innerHTML = `<div class="p-8 text-center text-rose-500 text-xs">Failed to load inventory: ${err.message}</div>`;
+        renderPaginationBar({ containerId: 'inventoryPaginationBar', totalItems: 0 });
       }
     }
 
     function renderInventoryTable(items) {
+      if (items) currentInventoryFilterList = items;
       const tbody = document.getElementById('inventoryTableBody');
       const mobList = document.getElementById('inventoryMobileList');
       const pharmacyId = currentAuthSession?.account?.pharmacyId;
 
-      if (!items || items.length === 0) {
+      const totalItems = currentInventoryFilterList.length;
+      if (totalItems === 0) {
         const emptyHtml = `No items currently on counter shelf. Tap "1-Click Master Catalog" or "Add Single Medicine" above!`;
         tbody.innerHTML = `<tr><td colspan="5" class="p-8 text-center text-slate-400 text-xs">${emptyHtml}</td></tr>`;
         if (mobList) mobList.innerHTML = `<div class="p-8 text-center text-slate-400 text-xs">${emptyHtml}</div>`;
+        renderPaginationBar({ containerId: 'inventoryPaginationBar', totalItems: 0 });
         return;
       }
 
-      tbody.innerHTML = items.map(item => `
+      const totalPages = Math.max(1, Math.ceil(totalItems / inventoryPageSize));
+      if (inventoryCurrentPage > totalPages) inventoryCurrentPage = totalPages;
+      if (inventoryCurrentPage < 1) inventoryCurrentPage = 1;
+
+      const startIdx = (inventoryCurrentPage - 1) * inventoryPageSize;
+      const paginatedItems = currentInventoryFilterList.slice(startIdx, startIdx + inventoryPageSize);
+
+      tbody.innerHTML = paginatedItems.map(item => `
         <tr class="hover:bg-slate-50 transition">
           <td class="p-3.5 font-bold text-slate-900">${item.name}</td>
           <td class="p-3.5 text-slate-500">
@@ -2607,7 +2794,7 @@
       `).join('');
 
       if (mobList) {
-        mobList.innerHTML = items.map(item => `
+        mobList.innerHTML = paginatedItems.map(item => `
           <div class="p-3.5 space-y-2.5">
             <div class="flex items-start justify-between gap-2">
               <div class="min-w-0">
@@ -2640,14 +2827,40 @@
           </div>
         `).join('');
       }
+
+      renderPaginationBar({
+        containerId: 'inventoryPaginationBar',
+        totalItems,
+        currentPage: inventoryCurrentPage,
+        pageSize: inventoryPageSize,
+        onPageChange: 'setInventoryPage',
+        onPageSizeChange: 'setInventoryPageSize',
+        itemLabel: 'medicines'
+      });
+    }
+
+    function setInventoryPage(page) {
+      inventoryCurrentPage = page;
+      renderInventoryTable();
+      const el = document.getElementById('inventoryTableBody')?.closest('.overflow-x-auto');
+      if (el) el.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    }
+
+    function setInventoryPageSize(size) {
+      inventoryPageSize = parseInt(size, 10) || 15;
+      inventoryCurrentPage = 1;
+      renderInventoryTable();
     }
 
     function filterInventoryTable() {
-      const q = document.getElementById('filterInventoryInput').value.toLowerCase();
-      const filtered = currentPharmacyInventory.filter(i => 
-        i.name.toLowerCase().includes(q) || (i.genericName && i.genericName.toLowerCase().includes(q))
+      const q = (document.getElementById('filterInventoryInput')?.value || '').toLowerCase().trim();
+      currentInventoryFilterList = currentPharmacyInventory.filter(i => 
+        (i.name && i.name.toLowerCase().includes(q)) || 
+        (i.genericName && i.genericName.toLowerCase().includes(q)) ||
+        (i.category && i.category.toLowerCase().includes(q))
       );
-      renderInventoryTable(filtered);
+      inventoryCurrentPage = 1;
+      renderInventoryTable();
     }
 
     async function toggleStock(pharmacyId, medicineName, newStock) {
@@ -2659,7 +2872,7 @@
         });
         const data = await res.json();
         if (data.success) {
-          loadPharmacyInventory();
+          loadPharmacyInventory(true);
         }
       } catch (err) {
         alert('Action failed: ' + err.message);
@@ -2674,7 +2887,7 @@
         });
         const data = await res.json();
         if (data.success) {
-          loadPharmacyInventory();
+          loadPharmacyInventory(true);
         }
       } catch (err) {
         alert('Failed to delete item: ' + err.message);
@@ -3414,8 +3627,13 @@
       }
     }
 
+    let ledgerCurrentPage = 1;
+    let ledgerPageSize = 15;
+    let currentLedgerFilterList = [];
+
     function filterCounterLedger(status) {
       currentLedgerFilter = status;
+      ledgerCurrentPage = 1;
 
       // Update button pill active states
       const filterKeys = ['ALL', 'FULFILLED', 'ACTIVE', 'CANCELLED', 'EXPIRED'];
@@ -3433,6 +3651,7 @@
     }
 
     function searchCounterLedger() {
+      ledgerCurrentPage = 1;
       applyLedgerFilterAndRender();
     }
 
@@ -3454,14 +3673,17 @@
         });
       }
 
-      renderCounterLedger(list);
+      currentLedgerFilterList = list;
+      renderCounterLedger();
     }
 
     function renderCounterLedger(items) {
+      if (items) currentLedgerFilterList = items;
       const tbody = document.getElementById('ledgerDesktopTableBody');
       const mobContainer = document.getElementById('ledgerMobileCardsContainer');
 
-      if (!items || items.length === 0) {
+      const totalItems = currentLedgerFilterList.length;
+      if (totalItems === 0) {
         const emptyMsg = `
           <div class="p-8 text-center text-slate-400 text-xs">
             <i class="fa-solid fa-receipt text-2xl text-slate-300 mb-2 block"></i>
@@ -3474,12 +3696,20 @@
         if (mobContainer) {
           mobContainer.innerHTML = emptyMsg;
         }
+        renderPaginationBar({ containerId: 'ledgerPaginationBar', totalItems: 0 });
         return;
       }
 
+      const totalPages = Math.max(1, Math.ceil(totalItems / ledgerPageSize));
+      if (ledgerCurrentPage > totalPages) ledgerCurrentPage = totalPages;
+      if (ledgerCurrentPage < 1) ledgerCurrentPage = 1;
+
+      const startIdx = (ledgerCurrentPage - 1) * ledgerPageSize;
+      const paginatedItems = currentLedgerFilterList.slice(startIdx, startIdx + ledgerPageSize);
+
       // 1. Desktop Table Rows
       if (tbody) {
-        tbody.innerHTML = items.map(r => {
+        tbody.innerHTML = paginatedItems.map(r => {
           const price = Number(r.lockedPriceETB || 0).toFixed(2);
           const contact = r.phone || r.patientUserId || 'N/A';
           const createdStr = formatLedgerDateTime(r.createdAt);
@@ -3535,7 +3765,7 @@
 
       // 2. Mobile Cards
       if (mobContainer) {
-        mobContainer.innerHTML = items.map(r => {
+        mobContainer.innerHTML = paginatedItems.map(r => {
           const price = Number(r.lockedPriceETB || 0).toFixed(2);
           const contact = r.phone || r.patientUserId || 'N/A';
           const createdStr = formatLedgerDateTime(r.createdAt);
@@ -3584,6 +3814,30 @@
           `;
         }).join('');
       }
+
+      renderPaginationBar({
+        containerId: 'ledgerPaginationBar',
+        totalItems,
+        currentPage: ledgerCurrentPage,
+        pageSize: ledgerPageSize,
+        onPageChange: 'setLedgerPage',
+        onPageSizeChange: 'setLedgerPageSize',
+        itemLabel: 'transactions',
+        containerClass: 'border border-slate-200 rounded-xl px-4 py-3 bg-slate-50/70 flex flex-col sm:flex-row items-center justify-between gap-3 text-xs text-slate-600'
+      });
+    }
+
+    function setLedgerPage(page) {
+      ledgerCurrentPage = page;
+      renderCounterLedger();
+      const el = document.getElementById('ledgerDesktopTableBody')?.closest('.overflow-x-auto');
+      if (el) el.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    }
+
+    function setLedgerPageSize(size) {
+      ledgerPageSize = parseInt(size, 10) || 15;
+      ledgerCurrentPage = 1;
+      renderCounterLedger();
     }
 
     function exportCounterLedgerCsv() {
@@ -3930,6 +4184,10 @@
       }
     }
 
+    let b2bOrdersCurrentPage = 1;
+    let b2bOrdersPageSize = 15;
+    let currentB2BOrdersList = [];
+
     async function loadWholesaleOrders() {
       if (!currentAuthSession) return;
       const pharmacyId = currentAuthSession.account?.pharmacyId || currentAuthSession.pharmacy?.id;
@@ -3944,31 +4202,47 @@
         const data = await res.json();
 
         if (data.success && Array.isArray(data.orders)) {
+          currentB2BOrdersList = data.orders;
+          b2bOrdersCurrentPage = 1;
           if (ordersCount) ordersCount.innerText = data.orders.length;
-          renderWholesaleOrdersTable(data.orders);
+          renderWholesaleOrdersTable();
         } else {
+          currentB2BOrdersList = [];
+          b2bOrdersCurrentPage = 1;
           tbody.innerHTML = `<tr><td colspan="9" class="p-6 text-center text-slate-400">No purchase orders placed yet.</td></tr>`;
           if (mobList) mobList.innerHTML = `<div class="p-6 text-center text-slate-400 text-xs">No purchase orders placed yet.</div>`;
+          renderPaginationBar({ containerId: 'b2bOrdersPaginationBar', totalItems: 0 });
         }
       } catch (err) {
         tbody.innerHTML = `<tr><td colspan="9" class="p-6 text-center text-rose-500">Failed to load orders: ${err.message}</td></tr>`;
         if (mobList) mobList.innerHTML = `<div class="p-6 text-center text-rose-500 text-xs">Failed to load orders: ${err.message}</div>`;
+        renderPaginationBar({ containerId: 'b2bOrdersPaginationBar', totalItems: 0 });
       }
     }
 
     function renderWholesaleOrdersTable(orders) {
+      if (orders) currentB2BOrdersList = orders;
       const tbody = document.getElementById('b2bOrdersTableTbody');
       const mobList = document.getElementById('b2bOrdersMobileList');
       if (!tbody) return;
 
-      if (!orders || orders.length === 0) {
+      const totalItems = currentB2BOrdersList.length;
+      if (totalItems === 0) {
         const emptyHtml = `No purchase orders placed yet. Browse the catalog to restock your shelf.`;
         tbody.innerHTML = `<tr><td colspan="9" class="p-8 text-center text-slate-400 text-xs">${emptyHtml}</td></tr>`;
         if (mobList) mobList.innerHTML = `<div class="p-8 text-center text-slate-400 text-xs">${emptyHtml}</div>`;
+        renderPaginationBar({ containerId: 'b2bOrdersPaginationBar', totalItems: 0 });
         return;
       }
 
-      tbody.innerHTML = orders.map(po => {
+      const totalPages = Math.max(1, Math.ceil(totalItems / b2bOrdersPageSize));
+      if (b2bOrdersCurrentPage > totalPages) b2bOrdersCurrentPage = totalPages;
+      if (b2bOrdersCurrentPage < 1) b2bOrdersCurrentPage = 1;
+
+      const startIdx = (b2bOrdersCurrentPage - 1) * b2bOrdersPageSize;
+      const paginatedOrders = currentB2BOrdersList.slice(startIdx, startIdx + b2bOrdersPageSize);
+
+      tbody.innerHTML = paginatedOrders.map(po => {
         let statusBadge = 'bg-slate-100 text-slate-700';
         if (po.status === 'PENDING') statusBadge = 'bg-amber-100 text-amber-800 font-bold';
         else if (po.status === 'CONFIRMED') statusBadge = 'bg-blue-100 text-blue-800 font-bold';
@@ -3996,7 +4270,7 @@
       }).join('');
 
       if (mobList) {
-        mobList.innerHTML = orders.map(po => {
+        mobList.innerHTML = paginatedOrders.map(po => {
           let statusBadge = 'bg-slate-100 text-slate-700';
           if (po.status === 'PENDING') statusBadge = 'bg-amber-100 text-amber-800 font-bold';
           else if (po.status === 'CONFIRMED') statusBadge = 'bg-blue-100 text-blue-800 font-bold';
@@ -4030,6 +4304,30 @@
           `;
         }).join('');
       }
+
+      renderPaginationBar({
+        containerId: 'b2bOrdersPaginationBar',
+        totalItems,
+        currentPage: b2bOrdersCurrentPage,
+        pageSize: b2bOrdersPageSize,
+        onPageChange: 'setB2BOrdersPage',
+        onPageSizeChange: 'setB2BOrdersPageSize',
+        itemLabel: 'purchase orders',
+        containerClass: 'border border-slate-200 rounded-xl px-4 py-3 bg-slate-50/70 flex flex-col sm:flex-row items-center justify-between gap-3 text-xs text-slate-600 mt-3'
+      });
+    }
+
+    function setB2BOrdersPage(page) {
+      b2bOrdersCurrentPage = page;
+      renderWholesaleOrdersTable();
+      const el = document.getElementById('b2bOrdersTableTbody')?.closest('.overflow-x-auto');
+      if (el) el.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    }
+
+    function setB2BOrdersPageSize(size) {
+      b2bOrdersPageSize = parseInt(size, 10) || 15;
+      b2bOrdersCurrentPage = 1;
+      renderWholesaleOrdersTable();
     }
   </script>
 </body>
