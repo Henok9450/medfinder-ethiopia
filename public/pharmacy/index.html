@@ -1144,23 +1144,38 @@
       <form onsubmit="saveOperatingHours(event)" class="space-y-4">
         <!-- 1-Tap Quick Preset Shift Buttons -->
         <div class="space-y-1.5">
-          <label class="block text-xs font-bold text-slate-700">1-Tap Shift Presets (ፈጣን የስራ ሰዓት ምርጫዎች)</label>
+          <div class="flex items-center justify-between">
+            <label class="block text-xs font-bold text-slate-700">1-Tap Shift Presets (ፈጣን የስራ ሰዓት ምርጫዎች)</label>
+            <span id="activePresetBadge" class="text-[10px] font-bold text-emerald-800 bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-200">Current Option</span>
+          </div>
           <div class="grid grid-cols-2 gap-2 text-[11px]">
-            <button type="button" onclick="applyHoursPreset('standard')" class="p-2.5 rounded-xl border border-slate-200 hover:border-indigo-400 bg-white hover:bg-indigo-50/50 text-left transition active:scale-98 shadow-xs">
-              <span class="font-extrabold text-slate-900 block">☀️ Standard Shift</span>
-              <span class="text-slate-500 text-[10px]">8:00 AM – 9:30 PM (ጠዋት 2:00 - ማታ 3:30)</span>
+            <button type="button" id="presetBtn_standard" onclick="applyHoursPreset('standard')" class="relative p-2.5 rounded-xl border border-slate-200 hover:border-slate-300 bg-white hover:bg-slate-50 text-left transition active:scale-98 shadow-xs">
+              <div class="flex items-center justify-between mb-0.5">
+                <span class="font-extrabold text-slate-900 block">☀️ Standard Shift</span>
+                <span id="presetCheck_standard" class="hidden text-[9px] font-black uppercase text-emerald-800 bg-emerald-100 px-1.5 py-0.2 rounded border border-emerald-200">✓ Active</span>
+              </div>
+              <span class="text-slate-500 text-[10px] block">8:00 AM – 9:30 PM (ጠዋት 2:00 - ማታ 3:30)</span>
             </button>
-            <button type="button" onclick="applyHoursPreset('extended')" class="p-2.5 rounded-xl border border-slate-200 hover:border-indigo-400 bg-white hover:bg-indigo-50/50 text-left transition active:scale-98 shadow-xs">
-              <span class="font-extrabold text-slate-900 block">🌙 Extended Evening</span>
-              <span class="text-slate-500 text-[10px]">8:00 AM – 11:00 PM (ጠዋት 2:00 - ሌሊት 5:00)</span>
+            <button type="button" id="presetBtn_extended" onclick="applyHoursPreset('extended')" class="relative p-2.5 rounded-xl border border-slate-200 hover:border-slate-300 bg-white hover:bg-slate-50 text-left transition active:scale-98 shadow-xs">
+              <div class="flex items-center justify-between mb-0.5">
+                <span class="font-extrabold text-slate-900 block">🌙 Extended Evening</span>
+                <span id="presetCheck_extended" class="hidden text-[9px] font-black uppercase text-emerald-800 bg-emerald-100 px-1.5 py-0.2 rounded border border-emerald-200">✓ Active</span>
+              </div>
+              <span class="text-slate-500 text-[10px] block">8:00 AM – 11:00 PM (ጠዋት 2:00 - ሌሊት 5:00)</span>
             </button>
-            <button type="button" onclick="applyHoursPreset('early')" class="p-2.5 rounded-xl border border-slate-200 hover:border-indigo-400 bg-white hover:bg-indigo-50/50 text-left transition active:scale-98 shadow-xs">
-              <span class="font-extrabold text-slate-900 block">🏥 Early Bird Clinic</span>
-              <span class="text-slate-500 text-[10px]">7:00 AM – 9:00 PM (ጠዋት 1:00 - ማታ 3:00)</span>
+            <button type="button" id="presetBtn_early" onclick="applyHoursPreset('early')" class="relative p-2.5 rounded-xl border border-slate-200 hover:border-slate-300 bg-white hover:bg-slate-50 text-left transition active:scale-98 shadow-xs">
+              <div class="flex items-center justify-between mb-0.5">
+                <span class="font-extrabold text-slate-900 block">🏥 Early Bird Clinic</span>
+                <span id="presetCheck_early" class="hidden text-[9px] font-black uppercase text-emerald-800 bg-emerald-100 px-1.5 py-0.2 rounded border border-emerald-200">✓ Active</span>
+              </div>
+              <span class="text-slate-500 text-[10px] block">7:00 AM – 9:00 PM (ጠዋት 1:00 - ማታ 3:00)</span>
             </button>
-            <button type="button" onclick="applyHoursPreset('24hours')" class="p-2.5 rounded-xl border border-indigo-200 bg-indigo-50 hover:bg-indigo-100/70 text-left transition active:scale-98 shadow-xs">
-              <span class="font-extrabold text-indigo-950 block">🌌 24/7 Night Duty</span>
-              <span class="text-indigo-700 text-[10px]">24 Hours Full Duty (የሌሊት ፈረቃ)</span>
+            <button type="button" id="presetBtn_24hours" onclick="applyHoursPreset('24hours')" class="relative p-2.5 rounded-xl border border-indigo-200 bg-indigo-50/60 hover:bg-indigo-100/70 text-left transition active:scale-98 shadow-xs">
+              <div class="flex items-center justify-between mb-0.5">
+                <span class="font-extrabold text-indigo-950 block">🌌 24/7 Night Duty</span>
+                <span id="presetCheck_24hours" class="hidden text-[9px] font-black uppercase text-indigo-900 bg-indigo-200 px-1.5 py-0.2 rounded border border-indigo-300">✓ Active</span>
+              </div>
+              <span class="text-indigo-700 text-[10px] block">24 Hours Full Duty (የሌሊት ፈረቃ)</span>
             </button>
           </div>
         </div>
@@ -1839,8 +1854,15 @@
         const res = await fetch(`/api/pharmacy/${pharmacyId}/operating-status`);
         const data = await res.json();
         if (data.success && data.operatingStatus) {
-          currentOperatingStatus = data.operatingStatus;
-          updateOperatingStatusUI(data.operatingStatus, data.pharmacy);
+          currentOperatingStatus = {
+            ...data.operatingStatus,
+            pharmacy: data.pharmacy,
+            openingTime: data.pharmacy?.openingTime || data.operatingStatus.openingTime || '08:00',
+            closingTime: data.pharmacy?.closingTime || data.operatingStatus.closingTime || '21:30',
+            is24Hours: Boolean(data.pharmacy?.is24Hours ?? data.operatingStatus.is24Hours),
+            isManuallyClosed: Boolean(data.pharmacy?.isManuallyClosed ?? data.operatingStatus.isManuallyClosed),
+          };
+          updateOperatingStatusUI(currentOperatingStatus, data.pharmacy);
         }
       } catch (err) {
         console.warn('[OperatingStatus] Failed to load status:', err);
@@ -1945,8 +1967,15 @@
         });
         const data = await res.json();
         if (data.success) {
-          currentOperatingStatus = data.operatingStatus;
-          updateOperatingStatusUI(data.operatingStatus, data.pharmacy);
+          currentOperatingStatus = {
+            ...data.operatingStatus,
+            pharmacy: data.pharmacy,
+            openingTime: data.pharmacy?.openingTime || data.operatingStatus.openingTime || '08:00',
+            closingTime: data.pharmacy?.closingTime || data.operatingStatus.closingTime || '21:30',
+            is24Hours: Boolean(data.pharmacy?.is24Hours ?? data.operatingStatus.is24Hours),
+            isManuallyClosed: Boolean(data.pharmacy?.isManuallyClosed ?? data.operatingStatus.isManuallyClosed),
+          };
+          updateOperatingStatusUI(currentOperatingStatus, data.pharmacy);
           showCounterToast(willManuallyClose ? '🔴 Counter paused / off-duty for breaks.' : '🟢 Counter reopened for patient holds!');
           if (window.Telegram?.WebApp?.HapticFeedback) {
             try { window.Telegram.WebApp.HapticFeedback.notificationOccurred(willManuallyClose ? 'warning' : 'success'); } catch (_) {}
@@ -1957,6 +1986,59 @@
       } catch (err) {
         showCounterToast('Server error: ' + err.message, true);
       }
+    }
+
+    function updateActivePresetHighlight() {
+      const chk24 = document.getElementById('modalIs24Hours');
+      const inOpen = document.getElementById('modalOpeningTime');
+      const inClose = document.getElementById('modalClosingTime');
+      const badge = document.getElementById('activePresetBadge');
+
+      const is24 = chk24 && chk24.checked;
+      const openVal = inOpen ? (inOpen.value || '08:00') : '08:00';
+      const closeVal = inClose ? (inClose.value || '21:30') : '21:30';
+
+      let matchedPreset = null;
+      let matchedLabel = 'Custom Hours';
+
+      if (is24) {
+        matchedPreset = '24hours';
+        matchedLabel = '🌌 24/7 Night Duty';
+      } else if (openVal === '08:00' && closeVal === '21:30') {
+        matchedPreset = 'standard';
+        matchedLabel = '☀️ Standard Shift';
+      } else if (openVal === '08:00' && closeVal === '23:00') {
+        matchedPreset = 'extended';
+        matchedLabel = '🌙 Extended Evening';
+      } else if (openVal === '07:00' && closeVal === '21:00') {
+        matchedPreset = 'early';
+        matchedLabel = '🏥 Early Bird Clinic';
+      }
+
+      if (badge) {
+        if (matchedPreset) {
+          badge.className = 'text-[10px] font-bold text-emerald-800 bg-emerald-100 px-2 py-0.5 rounded-full border border-emerald-300';
+          badge.innerText = `Selected: ${matchedLabel}`;
+        } else {
+          badge.className = 'text-[10px] font-bold text-slate-700 bg-slate-100 px-2 py-0.5 rounded-full border border-slate-300';
+          badge.innerText = `Custom Hours (${formatTime12H(openVal)} - ${formatTime12H(closeVal)})`;
+        }
+      }
+
+      const presets = ['standard', 'extended', 'early', '24hours'];
+      presets.forEach(p => {
+        const btn = document.getElementById('presetBtn_' + p);
+        const check = document.getElementById('presetCheck_' + p);
+        if (btn) {
+          if (p === matchedPreset) {
+            btn.className = 'relative p-2.5 rounded-xl border-2 border-emerald-600 bg-emerald-50/80 text-left transition active:scale-98 shadow-sm ring-2 ring-emerald-500/20';
+            if (check) check.classList.remove('hidden');
+          } else {
+            btn.className = 'relative p-2.5 rounded-xl border border-slate-200 hover:border-slate-300 bg-white hover:bg-slate-50 text-left transition active:scale-98 shadow-xs';
+            if (check) check.classList.add('hidden');
+          }
+        }
+      });
     }
 
     function applyHoursPreset(preset) {
@@ -1982,6 +2064,7 @@
         if (inClose) inClose.value = '23:59';
       }
       toggleHoursInputsDisabled();
+      updateActivePresetHighlight();
       refreshModalHoursPreview();
       if (window.Telegram?.WebApp?.HapticFeedback) {
         try { window.Telegram.WebApp.HapticFeedback.impactOccurred('light'); } catch (_) {}
@@ -2005,6 +2088,8 @@
       if (openHint) openHint.innerText = `${formatTime12H(openVal)} (${formatTimeEthiopianHint(openVal)})`;
       if (closeHint) closeHint.innerText = `${formatTime12H(closeVal)} (${formatTimeEthiopianHint(closeVal)})`;
 
+      updateActivePresetHighlight();
+
       if (previewEl) {
         if (isManual) {
           previewEl.innerHTML = `<span class="text-rose-700 font-bold">🔴 Counter Paused / Off-Duty (ዝግ ነው)</span>`;
@@ -2017,10 +2102,10 @@
     }
 
     function openOperatingHoursModal() {
-      const is24Hours = currentOperatingStatus?.pharmacy?.is24Hours ?? false;
-      const openingTime = currentOperatingStatus?.pharmacy?.openingTime || '08:00';
-      const closingTime = currentOperatingStatus?.pharmacy?.closingTime || '21:30';
-      const isManuallyClosed = currentOperatingStatus?.pharmacy?.isManuallyClosed ?? false;
+      const is24Hours = Boolean(currentOperatingStatus?.is24Hours ?? currentOperatingStatus?.pharmacy?.is24Hours ?? false);
+      const openingTime = currentOperatingStatus?.openingTime || currentOperatingStatus?.pharmacy?.openingTime || '08:00';
+      const closingTime = currentOperatingStatus?.closingTime || currentOperatingStatus?.pharmacy?.closingTime || '21:30';
+      const isManuallyClosed = Boolean(currentOperatingStatus?.isManuallyClosed ?? currentOperatingStatus?.pharmacy?.isManuallyClosed ?? false);
 
       const chk24 = document.getElementById('modalIs24Hours');
       const inOpen = document.getElementById('modalOpeningTime');
@@ -2033,6 +2118,7 @@
       if (chkManual) chkManual.checked = !!isManuallyClosed;
 
       toggleHoursInputsDisabled();
+      updateActivePresetHighlight();
       refreshModalHoursPreview();
       openModal('operatingHoursModal');
     }
@@ -2084,8 +2170,15 @@
         });
         const data = await res.json();
         if (data.success) {
-          currentOperatingStatus = data.operatingStatus;
-          updateOperatingStatusUI(data.operatingStatus, data.pharmacy);
+          currentOperatingStatus = {
+            ...data.operatingStatus,
+            pharmacy: data.pharmacy,
+            openingTime: data.pharmacy?.openingTime || data.operatingStatus.openingTime || openingTime,
+            closingTime: data.pharmacy?.closingTime || data.operatingStatus.closingTime || closingTime,
+            is24Hours: Boolean(data.pharmacy?.is24Hours ?? data.operatingStatus.is24Hours),
+            isManuallyClosed: Boolean(data.pharmacy?.isManuallyClosed ?? data.operatingStatus.isManuallyClosed),
+          };
+          updateOperatingStatusUI(currentOperatingStatus, data.pharmacy);
           closeModal('operatingHoursModal');
 
           const toastText = data.pharmacy?.is24Hours
