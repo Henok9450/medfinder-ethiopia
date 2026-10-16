@@ -26,6 +26,11 @@ CREATE TABLE IF NOT EXISTS pharmacies (
   in_stock_items TEXT[] DEFAULT ARRAY[]::TEXT[],
   inventory JSONB DEFAULT '[]'::jsonb,
   analytics_access JSONB DEFAULT '{"enabled": false, "tier": "BASIC"}'::jsonb,
+  opening_time TEXT DEFAULT '08:00',
+  closing_time TEXT DEFAULT '21:30',
+  is_24_hours BOOLEAN DEFAULT FALSE,
+  is_manually_closed BOOLEAN DEFAULT FALSE,
+  last_heartbeat_at TIMESTAMPTZ,
   -- Spatial location using PostGIS geography point (Longitude, Latitude)
   location GEOGRAPHY(Point, 4326) NOT NULL,
   created_at TIMESTAMPTZ DEFAULT NOW(),

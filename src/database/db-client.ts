@@ -134,6 +134,11 @@ export async function runMigrations(): Promise<{ success: boolean; message: stri
     // Ensure analytics_access column on pharmacies and search_analytics_events table exist
     await p.query(`
       ALTER TABLE pharmacies ADD COLUMN IF NOT EXISTS analytics_access JSONB DEFAULT '{"enabled": false, "tier": "BASIC"}'::jsonb;
+      ALTER TABLE pharmacies ADD COLUMN IF NOT EXISTS opening_time TEXT DEFAULT '08:00';
+      ALTER TABLE pharmacies ADD COLUMN IF NOT EXISTS closing_time TEXT DEFAULT '21:30';
+      ALTER TABLE pharmacies ADD COLUMN IF NOT EXISTS is_24_hours BOOLEAN DEFAULT FALSE;
+      ALTER TABLE pharmacies ADD COLUMN IF NOT EXISTS is_manually_closed BOOLEAN DEFAULT FALSE;
+      ALTER TABLE pharmacies ADD COLUMN IF NOT EXISTS last_heartbeat_at TIMESTAMPTZ;
       
       CREATE TABLE IF NOT EXISTS search_analytics_events (
         id TEXT PRIMARY KEY,

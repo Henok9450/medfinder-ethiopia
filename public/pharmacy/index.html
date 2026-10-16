@@ -1113,58 +1113,100 @@
   <!-- ============================================================== -->
   <!-- MODAL: PHARMACY OPERATING HOURS & 24/7 NIGHT DUTY               -->
   <!-- ============================================================== -->
+  <!-- ============================================================== -->
+  <!-- MODAL: PHARMACY OPERATING HOURS & 24/7 NIGHT DUTY               -->
+  <!-- ============================================================== -->
   <div id="operatingHoursModal" class="hidden fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-xs p-4">
-    <div class="bg-white rounded-3xl max-w-md w-full p-6 shadow-2xl border border-slate-200 space-y-4 animate-in fade-in zoom-in-95">
+    <div class="bg-white rounded-3xl max-w-lg w-full p-6 shadow-2xl border border-slate-200 space-y-4 animate-in fade-in zoom-in-95 max-h-[90vh] overflow-y-auto">
       <div class="flex items-center justify-between border-b border-slate-100 pb-3">
-        <div class="flex items-center gap-2">
-          <i class="fa-solid fa-clock text-indigo-600 text-lg"></i>
+        <div class="flex items-center gap-2.5">
+          <div class="w-9 h-9 rounded-xl bg-indigo-50 border border-indigo-200 text-indigo-700 flex items-center justify-center text-sm shadow-xs">
+            <i class="fa-solid fa-clock"></i>
+          </div>
           <div>
-            <h3 class="font-extrabold text-slate-900 text-sm">Pharmacy Counter Operating Hours</h3>
-            <p class="text-[11px] text-slate-500">Prevent customer holds when your counter is closed</p>
+            <h3 class="font-extrabold text-slate-900 text-sm">Pharmacy Counter Working Hours</h3>
+            <p class="text-[11px] text-slate-500">Set counter schedule to accept customer 60-min medicine holds</p>
           </div>
         </div>
-        <button onclick="closeModal('operatingHoursModal')" class="text-slate-400 hover:text-slate-700 text-base">
+        <button onclick="closeModal('operatingHoursModal')" class="text-slate-400 hover:text-slate-700 p-1 text-base">
           <i class="fa-solid fa-xmark"></i>
         </button>
       </div>
 
+      <!-- Live Schedule Preview Card -->
+      <div class="p-3.5 bg-slate-50 border border-slate-200/90 rounded-2xl space-y-1">
+        <span class="text-[10px] uppercase font-bold text-slate-400 tracking-wider block">Live Counter Schedule Preview</span>
+        <div id="modalHoursPreviewText" class="text-xs font-semibold text-slate-800">
+          <span class="text-emerald-800 font-bold">⏰ 08:00 AM – 09:30 PM</span> <span class="text-slate-500 text-[11px]">(ከጠዋቱ 2:00 እስከ ከምሽቱ 3:30)</span>
+        </div>
+      </div>
+
       <form onsubmit="saveOperatingHours(event)" class="space-y-4">
-        <!-- 24/7 Emergency Night Duty Checkbox -->
-        <div class="p-3 bg-indigo-50 border border-indigo-200 rounded-2xl flex items-start gap-3">
-          <input type="checkbox" id="modalIs24Hours" onchange="toggleHoursInputsDisabled()" class="mt-0.5 h-4 w-4 text-indigo-600 rounded border-indigo-300 focus:ring-indigo-500">
-          <div>
-            <label for="modalIs24Hours" class="font-bold text-xs text-indigo-950 block cursor-pointer">🌙 24/7 Emergency Night Duty Pharmacy (የሌሊት ፈረቃ)</label>
-            <p class="text-[11px] text-indigo-700">Check this if your pharmacy operates around the clock for late-night emergency patients.</p>
+        <!-- 1-Tap Quick Preset Shift Buttons -->
+        <div class="space-y-1.5">
+          <label class="block text-xs font-bold text-slate-700">1-Tap Shift Presets (ፈጣን የስራ ሰዓት ምርጫዎች)</label>
+          <div class="grid grid-cols-2 gap-2 text-[11px]">
+            <button type="button" onclick="applyHoursPreset('standard')" class="p-2.5 rounded-xl border border-slate-200 hover:border-indigo-400 bg-white hover:bg-indigo-50/50 text-left transition active:scale-98 shadow-xs">
+              <span class="font-extrabold text-slate-900 block">☀️ Standard Shift</span>
+              <span class="text-slate-500 text-[10px]">8:00 AM – 9:30 PM (ጠዋት 2:00 - ማታ 3:30)</span>
+            </button>
+            <button type="button" onclick="applyHoursPreset('extended')" class="p-2.5 rounded-xl border border-slate-200 hover:border-indigo-400 bg-white hover:bg-indigo-50/50 text-left transition active:scale-98 shadow-xs">
+              <span class="font-extrabold text-slate-900 block">🌙 Extended Evening</span>
+              <span class="text-slate-500 text-[10px]">8:00 AM – 11:00 PM (ጠዋት 2:00 - ሌሊት 5:00)</span>
+            </button>
+            <button type="button" onclick="applyHoursPreset('early')" class="p-2.5 rounded-xl border border-slate-200 hover:border-indigo-400 bg-white hover:bg-indigo-50/50 text-left transition active:scale-98 shadow-xs">
+              <span class="font-extrabold text-slate-900 block">🏥 Early Bird Clinic</span>
+              <span class="text-slate-500 text-[10px]">7:00 AM – 9:00 PM (ጠዋት 1:00 - ማታ 3:00)</span>
+            </button>
+            <button type="button" onclick="applyHoursPreset('24hours')" class="p-2.5 rounded-xl border border-indigo-200 bg-indigo-50 hover:bg-indigo-100/70 text-left transition active:scale-98 shadow-xs">
+              <span class="font-extrabold text-indigo-950 block">🌌 24/7 Night Duty</span>
+              <span class="text-indigo-700 text-[10px]">24 Hours Full Duty (የሌሊት ፈረቃ)</span>
+            </button>
           </div>
         </div>
 
-        <div id="standardHoursContainer" class="grid grid-cols-2 gap-3">
+        <!-- 24/7 Emergency Night Duty Checkbox -->
+        <div class="p-3.5 bg-indigo-50/80 border border-indigo-200 rounded-2xl flex items-start gap-3">
+          <input type="checkbox" id="modalIs24Hours" onchange="toggleHoursInputsDisabled(); refreshModalHoursPreview();" class="mt-1 h-4 w-4 text-indigo-600 rounded border-indigo-300 focus:ring-indigo-500">
           <div>
-            <label class="block text-xs font-semibold text-slate-700 mb-1">Opening Time (EAT)</label>
-            <input type="time" id="modalOpeningTime" value="08:00" class="w-full text-xs px-3 py-2 rounded-xl border border-slate-300 focus:ring-2 focus:ring-indigo-500 outline-none">
+            <label for="modalIs24Hours" class="font-bold text-xs text-indigo-950 block cursor-pointer">🌙 24/7 Emergency Night Duty Pharmacy (የሌሊት ፈረቃ)</label>
+            <p class="text-[11px] text-indigo-700 mt-0.5">Check this if your pharmacy counter operates continuously for emergency midnight patients.</p>
           </div>
-          <div>
-            <label class="block text-xs font-semibold text-slate-700 mb-1">Closing Time (EAT)</label>
-            <input type="time" id="modalClosingTime" value="21:30" class="w-full text-xs px-3 py-2 rounded-xl border border-slate-300 focus:ring-2 focus:ring-indigo-500 outline-none">
+        </div>
+
+        <!-- Standard Hours Inputs with 12H Hints -->
+        <div id="standardHoursContainer" class="p-3.5 bg-slate-50 border border-slate-200 rounded-2xl space-y-3">
+          <div class="grid grid-cols-2 gap-3">
+            <div>
+              <label class="block text-xs font-bold text-slate-700 mb-1">Opening Time (መክፈቻ)</label>
+              <input type="time" id="modalOpeningTime" value="08:00" onchange="refreshModalHoursPreview()" oninput="refreshModalHoursPreview()" class="w-full text-xs font-bold px-3 py-2.5 rounded-xl border border-slate-300 bg-white focus:ring-2 focus:ring-indigo-500 outline-none">
+              <span id="modalOpeningHint" class="block text-[11px] text-slate-500 mt-1 font-medium">8:00 AM (ከጠዋቱ 2:00)</span>
+            </div>
+            <div>
+              <label class="block text-xs font-bold text-slate-700 mb-1">Closing Time (መዝጊያ)</label>
+              <input type="time" id="modalClosingTime" value="21:30" onchange="refreshModalHoursPreview()" oninput="refreshModalHoursPreview()" class="w-full text-xs font-bold px-3 py-2.5 rounded-xl border border-slate-300 bg-white focus:ring-2 focus:ring-indigo-500 outline-none">
+              <span id="modalClosingHint" class="block text-[11px] text-slate-500 mt-1 font-medium">9:30 PM (ከምሽቱ 3:30)</span>
+            </div>
           </div>
+          <p class="text-[10px] text-slate-400">💡 Tip: Customer 60-minute reservation holds are automatically truncated as your closing time approaches to prevent abandoned pickups.</p>
         </div>
 
         <!-- 1-Tap Manual Break Switch -->
-        <div class="p-3 bg-slate-50 border border-slate-200 rounded-2xl flex items-start gap-3">
-          <input type="checkbox" id="modalIsManuallyClosed" class="mt-0.5 h-4 w-4 text-rose-600 rounded border-slate-300 focus:ring-rose-500">
+        <div class="p-3.5 bg-amber-50/70 border border-amber-200 rounded-2xl flex items-start gap-3">
+          <input type="checkbox" id="modalIsManuallyClosed" onchange="refreshModalHoursPreview()" class="mt-1 h-4 w-4 text-rose-600 rounded border-amber-300 focus:ring-rose-500">
           <div>
-            <label for="modalIsManuallyClosed" class="font-bold text-xs text-slate-800 block cursor-pointer">🔴 Temporarily Mark Closed / Off-Duty (ዝግ አድርግ)</label>
-            <p class="text-[11px] text-slate-500">Pause customer 60-minute holds during lunch breaks, power outages, or inventory audits.</p>
+            <label for="modalIsManuallyClosed" class="font-bold text-xs text-amber-950 block cursor-pointer">🔴 Temporarily Mark Closed / Off-Duty (በጊዜያዊነት ዝግ አድርግ)</label>
+            <p class="text-[11px] text-amber-800 mt-0.5">Pause customer holds during lunch breaks, power outages, or inventory audits without resetting your normal schedule.</p>
           </div>
         </div>
 
-        <div class="flex items-center gap-2 pt-2">
-          <button type="button" onclick="closeModal('operatingHoursModal')" class="flex-1 py-2.5 text-xs font-semibold text-slate-600 bg-slate-100 hover:bg-slate-200 rounded-xl transition">
+        <div class="flex items-center gap-2 pt-1">
+          <button type="button" onclick="closeModal('operatingHoursModal')" class="flex-1 py-3 text-xs font-semibold text-slate-600 bg-slate-100 hover:bg-slate-200 rounded-xl transition">
             Cancel
           </button>
-          <button type="submit" id="saveHoursBtn" class="flex-1 py-2.5 text-xs font-bold text-white bg-slate-900 hover:bg-black rounded-xl transition shadow-sm flex items-center justify-center gap-1.5">
-            <i class="fa-solid fa-check"></i>
-            <span>Save Hours</span>
+          <button type="submit" id="saveHoursBtn" class="flex-1 py-3 text-xs font-extrabold text-white bg-slate-900 hover:bg-black active:scale-95 rounded-xl transition shadow-md flex items-center justify-center gap-2">
+            <i class="fa-solid fa-check text-emerald-400"></i>
+            <span>Save Working Hours</span>
           </button>
         </div>
       </form>
@@ -1805,6 +1847,52 @@
       }
     }
 
+    function formatTime12H(time24) {
+      if (!time24) return '';
+      const parts = time24.split(':');
+      let h = parseInt(parts[0], 10);
+      const m = parts[1] || '00';
+      if (isNaN(h)) return time24;
+      const ampm = h >= 12 ? 'PM' : 'AM';
+      h = h % 12;
+      if (h === 0) h = 12;
+      return `${h}:${m} ${ampm}`;
+    }
+
+    function formatTimeEthiopianHint(time24) {
+      if (!time24) return '';
+      const parts = time24.split(':');
+      const h = parseInt(parts[0], 10);
+      const m = parts[1] || '00';
+      if (isNaN(h)) return '';
+      let ethHour = (h - 6 + 24) % 24;
+      let period = '';
+      if (h >= 6 && h < 12) period = 'ጠዋት';
+      else if (h >= 12 && h < 16) period = 'ቀን';
+      else if (h >= 16 && h < 19) period = 'ከሰዓት';
+      else if (h >= 19 && h < 23) period = 'ምሽት';
+      else period = 'ሌሊት';
+
+      ethHour = ethHour % 12;
+      if (ethHour === 0) ethHour = 12;
+      return `ከ${period} ${ethHour}:${m}`;
+    }
+
+    function showCounterToast(msg, isError = false) {
+      let toast = document.getElementById('counterFloatingToast');
+      if (!toast) {
+        toast = document.createElement('div');
+        toast.id = 'counterFloatingToast';
+        document.body.appendChild(toast);
+      }
+      toast.className = `fixed top-5 right-5 z-50 px-4 py-3 rounded-2xl shadow-xl text-xs font-bold transition-all duration-300 flex items-center gap-2.5 ${isError ? 'bg-rose-950 text-rose-200 border border-rose-700' : 'bg-slate-900 text-emerald-300 border border-slate-700'}`;
+      toast.innerHTML = `<i class="fa-solid ${isError ? 'fa-circle-exclamation text-rose-400' : 'fa-circle-check text-emerald-400'} text-base"></i><span>${msg}</span>`;
+      toast.style.display = 'flex';
+      setTimeout(() => {
+        if (toast) toast.style.display = 'none';
+      }, 4000);
+    }
+
     function updateOperatingStatusUI(status, pharmacy) {
       if (!status) return;
       const toggleBtn = document.getElementById('storeStatusToggleBtn');
@@ -1830,8 +1918,8 @@
         if (pharmacy?.is24Hours) {
           hoursText.innerText = '🌙 24/7 Night Duty';
         } else {
-          const openT = pharmacy?.openingTime || '08:00';
-          const closeT = pharmacy?.closingTime || '21:30';
+          const openT = formatTime12H(pharmacy?.openingTime || '08:00');
+          const closeT = formatTime12H(pharmacy?.closingTime || '21:30');
           hoursText.innerText = `⏰ ${openT} - ${closeT}` + (status.reason === 'MANUALLY_CLOSED' ? ' (Paused)' : '');
         }
       }
@@ -1859,14 +1947,72 @@
         if (data.success) {
           currentOperatingStatus = data.operatingStatus;
           updateOperatingStatusUI(data.operatingStatus, data.pharmacy);
+          showCounterToast(willManuallyClose ? '🔴 Counter paused / off-duty for breaks.' : '🟢 Counter reopened for patient holds!');
           if (window.Telegram?.WebApp?.HapticFeedback) {
             try { window.Telegram.WebApp.HapticFeedback.notificationOccurred(willManuallyClose ? 'warning' : 'success'); } catch (_) {}
           }
         } else {
-          alert('Failed to update store status: ' + (data.error || 'Server error'));
+          showCounterToast('Failed to update store status: ' + (data.error || 'Server error'), true);
         }
       } catch (err) {
-        alert('Server error: ' + err.message);
+        showCounterToast('Server error: ' + err.message, true);
+      }
+    }
+
+    function applyHoursPreset(preset) {
+      const chk24 = document.getElementById('modalIs24Hours');
+      const inOpen = document.getElementById('modalOpeningTime');
+      const inClose = document.getElementById('modalClosingTime');
+
+      if (preset === 'standard') {
+        if (chk24) chk24.checked = false;
+        if (inOpen) inOpen.value = '08:00';
+        if (inClose) inClose.value = '21:30';
+      } else if (preset === 'extended') {
+        if (chk24) chk24.checked = false;
+        if (inOpen) inOpen.value = '08:00';
+        if (inClose) inClose.value = '23:00';
+      } else if (preset === 'early') {
+        if (chk24) chk24.checked = false;
+        if (inOpen) inOpen.value = '07:00';
+        if (inClose) inClose.value = '21:00';
+      } else if (preset === '24hours') {
+        if (chk24) chk24.checked = true;
+        if (inOpen) inOpen.value = '00:00';
+        if (inClose) inClose.value = '23:59';
+      }
+      toggleHoursInputsDisabled();
+      refreshModalHoursPreview();
+      if (window.Telegram?.WebApp?.HapticFeedback) {
+        try { window.Telegram.WebApp.HapticFeedback.impactOccurred('light'); } catch (_) {}
+      }
+    }
+
+    function refreshModalHoursPreview() {
+      const chk24 = document.getElementById('modalIs24Hours');
+      const inOpen = document.getElementById('modalOpeningTime');
+      const inClose = document.getElementById('modalClosingTime');
+      const chkManual = document.getElementById('modalIsManuallyClosed');
+      const previewEl = document.getElementById('modalHoursPreviewText');
+      const openHint = document.getElementById('modalOpeningHint');
+      const closeHint = document.getElementById('modalClosingHint');
+
+      const is24 = chk24 && chk24.checked;
+      const isManual = chkManual && chkManual.checked;
+      const openVal = inOpen ? (inOpen.value || '08:00') : '08:00';
+      const closeVal = inClose ? (inClose.value || '21:30') : '21:30';
+
+      if (openHint) openHint.innerText = `${formatTime12H(openVal)} (${formatTimeEthiopianHint(openVal)})`;
+      if (closeHint) closeHint.innerText = `${formatTime12H(closeVal)} (${formatTimeEthiopianHint(closeVal)})`;
+
+      if (previewEl) {
+        if (isManual) {
+          previewEl.innerHTML = `<span class="text-rose-700 font-bold">🔴 Counter Paused / Off-Duty (ዝግ ነው)</span>`;
+        } else if (is24) {
+          previewEl.innerHTML = `<span class="text-indigo-800 font-bold">🌙 24/7 Night Duty (የሌሊት ፈረቃ) — Open Around-the-Clock</span>`;
+        } else {
+          previewEl.innerHTML = `<span class="text-emerald-800 font-bold">⏰ ${formatTime12H(openVal)} – ${formatTime12H(closeVal)}</span> <span class="text-slate-500 text-[11px]">(${formatTimeEthiopianHint(openVal)} እስከ ${formatTimeEthiopianHint(closeVal)})</span>`;
+        }
       }
     }
 
@@ -1887,6 +2033,7 @@
       if (chkManual) chkManual.checked = !!isManuallyClosed;
 
       toggleHoursInputsDisabled();
+      refreshModalHoursPreview();
       openModal('operatingHoursModal');
     }
 
@@ -1914,8 +2061,8 @@
       if (!pharmacyId) return;
 
       const is24Hours = document.getElementById('modalIs24Hours').checked;
-      const openingTime = document.getElementById('modalOpeningTime').value;
-      const closingTime = document.getElementById('modalClosingTime').value;
+      const openingTime = document.getElementById('modalOpeningTime').value || '08:00';
+      const closingTime = document.getElementById('modalClosingTime').value || '21:30';
       const isManuallyClosed = document.getElementById('modalIsManuallyClosed').checked;
 
       const btn = document.getElementById('saveHoursBtn');
@@ -1940,15 +2087,24 @@
           currentOperatingStatus = data.operatingStatus;
           updateOperatingStatusUI(data.operatingStatus, data.pharmacy);
           closeModal('operatingHoursModal');
+
+          const toastText = data.pharmacy?.is24Hours
+            ? '🌙 Operating hours saved: 24/7 Night Duty Active!'
+            : `✅ Working hours saved: ${formatTime12H(data.pharmacy?.openingTime || openingTime)} – ${formatTime12H(data.pharmacy?.closingTime || closingTime)}`;
+          showCounterToast(toastText);
+
+          if (window.Telegram?.WebApp?.HapticFeedback) {
+            try { window.Telegram.WebApp.HapticFeedback.notificationOccurred('success'); } catch (_) {}
+          }
         } else {
-          alert('Could not save hours: ' + (data.error || 'Server error'));
+          showCounterToast('Could not save hours: ' + (data.error || 'Server error'), true);
         }
       } catch (err) {
-        alert('Server error saving hours: ' + err.message);
+        showCounterToast('Server error saving hours: ' + err.message, true);
       } finally {
         if (btn) {
           btn.disabled = false;
-          btn.innerHTML = `<i class="fa-solid fa-check"></i><span>Save Hours</span>`;
+          btn.innerHTML = `<i class="fa-solid fa-check text-emerald-400"></i><span>Save Working Hours</span>`;
         }
       }
     }

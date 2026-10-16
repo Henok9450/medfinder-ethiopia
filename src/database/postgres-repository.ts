@@ -215,6 +215,11 @@ export class PostgresRepository implements IDatabaseRepository {
         is_permanently_banned AS "isPermanentlyBanned",
         in_stock_items AS "inStockItems", inventory,
         analytics_access AS "analyticsAccess",
+        opening_time AS "openingTime",
+        closing_time AS "closingTime",
+        is_24_hours AS "is24Hours",
+        is_manually_closed AS "isManuallyClosed",
+        last_heartbeat_at AS "lastHeartbeatAt",
         ST_Y(location::geometry) AS latitude,
         ST_X(location::geometry) AS longitude,
         ROUND((ST_Distance(location, ST_MakePoint($1, $2)::geography) / 1000.0)::numeric, 2) AS "distanceKm"
@@ -274,6 +279,11 @@ export class PostgresRepository implements IDatabaseRepository {
         is_permanently_banned AS "isPermanentlyBanned",
         in_stock_items AS "inStockItems", inventory,
         analytics_access AS "analyticsAccess",
+        opening_time AS "openingTime",
+        closing_time AS "closingTime",
+        is_24_hours AS "is24Hours",
+        is_manually_closed AS "isManuallyClosed",
+        last_heartbeat_at AS "lastHeartbeatAt",
         ST_Y(location::geometry) AS latitude,
         ST_X(location::geometry) AS longitude
       FROM pharmacies WHERE id = $1`,
@@ -298,6 +308,11 @@ export class PostgresRepository implements IDatabaseRepository {
         is_permanently_banned AS "isPermanentlyBanned",
         in_stock_items AS "inStockItems", inventory,
         analytics_access AS "analyticsAccess",
+        opening_time AS "openingTime",
+        closing_time AS "closingTime",
+        is_24_hours AS "is24Hours",
+        is_manually_closed AS "isManuallyClosed",
+        last_heartbeat_at AS "lastHeartbeatAt",
         ST_Y(location::geometry) AS latitude,
         ST_X(location::geometry) AS longitude
       FROM pharmacies ORDER BY created_at DESC`
@@ -927,18 +942,19 @@ export class PostgresRepository implements IDatabaseRepository {
       await pool.query(
         `UPDATE pharmacies
          SET 
-           is_manually_closed = COALESCE($1, is_manually_closed),
-           opening_time = COALESCE($2, opening_time),
-           closing_time = COALESCE($3, closing_time),
-           is_24_hours = COALESCE($4, is_24_hours),
+           is_manually_closed = $1,
+           opening_time = $2,
+           closing_time = $3,
+           is_24_hours = $4,
            updated_at = NOW()
          WHERE id = $5`,
         [isManuallyClosed, openingTime, closingTime, is24Hours, pharmacyId]
-      ).catch(() => {});
+      );
 
       const updated = await this.getPharmacyById(pharmacyId);
       return { success: true, pharmacy: updated || inMemRes.pharmacy };
-    } catch (_) {
+    } catch (err: any) {
+      console.error('[PostgresRepo] Error updating pharmacy operating status:', err?.message || err);
       return inMemRes;
     }
   }

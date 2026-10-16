@@ -30,6 +30,11 @@ CREATE TABLE IF NOT EXISTS pharmacies (
   is_permanently_banned BOOLEAN DEFAULT FALSE,
   in_stock_items TEXT[] DEFAULT ARRAY[]::TEXT[],
   inventory JSONB DEFAULT '[]'::jsonb,
+  opening_time TEXT DEFAULT '08:00',
+  closing_time TEXT DEFAULT '21:30',
+  is_24_hours BOOLEAN DEFAULT FALSE,
+  is_manually_closed BOOLEAN DEFAULT FALSE,
+  last_heartbeat_at TIMESTAMPTZ,
   location GEOGRAPHY(Point, 4326) NOT NULL,
   created_at TIMESTAMPTZ DEFAULT NOW(),
   updated_at TIMESTAMPTZ DEFAULT NOW()
